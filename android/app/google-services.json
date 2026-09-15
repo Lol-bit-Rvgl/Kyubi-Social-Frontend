@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "999144522165",
+    "project_id": "kyubi-565b7",
+    "storage_bucket": "kyubi-565b7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:999144522165:android:0f2e46e4e62a4a647719fc",
+        "android_client_info": {
+          "package_name": "com.nodoapps.kyubi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0nXleagkn4SKBksCPwL17G89JNxJAgoU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
