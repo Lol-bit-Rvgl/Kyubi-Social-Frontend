@@ -1,5 +1,6 @@
 import '../core/config/app_config.dart';
 import '../core/network/api_client.dart';
+import '../models/circle.dart';
 import '../models/user.dart';
 
 /// Resultado de búsqueda de publicación (full-text).
@@ -16,13 +17,13 @@ class SearchPost {
   });
 
   factory SearchPost.fromJson(Map<String, dynamic> json) => SearchPost(
-    id: json['id'] as String? ?? '',
-    content: json['content'] as String? ?? '',
-    title: json['title'] as String?,
-    coverImageUrl: json['coverImageUrl'] as String?,
-    authorName: (json['authorName'] as String?) ?? 'Anónimo',
-    authorUsername: json['authorUsername'] as String? ?? '',
-    authorAvatar: json['authorAvatar'] as String?,
+    id: json['id']?.toString() ?? '',
+    content: json['content']?.toString() ?? '',
+    title: json['title']?.toString(),
+    coverImageUrl: json['coverImageUrl']?.toString(),
+    authorName: json['authorName']?.toString() ?? 'Anónimo',
+    authorUsername: json['authorUsername']?.toString() ?? '',
+    authorAvatar: json['authorAvatar']?.toString(),
     tags:
         (json['tags'] as List?)
             ?.whereType<Object>()
@@ -53,11 +54,11 @@ class SearchRoom {
   });
 
   factory SearchRoom.fromJson(Map<String, dynamic> json) => SearchRoom(
-    id: json['id'] as String? ?? '',
-    name: json['name'] as String? ?? '',
-    description: json['description'] as String?,
-    imageUrl: json['imageUrl'] as String?,
-    hostName: json['hostName'] as String?,
+    id: json['id']?.toString() ?? '',
+    name: json['name']?.toString() ?? '',
+    description: json['description']?.toString(),
+    imageUrl: json['imageUrl']?.toString(),
+    hostName: json['hostName']?.toString(),
     participantCount: (json['participantCount'] as num?)?.toInt() ?? 0,
   );
 
@@ -74,7 +75,7 @@ class TrendingTag {
   const TrendingTag({required this.tag, required this.uses});
 
   factory TrendingTag.fromJson(Map<String, dynamic> json) => TrendingTag(
-    tag: json['tag'] as String? ?? '',
+    tag: json['tag']?.toString() ?? '',
     uses: (json['uses'] as num?)?.toInt() ?? 0,
   );
 
@@ -88,43 +89,93 @@ class SearchResults {
     this.posts = const [],
     this.users = const [],
     this.rooms = const [],
+    this.circles = const [],
   });
 
-  factory SearchResults.fromJson(Map<String, dynamic> json) => SearchResults(
-    posts: (json['posts'] as List? ?? [])
-        .whereType<Map<String, dynamic>>()
-        .map(SearchPost.fromJson)
-        .toList(),
-    users: (json['users'] as List? ?? [])
-        .whereType<Map<String, dynamic>>()
-        .map(
-          (u) => FollowItem(
-            id: u['id'] as String? ?? '',
-            username: u['username'] as String? ?? '',
-            displayName:
-                (u['displayName'] as String?) ?? u['username'] as String? ?? '',
-            avatarUrl: u['avatarUrl'] as String?,
-            bio: u['bio'] as String?,
-            usernameColor: u['usernameColor'] as String?,
-            avatarFrame: u['avatarFrame'] as String?,
-            level: (u['level'] as num?)?.toInt() ?? 1,
-            isOnline: u['isOnline'] as bool? ?? false,
-            isFollowing: u['isFollowing'] as bool? ?? false,
-          ),
-        )
-        .toList(),
-    rooms: (json['rooms'] as List? ?? [])
-        .whereType<Map<String, dynamic>>()
-        .map(SearchRoom.fromJson)
-        .toList(),
-  );
+  static Map<String, dynamic>? _asMap(dynamic item) {
+    if (item is Map<String, dynamic>) return item;
+    if (item is Map) return Map<String, dynamic>.from(item);
+    return null;
+  }
+
+  factory SearchResults.fromJson(Map<String, dynamic> json) {
+    final postsRaw = json['posts'] as List? ?? [];
+    final usersRaw = json['users'] as List? ?? [];
+    final roomsRaw = json['rooms'] as List? ?? [];
+    final circlesRaw = json['circles'] as List? ?? [];
+
+    final posts = <SearchPost>[];
+    for (final p in postsRaw) {
+      final map = _asMap(p);
+      if (map != null) {
+        try {
+          posts.add(SearchPost.fromJson(map));
+        } catch (_) {}
+      }
+    }
+
+    final users = <FollowItem>[];
+    for (final u in usersRaw) {
+      final map = _asMap(u);
+      if (map != null) {
+        try {
+          users.add(
+            FollowItem(
+              id: map['id']?.toString() ?? '',
+              username: map['username']?.toString() ?? '',
+              displayName:
+                  map['displayName']?.toString() ??
+                  map['username']?.toString() ??
+                  '',
+              avatarUrl: map['avatarUrl']?.toString(),
+              bio: map['bio']?.toString(),
+              usernameColor: map['usernameColor']?.toString(),
+              avatarFrame: map['avatarFrame']?.toString(),
+              level: (map['level'] as num?)?.toInt() ?? 1,
+              isOnline: map['isOnline'] == true,
+              isFollowing: map['isFollowing'] == true,
+            ),
+          );
+        } catch (_) {}
+      }
+    }
+
+    final rooms = <SearchRoom>[];
+    for (final r in roomsRaw) {
+      final map = _asMap(r);
+      if (map != null) {
+        try {
+          rooms.add(SearchRoom.fromJson(map));
+        } catch (_) {}
+      }
+    }
+
+    final circles = <Circle>[];
+    for (final c in circlesRaw) {
+      final map = _asMap(c);
+      if (map != null) {
+        try {
+          circles.add(Circle.fromJson(map));
+        } catch (_) {}
+      }
+    }
+
+    return SearchResults(
+      posts: posts,
+      users: users,
+      rooms: rooms,
+      circles: circles,
+    );
+  }
 
   final List<SearchPost> posts;
   final List<FollowItem> users;
   final List<SearchRoom> rooms;
+  final List<Circle> circles;
 
-  bool get isEmpty => posts.isEmpty && users.isEmpty && rooms.isEmpty;
-  int get total => posts.length + users.length + rooms.length;
+  bool get isEmpty =>
+      posts.isEmpty && users.isEmpty && rooms.isEmpty && circles.isEmpty;
+  int get total => posts.length + users.length + rooms.length + circles.length;
 }
 
 /// Cliente del motor de búsqueda full-text (GET /search y /search/trending).

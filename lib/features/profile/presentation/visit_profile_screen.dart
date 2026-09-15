@@ -459,7 +459,7 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
                     ),
                   ),
                   actions: [
-                    _buildStreakCoinsChip(metrics.streakDays, coins),
+                    if (coins > 0) _buildCoinsChip(coins),
                     IconButton(
                       onPressed: () => _shareProfile(user),
                       icon: const Icon(
@@ -557,7 +557,7 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
     );
   }
 
-  Widget _buildStreakCoinsChip(int streakDays, int coins) {
+  Widget _buildCoinsChip(int coins) {
     return Container(
       margin: const EdgeInsets.only(right: 4),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -569,23 +569,6 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.local_fire_department_rounded,
-            color: Color(0xFFFF5252),
-            size: 15,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '$streakDays',
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(width: 1, height: 12, color: Colors.white24),
-          const SizedBox(width: 8),
           const Icon(
             Icons.monetization_on_rounded,
             color: Color(0xFFFFD600),
@@ -928,11 +911,7 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
 
   Widget _buildStats(User user, ProfileMetrics metrics) {
     final followState = ref.watch(userFollowNotifierProvider(user.id));
-    final visits = (user.profileViews > 0)
-        ? user.profileViews
-        : (metrics.profileViews > 0
-              ? metrics.profileViews
-              : (user.level * 18 + 142));
+    final visits = user.profileViews;
     final followers = followState.followersCount ?? user.followersCount;
     final levelName = metrics.levelName.isNotEmpty
         ? metrics.levelName

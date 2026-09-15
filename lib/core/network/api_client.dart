@@ -286,6 +286,7 @@ class ApiClient {
       try {
         final decoded = jsonDecode(body);
         if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
         if (decoded is List) return {'data': decoded};
         throw _toException(res, 'Respuesta inválida del servidor');
       } catch (_) {
@@ -293,6 +294,7 @@ class ApiClient {
       }
     }
     if (body is Map<String, dynamic>) return body;
+    if (body is Map) return Map<String, dynamic>.from(body);
     if (body is List) return {'data': body};
     throw _toException(res, 'Respuesta inválida del servidor');
   }

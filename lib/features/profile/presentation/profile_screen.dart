@@ -443,16 +443,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     icon: const Icon(Icons.menu_rounded, color: Colors.white),
                   ),
                   actions: [
-                    _buildStreakChip(metrics.streakDays),
                     if (_refreshing)
-                      const Padding(
-                        padding: EdgeInsets.only(right: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
                         child: SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Color(0xFFA594F9),
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                       ),
@@ -557,34 +556,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildStreakChip(int streakDays) {
-    return Container(
-      margin: const EdgeInsets.only(right: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xCC14141E),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.local_fire_department_rounded,
-            color: Color(0xFFFF5252),
-            size: 15,
-          ),
-          Text(
-            ' $streakDays Días',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildSavedTab() {
     return const SavedPostsList();
@@ -919,11 +890,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildStats(User user, ProfileMetrics metrics) {
-    final visits = (user.profileViews > 0)
-        ? user.profileViews
-        : (metrics.profileViews > 0
-              ? metrics.profileViews
-              : (user.level * 18 + 142));
+    final visits = user.profileViews;
     final followers = user.followersCount;
     final levelName = metrics.levelName.isNotEmpty
         ? metrics.levelName

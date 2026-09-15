@@ -723,33 +723,6 @@ class _UserBioScreenState extends ConsumerState<UserBioScreen> {
                             ),
                           ],
                         ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.accentCrimson.withValues(
-                              alpha: 0.15,
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: AppColors.accentCrimson.withValues(
-                                alpha: 0.35,
-                              ),
-                              width: 0.8,
-                            ),
-                          ),
-                          child: Text(
-                            '🔥 ${metrics.streakDays} Días Racha',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.accentCrimson,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),

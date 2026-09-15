@@ -7,10 +7,12 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/asset_frame.dart';
 import '../../../../core/widgets/kyubi_blob.dart';
 import '../../../../core/widgets/kyubi_shimmer.dart';
+import '../../../../core/widgets/liquid_glass_button.dart';
 import '../../../../models/circle.dart';
 import '../../../../models/user.dart';
 import '../../../../repositories/search_repository.dart';
@@ -179,14 +181,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       final results = await ref
           .read(searchRepositoryProvider)
           .search(query, type: _selectedType);
-      // Comunidades/Círculos: endpoint separado (/circles/search); si falla
-      // se ignoran y el resto de resultados sigue mostrándose.
-      List<Circle> circles = const [];
-      try {
-        circles = await ref
-            .read(circleRepositoryProvider)
-            .searchCircles(query, limit: 20);
-      } catch (_) {}
+      List<Circle> circles = results.circles;
+      if (circles.isEmpty &&
+          (_selectedType == 'all' || _selectedType == 'circles')) {
+        try {
+          circles = await ref
+              .read(circleRepositoryProvider)
+              .searchCircles(query, limit: 20);
+        } catch (_) {}
+      }
       if (!mounted) return;
       setState(() {
         _postResults = results.posts;
@@ -250,39 +253,42 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.obsidianBg,
-      body: SafeArea(
-        bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            _buildSliverSearchBar(),
-            _buildCategoryPills(),
-            if (!_hasSearched && !_loading) ...[
-              if (_recentSearches.isNotEmpty) _buildRecentSearches(),
-              _buildSuggestionsHeader(),
-              _buildSuggestionsList(),
-              _buildDiscoverHeader(),
-              _buildDiscoverGrid(),
-              _buildTrendingBanner(),
-            ] else if (_loading)
-              SliverPadding(
-                padding: const EdgeInsets.only(top: AppDimens.md),
-                sliver: SliverToBoxAdapter(child: _buildLoadingSkeleton()),
-              )
-            else if (_error != null)
-              SliverFillRemaining(child: _buildError())
-            else if (_hasSearched &&
-                _results.isEmpty &&
-                _postResults.isEmpty &&
-                _roomResults.isEmpty &&
-                _circleResults.isEmpty)
-              SliverFillRemaining(child: _buildNoResults())
-            else ...[
-              _buildResultsHeader(),
-              _buildResultsList(),
+      backgroundColor: const Color(0xFF0D0A14),
+      body: DecoratedBox(
+        decoration: AppTheme.buildCosmicBackgroundDecoration(context),
+        child: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            slivers: [
+              _buildSliverSearchBar(),
+              _buildCategoryPills(),
+              if (!_hasSearched && !_loading) ...[
+                if (_recentSearches.isNotEmpty) _buildRecentSearches(),
+                _buildSuggestionsHeader(),
+                _buildSuggestionsList(),
+                _buildDiscoverHeader(),
+                _buildDiscoverGrid(),
+                _buildTrendingBanner(),
+              ] else if (_loading)
+                SliverPadding(
+                  padding: const EdgeInsets.only(top: AppDimens.md),
+                  sliver: SliverToBoxAdapter(child: _buildLoadingSkeleton()),
+                )
+              else if (_error != null)
+                SliverFillRemaining(child: _buildError())
+              else if (_hasSearched &&
+                  _results.isEmpty &&
+                  _postResults.isEmpty &&
+                  _roomResults.isEmpty &&
+                  _circleResults.isEmpty)
+                SliverFillRemaining(child: _buildNoResults())
+              else ...[
+                _buildResultsHeader(),
+                _buildResultsList(),
+              ],
+              const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
             ],
-            const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
-          ],
+          ),
         ),
       ),
     );
@@ -352,26 +358,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         )
                       : null,
                   filled: true,
-                  fillColor: const Color(0xFF14141B),
+                  fillColor: const Color(0xFF14141E),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppDimens.radiusMd),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF22222E),
-                      width: 0.8,
+                    borderSide: BorderSide(
+                      color: scheme.primary.withValues(alpha: 0.3),
+                      width: 1.0,
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppDimens.radiusMd),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF22222E),
-                      width: 0.8,
+                    borderSide: BorderSide(
+                      color: scheme.primary.withValues(alpha: 0.3),
+                      width: 1.0,
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppDimens.radiusMd),
-                    borderSide: const BorderSide(
-                      color: AppColors.accentCrimson,
-                      width: 1.2,
+                    borderSide: BorderSide(
+                      color: scheme.primary,
+                      width: 1.4,
                     ),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
@@ -391,6 +397,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Widget _buildCategoryPills() {
     final categories = ['Todo', 'Usuarios', 'Salas', 'Círculos'];
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final secondaryColor = theme.colorScheme.secondary;
+
     return SliverToBoxAdapter(
       child: SizedBox(
         height: 44,
@@ -407,7 +417,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 if (_selectedCategoryIndex == index) return;
                 setState(() => _selectedCategoryIndex = index);
                 // Re-buscar con el nuevo filtro si ya hay término activo.
-                if (_hasSearched && _controller.text.trim().length >= 2) {
+                if (_hasSearched && _controller.text.trim().isNotEmpty) {
                   _debounce?.cancel();
                   _debounce = Timer(_debounceDuration, () => _search());
                 }
@@ -418,22 +428,38 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   vertical: AppDimens.xs,
                 ),
                 decoration: BoxDecoration(
+                  gradient: isSelected
+                      ? LinearGradient(
+                          colors: [primaryColor, secondaryColor],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        )
+                      : null,
                   color: isSelected
-                      ? AppColors.accentCrimson.withValues(alpha: 0.15)
-                      : AppColors.surfaceGlass,
+                      ? null
+                      : Colors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(AppDimens.radiusFull),
                   border: Border.all(
                     color: isSelected
-                        ? AppColors.accentCrimson.withValues(alpha: 0.4)
-                        : AppColors.borderGlow,
+                        ? Colors.transparent
+                        : Colors.white.withValues(alpha: 0.12),
                   ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: primaryColor.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Center(
                   child: Text(
                     categories[index],
                     style: TextStyle(
                       color: isSelected
-                          ? AppColors.accentCrimson
+                          ? Colors.white
                           : scheme.onSurfaceVariant,
                       fontWeight: isSelected
                           ? FontWeight.w700
@@ -683,11 +709,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         children: discoverItems
             .map(
               (item) => _buildDiscoverTile(
-                asset: item['asset'],
-                icon: item['icon'],
-                label: item['label'],
-                subtitle: item['subtitle'],
-                onTap: item['onTap'],
+                icon: item['icon'] as IconData? ?? Icons.explore_rounded,
+                label: item['label'] as String,
+                subtitle: item['subtitle'] as String,
+                onTap: item['onTap'] as VoidCallback?,
               ),
             )
             .toList(),
@@ -700,19 +725,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       case 0: // Todo
         return [
           {
-            'asset': AppAssets.meetings,
+            'icon': Icons.forum_rounded,
             'label': 'Salas',
             'subtitle': 'Reuniones y chats en vivo',
             'onTap': () => context.push('/salas'),
           },
           {
-            'asset': AppAssets.groups,
+            'icon': Icons.groups_rounded,
             'label': 'Círculos',
             'subtitle': 'Grupos de intereses',
             'onTap': () => context.push('/circles'),
           },
           {
-            'icon': Icons.history_rounded,
+            'icon': Icons.auto_stories_rounded,
             'label': 'Historias',
             'subtitle': 'Momentos efímeros',
           },
@@ -738,7 +763,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       case 2: // Salas
         return [
           {
-            'asset': AppAssets.meetings,
+            'icon': Icons.forum_rounded,
             'label': 'Salas en vivo',
             'subtitle': 'Únete a conversaciones ahora',
             'onTap': () => context.push('/salas'),
@@ -758,7 +783,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       case 3: // Círculos
         return [
           {
-            'asset': AppAssets.groups,
+            'icon': Icons.groups_rounded,
             'label': 'Explorar círculos',
             'subtitle': 'Grupos de intereses',
             'onTap': () => context.push('/circles'),
@@ -781,8 +806,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildDiscoverTile({
-    String? asset,
-    IconData? icon,
+    required IconData icon,
     required String label,
     required String subtitle,
     VoidCallback? onTap,
@@ -802,15 +826,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       child: Container(
         padding: const EdgeInsets.all(AppDimens.sm),
         decoration: BoxDecoration(
-          color: AppColors.surfaceGlass,
+          color: Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-          border: Border.all(color: AppColors.borderGlow),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            _discoverBadge(asset, icon),
+            _discoverBadge(icon),
             const SizedBox(height: AppDimens.xs),
             Text(
               label,
@@ -840,6 +864,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Widget _buildDiscoverRow(Map<String, dynamic> item) {
     final scheme = Theme.of(context).colorScheme;
+    final icon = item['icon'] as IconData? ?? Icons.explore_rounded;
     return GestureDetector(
       onTap:
           item['onTap'] as VoidCallback? ??
@@ -854,13 +879,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       child: Container(
         padding: const EdgeInsets.all(AppDimens.sm),
         decoration: BoxDecoration(
-          color: AppColors.surfaceGlass,
+          color: Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-          border: Border.all(color: AppColors.borderGlow),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Row(
           children: [
-            _discoverBadge(item['asset'], item['icon']),
+            _discoverBadge(icon),
             const SizedBox(width: AppDimens.sm),
             Expanded(
               child: Column(
@@ -899,16 +924,29 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Widget _discoverBadge(String? asset, IconData? icon) {
-    if (asset != null) return _AssetBadge(asset: asset);
+  Widget _discoverBadge(IconData icon) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final secondaryColor = theme.colorScheme.secondary;
     return Container(
-      width: 44,
-      height: 44,
-      decoration: const BoxDecoration(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: AppColors.brandGradient,
+        gradient: LinearGradient(
+          colors: [
+            primaryColor.withValues(alpha: 0.25),
+            secondaryColor.withValues(alpha: 0.15),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: primaryColor.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
       ),
-      child: Icon(icon, size: 22, color: Colors.white),
+      child: Icon(icon, size: 22, color: primaryColor),
     );
   }
 
@@ -1533,46 +1571,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         child: CircularProgressIndicator(strokeWidth: 2.2),
       );
     }
-    return user.isFollowing
-        ? GestureDetector(
-            onTap: () => _toggleFollow(user),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceGlass,
-                borderRadius: BorderRadius.circular(AppDimens.radiusFull),
-                border: Border.all(color: AppColors.borderGlow),
-              ),
-              child: Text(
-                'Siguiendo',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: scheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+    if (user.isFollowing) {
+      return GestureDetector(
+        onTap: () => _toggleFollow(user),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppDimens.radiusFull),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          child: Text(
+            'Siguiendo',
+            style: TextStyle(
+              fontSize: 12,
+              color: scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
             ),
-          )
-        : GestureDetector(
-            onTap: () => _toggleFollow(user),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: const BoxDecoration(
-                gradient: AppColors.crimsonGlow,
-                borderRadius: BorderRadius.all(
-                  Radius.circular(AppDimens.radiusFull),
-                ),
-              ),
-              child: const Text(
-                'Seguir',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          );
+          ),
+        ),
+      );
+    }
+    return LiquidGlassButton(
+      label: 'Seguir',
+      height: 32,
+      borderRadius: 16,
+      onTap: () => _toggleFollow(user),
+    );
   }
 
   Widget _buildError() {
@@ -1684,30 +1709,3 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-class _AssetBadge extends StatelessWidget {
-  const _AssetBadge({required this.asset});
-
-  final String asset;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 46,
-      height: 46,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        gradient: AppColors.brandGradient,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Image.asset(asset, fit: BoxFit.contain),
-      ),
-    );
-  }
-}

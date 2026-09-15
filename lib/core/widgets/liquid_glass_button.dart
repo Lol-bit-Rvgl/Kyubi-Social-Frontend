@@ -36,9 +36,24 @@ class LiquidGlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final secondaryColor = theme.colorScheme.secondary;
+
     final effectiveBorderColor =
         borderColor?.withValues(alpha: 0.5) ??
-        const Color(0xFF9E8CD9).withValues(alpha: 0.35);
+        primaryColor.withValues(alpha: 0.35);
+
+    final effectiveGradient =
+        customGradient ??
+        LinearGradient(
+          colors: [
+            primaryColor.withValues(alpha: 0.85),
+            secondaryColor.withValues(alpha: 0.65),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
 
     final button = Container(
       height: height,
@@ -46,7 +61,7 @@ class LiquidGlassButton extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
-        gradient: customGradient ?? nightGradient,
+        gradient: effectiveGradient,
         border: Border(
           top: BorderSide(
             // Borde superior con resplandor suave según tema
