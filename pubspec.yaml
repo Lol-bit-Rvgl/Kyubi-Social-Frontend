@@ -93,14 +93,14 @@ flutter_launcher_icons:
 
 flutter_native_splash:
   color: "#0A0A0B"
-  image: assets/icon/app_icon.png
-  image_dark: assets/icon/app_icon.png
+  image: assets/icons/kyubi_logo.jpg
+  image_dark: assets/icons/kyubi_logo.jpg
   color_dark: "#0A0A0B"
   android: true
   ios: true
   android_12:
     color: "#0A0A0B"
-    image: assets/icon/app_icon.png
+    image: assets/icons/kyubi_logo.jpg
   web: false
 
 # For information on the generic Dart part of this file, see the
@@ -121,14 +121,7 @@ flutter:
     - assets/icons/
     - assets/icons/amistad/
     - assets/images/
-    - assets/icon/
     - assets/stickers/
-    - assets/images/empty_states/
-    - assets/images/onboarding/
-    - assets/images/splash/
-    - assets/images/avatars/
-    - assets/images/profile/
-    - assets/images/store/
     - assets/Emojis/Symbols/
     - assets/Emojis/Travel and places/
     - assets/Emojis/Smileys and emotions/
