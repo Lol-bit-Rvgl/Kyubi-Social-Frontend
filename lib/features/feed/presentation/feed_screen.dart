@@ -63,11 +63,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
           bottom: false,
           child: RefreshIndicator(
             onRefresh: notifier.refresh,
-            // Indicador temático Nebulæ: brandGradient (lavanda → morado).
-            // RefreshIndicator solo admite colores sólidos, así que usamos sus
-            // extremos: spinner #A594F9 sobre fondo #3B2D60.
-            color: const Color(0xFFA594F9),
-            backgroundColor: const Color(0xFF2E2850),
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: const Color(0xFF0D0A14),
             child: EndReachedNotifier(
               onEndReached: notifier.loadMore,
               child: CustomScrollView(
@@ -413,6 +410,9 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               child: Row(
                 children: List.generate(tabs.length, (index) {
                   final isSelected = _selectedTab == index;
+                  final primaryColor = Theme.of(context).colorScheme.primary;
+                  final secondaryColor =
+                      Theme.of(context).colorScheme.secondary;
                   return Expanded(
                     child: GestureDetector(
                       onTap: () {
@@ -433,18 +433,21 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
+                          gradient: isSelected
+                              ? LinearGradient(
+                                  colors: [primaryColor, secondaryColor],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                )
+                              : null,
                           color: isSelected
-                              ? const Color(0xFFA594F9)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(
-                            AppDimens.radiusFull,
-                          ),
+                              ? null
+                              : Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(18),
                           boxShadow: isSelected
                               ? [
                                   BoxShadow(
-                                    color: const Color(
-                                      0xFFA594F9,
-                                    ).withValues(alpha: 0.4),
+                                    color: primaryColor.withValues(alpha: 0.35),
                                     blurRadius: 12,
                                     offset: const Offset(0, 2),
                                   ),

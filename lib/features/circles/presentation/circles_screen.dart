@@ -644,6 +644,9 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
                   final isSelected =
                       state.selectedTag == tag ||
                       (tag == '#Todos' && state.selectedTag == 'Todos');
+                  final primaryColor = Theme.of(context).colorScheme.primary;
+                  final secondaryColor =
+                      Theme.of(context).colorScheme.secondary;
                   return GestureDetector(
                     onTap: () => notifier.selectTag(tag),
                     child: AnimatedContainer(
@@ -653,16 +656,30 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFF1A2A38)
-                            : const Color(0xFF14141B),
+                        gradient: isSelected
+                            ? LinearGradient(
+                                colors: [primaryColor, secondaryColor],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              )
+                            : null,
+                        color: isSelected ? null : const Color(0xFF14141B),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected
-                              ? AppColors.accentCyan
+                              ? primaryColor.withValues(alpha: 0.4)
                               : const Color(0xFF22222E),
                           width: isSelected ? 1.2 : 0.8,
                         ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: primaryColor.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
                       ),
                       child: Center(
                         child: Text(
@@ -673,7 +690,7 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
                                 ? FontWeight.w800
                                 : FontWeight.w600,
                             color: isSelected
-                                ? AppColors.accentCyan
+                                ? Colors.white
                                 : AppColors.textSecondary,
                           ),
                         ),

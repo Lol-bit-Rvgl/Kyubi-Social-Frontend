@@ -11,29 +11,67 @@ class AppTheme {
   static ThemeData get dark => buildDark();
   static ThemeData get light => buildLight();
 
-  static ThemeData buildDark({UserThemeSettings? themeSettings}) => _build(
-    brightness: Brightness.dark,
-    background: AppColors.obsidianBg,
-    surface: AppColors.ink800,
-    surfaceAlt: AppColors.ink700,
-    textPrimary: AppColors.gray50,
-    textSecondary: AppColors.gray400,
-    border: AppColors.gray700,
-    primaryColor: themeSettings?.primary ?? AppColors.primary,
-    secondaryColor: themeSettings?.accent ?? AppColors.vhsCyan,
-  );
+  static ThemeData buildDark({UserThemeSettings? themeSettings}) {
+    final effectivePrimary = themeSettings?.primary ?? AppColors.primary;
+    final effectiveSecondary =
+        themeSettings?.accent ?? deriveHarmonicSecondary(effectivePrimary);
+    return _build(
+      brightness: Brightness.dark,
+      background: AppColors.obsidianBg,
+      surface: AppColors.ink800,
+      surfaceAlt: AppColors.ink700,
+      textPrimary: AppColors.gray50,
+      textSecondary: AppColors.gray400,
+      border: AppColors.gray700,
+      primaryColor: effectivePrimary,
+      secondaryColor: effectiveSecondary,
+    );
+  }
 
-  static ThemeData buildLight({UserThemeSettings? themeSettings}) => _build(
-    brightness: Brightness.light,
-    background: AppColors.gray50,
-    surface: Colors.white,
-    surfaceAlt: AppColors.gray100,
-    textPrimary: AppColors.ink900,
-    textSecondary: AppColors.gray500,
-    border: AppColors.gray200,
-    primaryColor: themeSettings?.primary ?? AppColors.primary,
-    secondaryColor: themeSettings?.accent ?? AppColors.vhsCyan,
-  );
+  static ThemeData buildLight({UserThemeSettings? themeSettings}) {
+    final effectivePrimary = themeSettings?.primary ?? AppColors.primary;
+    final effectiveSecondary =
+        themeSettings?.accent ?? deriveHarmonicSecondary(effectivePrimary);
+    return _build(
+      brightness: Brightness.light,
+      background: AppColors.gray50,
+      surface: Colors.white,
+      surfaceAlt: AppColors.gray100,
+      textPrimary: AppColors.ink900,
+      textSecondary: AppColors.gray500,
+      border: AppColors.gray200,
+      primaryColor: effectivePrimary,
+      secondaryColor: effectiveSecondary,
+    );
+  }
+
+  /// Decoración de fondo cósmico reactivo de dos colores canónico de Kyubi.
+  ///
+  /// Base neutra profunda (`#0D0A14`) con resplandor superior izquierdo del color
+  /// primario (`alpha: 0.22`), centro neutro profundo y base inferior derecha
+  /// del color secundario armónico (`alpha: 0.18`).
+  static BoxDecoration buildCosmicBackgroundDecoration(
+    BuildContext context, {
+    Color? primaryColor,
+    Color? secondaryColor,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final effectivePrimary = primaryColor ?? scheme.primary;
+    final effectiveSecondary = secondaryColor ?? scheme.secondary;
+    return BoxDecoration(
+      color: const Color(0xFF0D0A14),
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          effectivePrimary.withValues(alpha: 0.22),
+          const Color(0xFF0D0A14),
+          effectiveSecondary.withValues(alpha: 0.18),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ),
+    );
+  }
 
   static ThemeData _build({
     required Brightness brightness,

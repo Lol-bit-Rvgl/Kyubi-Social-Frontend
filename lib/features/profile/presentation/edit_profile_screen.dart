@@ -157,7 +157,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       _interests = {...user.interests};
       _usernameColor = initialColor;
       _themePrimaryColor = themeSettings.primaryColor;
-      _themeAccentColor = themeSettings.accentColor;
+      _themeAccentColor = themeSettings.accentColor ?? '#00E676';
       _themeGlassStyle = themeSettings.glassStyle;
       _loading = false;
     });

@@ -43,7 +43,7 @@ class AnimatedFluidBackground extends StatefulWidget {
 
 class _AnimatedFluidBackgroundState extends State<AnimatedFluidBackground>
     with SingleTickerProviderStateMixin {
-  static const _scrimColor = Color(0xFF0D0D12);
+  static const _scrimColor = Color(0xFF0D0A14);
   static const double _minScale = 1.05;
   static const double _maxScale = 1.20;
   static const double _maxOffsetX = 35.0;
@@ -68,9 +68,29 @@ class _AnimatedFluidBackgroundState extends State<AnimatedFluidBackground>
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final secondaryColor = Theme.of(context).colorScheme.secondary;
+
     return Stack(
       fit: StackFit.expand,
       children: [
+        // Fondo cósmico neutro de 2 colores canónico
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: _scrimColor,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                primaryColor.withValues(alpha: 0.22),
+                _scrimColor,
+                secondaryColor.withValues(alpha: 0.18),
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+        ),
+
         // Base: la capa fluida ocupa toda la pantalla y no captura gestos.
         IgnorePointer(
           child: AnimatedBuilder(

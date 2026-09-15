@@ -44,19 +44,26 @@ class KyubiDrawer extends ConsumerWidget {
   final User? user;
   final VoidCallback? onProfileTap;
 
-  Widget _buildDefaultCosmicBackground([Color? themeColor]) {
+  Widget _buildDefaultCosmicBackground(
+    BuildContext context, [
+    Color? themeColor,
+    Color? secondaryColor,
+  ]) {
+    final scheme = Theme.of(context).colorScheme;
+    final primary = themeColor ?? scheme.primary;
+    final secondary = secondaryColor ?? scheme.secondary;
     return Container(
       decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(-0.4, -0.6),
-          radius: 1.2,
+        color: const Color(0xFF0D0A14),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
-            themeColor != null
-                ? themeColor.withValues(alpha: 0.35)
-                : const Color(0xFF24123E), // Nebulosa morada superior
-            const Color(0xFF0D0818),
-            const Color(0xFF05030A), // Base casi negra
+            primary.withValues(alpha: 0.22),
+            const Color(0xFF0D0A14),
+            secondary.withValues(alpha: 0.18),
           ],
+          stops: const [0.0, 0.5, 1.0],
         ),
       ),
     );
@@ -95,12 +102,20 @@ class KyubiDrawer extends ConsumerWidget {
                   bannerUrl,
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) =>
-                      _buildDefaultCosmicBackground(themeColor),
+                      _buildDefaultCosmicBackground(
+                        context,
+                        themeColor,
+                        activeUser?.themeSettings.accent,
+                      ),
                 ),
               )
             else
               Positioned.fill(
-                child: _buildDefaultCosmicBackground(themeColor),
+                child: _buildDefaultCosmicBackground(
+                  context,
+                  themeColor,
+                  activeUser?.themeSettings.accent,
+                ),
               ),
 
             // Capa 2: Filtro de desenfoque Liquid/Frosted

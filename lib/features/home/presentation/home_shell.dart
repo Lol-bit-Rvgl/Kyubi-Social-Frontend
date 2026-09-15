@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_drawer.dart';
 import '../../../../services/auth_controller.dart';
 
@@ -95,7 +96,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) => _onPopInvoked(didPop),
       child: Scaffold(
-        backgroundColor: AppColors.obsidianBg,
+        backgroundColor: const Color(0xFF0D0A14),
         drawer: KyubiDrawer(
           user: user,
           onProfileTap: () {
@@ -103,7 +104,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             widget.navigationShell.goBranch(3);
           },
         ),
-        body: widget.navigationShell,
+        body: DecoratedBox(
+          decoration: AppTheme.buildCosmicBackgroundDecoration(context),
+          child: widget.navigationShell,
+        ),
         bottomNavigationBar: _KyubiNavBar(
           currentIndex: index,
           onSelect: (i) =>
@@ -174,11 +178,12 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final destination = _shellDestinations[index];
-    final color = selected ? const Color(0xFFA594F9) : const Color(0xFF6A6A7A);
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final color = selected ? primaryColor : const Color(0xFF6A6A7A);
 
     return InkWell(
       onTap: onTap,
-      splashColor: const Color(0xFFA594F9).withValues(alpha: 0.12),
+      splashColor: primaryColor.withValues(alpha: 0.12),
       highlightColor: Colors.transparent,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -189,7 +194,7 @@ class _NavItem extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: selected
-                  ? const Color(0xFFA594F9).withValues(alpha: 0.15)
+                  ? primaryColor.withValues(alpha: 0.15)
                   : Colors.transparent,
             ),
             child: destination.label == 'Comunidades'

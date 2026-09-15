@@ -80,10 +80,11 @@ class LiquidGlassContainer extends StatelessWidget {
         ? (blur == 12.0 ? 2.0 : blur)
         : blur;
 
+    const neutralDarkBg = Color(0xFF0D0A14);
     final effectiveTint = tintColor ?? tint ??
         (style == GlassStyle.transparent
-            ? const Color(0xFF140F24).withValues(alpha: 0.11)
-            : const Color(0xFF140F24).withValues(alpha: 0.55));
+            ? neutralDarkBg.withValues(alpha: 0.11)
+            : neutralDarkBg.withValues(alpha: 0.55));
 
     final innerRadius = borderRadius > 1.2 ? borderRadius - 1.2 : borderRadius;
 

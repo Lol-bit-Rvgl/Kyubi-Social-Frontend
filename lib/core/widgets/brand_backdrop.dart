@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
-
 /// Fondo ambiental cyberpunk: resplandores radiales de crimson y purple
 /// sobre obsidiana, con textura sutil opcional.
 ///
@@ -16,14 +14,31 @@ class BrandBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final top = isDark ? 0.12 : 0.05;
-    final bottom = isDark ? 0.14 : 0.04;
+    final top = isDark ? 0.22 : 0.08;
+    final bottom = isDark ? 0.18 : 0.06;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final secondaryColor = Theme.of(context).colorScheme.secondary;
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Base obsidian
-        const ColoredBox(color: AppColors.obsidianBg),
+        // Base neutral deep dark
+        const ColoredBox(color: Color(0xFF0D0A14)),
+        // Fondo cósmico reactivo
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                primaryColor.withValues(alpha: 0.22 * strength),
+                const Color(0xFF0D0A14),
+                secondaryColor.withValues(alpha: 0.18 * strength),
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+        ),
         // Textura sutil (si existe el asset)
         if (texture)
           Positioned.fill(
@@ -36,34 +51,24 @@ class BrandBackdrop extends StatelessWidget {
               ),
             ),
           ),
-        // Top-left crimson glow
+        // Top-left primary glow
         Positioned(
           top: -120,
           left: -80,
           child: _Glow(
             size: 300,
-            color: AppColors.accentCrimson,
+            color: primaryColor,
             opacity: top * strength,
           ),
         ),
-        // Bottom-right purple glow
+        // Bottom-right secondary glow
         Positioned(
           bottom: -150,
           right: -110,
           child: _Glow(
             size: 340,
-            color: AppColors.accentPurple,
+            color: secondaryColor,
             opacity: bottom * strength,
-          ),
-        ),
-        // Center-left subtle cyan accent
-        Positioned(
-          top: 200,
-          left: -60,
-          child: _Glow(
-            size: 200,
-            color: AppColors.accentCyan,
-            opacity: 0.04 * strength,
           ),
         ),
       ],

@@ -359,6 +359,9 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final secondaryColor = Theme.of(context).colorScheme.secondary;
+
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -366,18 +369,25 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 7),
           decoration: BoxDecoration(
-            color: isSelected
-                ? accentColor.withValues(alpha: 0.15)
-                : const Color(0xFF14141B),
+            gradient: isSelected
+                ? LinearGradient(
+                    colors: [primaryColor, secondaryColor],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  )
+                : null,
+            color: isSelected ? null : const Color(0xFF14141B),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isSelected ? accentColor : const Color(0xFF22222E),
+              color: isSelected
+                  ? primaryColor.withValues(alpha: 0.4)
+                  : const Color(0xFF22222E),
               width: 0.8,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: accentColor.withValues(alpha: 0.25),
+                      color: primaryColor.withValues(alpha: 0.3),
                       blurRadius: 8,
                     ),
                   ]
@@ -410,6 +420,8 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
     required String label,
   }) {
     final isSelected = _selectedCategoryTag == tag;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final secondaryColor = Theme.of(context).colorScheme.secondary;
 
     return Expanded(
       child: GestureDetector(
@@ -426,18 +438,25 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 7),
           decoration: BoxDecoration(
-            color: isSelected
-                ? iconColor.withValues(alpha: 0.15)
-                : const Color(0xFF14141B),
+            gradient: isSelected
+                ? LinearGradient(
+                    colors: [primaryColor, secondaryColor],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  )
+                : null,
+            color: isSelected ? null : const Color(0xFF14141B),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isSelected ? iconColor : const Color(0xFF22222E),
+              color: isSelected
+                  ? primaryColor.withValues(alpha: 0.4)
+                  : const Color(0xFF22222E),
               width: 0.8,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: iconColor.withValues(alpha: 0.25),
+                      color: primaryColor.withValues(alpha: 0.3),
                       blurRadius: 8,
                     ),
                   ]
@@ -446,7 +465,11 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 13, color: iconColor),
+              Icon(
+                icon,
+                size: 13,
+                color: isSelected ? Colors.white : iconColor,
+              ),
               const SizedBox(width: 5),
               Text(
                 label,

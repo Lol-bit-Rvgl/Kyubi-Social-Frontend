@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kyubi/core/theme/app_theme.dart';
 import 'package:kyubi/core/utils/image_theme_extractor.dart';
 import 'package:kyubi/core/widgets/liquid_glass_container.dart';
 import 'package:kyubi/models/user.dart';
@@ -72,6 +73,62 @@ void main() {
       expect(userWithTheme.themeSettings.primaryColor, '#7C4DFF');
       expect(userWithTheme.themeSettings.accentColor, '#00E676');
       expect(userWithTheme.themeSettings.glassStyle, GlassStyle.transparent);
+    });
+
+    test('deriveHarmonicSecondary rotates hue by ~30 degrees', () {
+      const primary = Color(0xFFE53935);
+      final harmonic = deriveHarmonicSecondary(primary);
+      final primaryHsv = HSVColor.fromColor(primary);
+      final harmonicHsv = HSVColor.fromColor(harmonic);
+
+      expect((harmonicHsv.hue - primaryHsv.hue - 30.0).abs(), lessThan(0.01));
+    });
+
+    test('UserThemeSettings derives harmonic secondary when no explicit accent is provided', () {
+      const themeWithoutAccent = UserThemeSettings(
+        primaryColor: '#E53935',
+        accentColor: null,
+      );
+      expect(themeWithoutAccent.hasExplicitAccent, isFalse);
+      final expectedSecondary = deriveHarmonicSecondary(themeWithoutAccent.primary);
+      expect(themeWithoutAccent.accent, expectedSecondary);
+    });
+
+    test('User with themeColor derives harmonic secondary in themeSettings', () {
+      const user = User(
+        id: 'u-3',
+        username: 'wine_fox',
+        displayName: 'Wine Fox',
+        usernameColor: '#880E4F',
+      );
+      expect(user.themeSettings.hasExplicitAccent, isFalse);
+      final expectedHarmonic = deriveHarmonicSecondary(const Color(0xFF880E4F));
+      expect(user.themeSettings.accent, expectedHarmonic);
+    });
+
+    testWidgets('AppTheme.buildCosmicBackgroundDecoration produces expected 2-color gradient', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFFE53935),
+              secondary: Color(0xFFFFB300),
+            ),
+          ),
+          home: Builder(
+            builder: (context) {
+              final decoration = AppTheme.buildCosmicBackgroundDecoration(context);
+              final gradient = decoration.gradient as LinearGradient;
+              expect(gradient.begin, Alignment.topLeft);
+              expect(gradient.end, Alignment.bottomRight);
+              expect(gradient.colors[0], const Color(0xFFE53935).withValues(alpha: 0.22));
+              expect(gradient.colors[1], const Color(0xFF0D0A14));
+              expect(gradient.colors[2], const Color(0xFFFFB300).withValues(alpha: 0.18));
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
     });
   });
 

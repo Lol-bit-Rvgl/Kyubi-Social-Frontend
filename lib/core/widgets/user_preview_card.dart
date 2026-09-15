@@ -45,16 +45,20 @@ class UserPreviewCard extends StatelessWidget {
   }
 
   Widget _buildDefaultCosmicBackground() {
+    final primaryColor = user.themeSettings.primary;
+    final secondaryColor = user.themeSettings.accent;
     return Container(
-      decoration: const BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment(-0.4, -0.6),
-          radius: 1.3,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D0A14),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
-            Color(0xFF24123E), // Nebulosa morada superior
-            Color(0xFF0E0B1A),
-            Color(0xFF05030A), // Base casi negra
+            primaryColor.withValues(alpha: 0.22),
+            const Color(0xFF0D0A14),
+            secondaryColor.withValues(alpha: 0.18),
           ],
+          stops: const [0.0, 0.5, 1.0],
         ),
       ),
     );
@@ -105,10 +109,10 @@ class UserPreviewCard extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        const Color(0xFF0E0A1A).withValues(
+                        const Color(0xFF0D0A14).withValues(
                           alpha: isTransparent ? 0.20 : 0.65,
                         ),
-                        const Color(0xFF090610).withValues(
+                        const Color(0xFF05030A).withValues(
                           alpha: isTransparent ? 0.35 : 0.92,
                         ),
                       ],

@@ -109,8 +109,11 @@ abstract class User with _$User {
     if (raw is Map<String, dynamic>) {
       return UserThemeSettings.fromJson(raw);
     }
-    if (themeColor != null) {
-      return UserThemeSettings(primaryColor: themeColor!);
+    if (themeColor != null && themeColor!.isNotEmpty) {
+      return UserThemeSettings(
+        primaryColor: themeColor!,
+        accentColor: null,
+      );
     }
     return const UserThemeSettings();
   }
@@ -145,10 +148,17 @@ Color _parseHexColor(String hex, {required Color fallback}) {
   return fallback;
 }
 
+/// Deriva de forma armónica un color secundario rotando el matiz (hue) ~30° a partir del primario.
+Color deriveHarmonicSecondary(Color primary) {
+  final hsv = HSVColor.fromColor(primary);
+  final newHue = (hsv.hue + 30.0) % 360.0;
+  return hsv.withHue(newHue).toColor();
+}
+
 /// Configuración visual de colores y estilo Liquid Glass inspirada en Discord Nitro.
 class UserThemeSettings {
   final String primaryColor;
-  final String accentColor;
+  final String? accentColor;
   final GlassStyle glassStyle;
 
   const UserThemeSettings({
@@ -157,25 +167,44 @@ class UserThemeSettings {
     this.glassStyle = GlassStyle.frosted,
   });
 
+  /// Indica si el usuario especificó un color de acento explícito.
+  bool get hasExplicitAccent {
+    final hex = accentColor;
+    return hex != null && hex.trim().isNotEmpty;
+  }
+
   factory UserThemeSettings.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const UserThemeSettings();
+    final primary = (json['primaryColor'] as String?) ?? '#BA68C8';
+    final hasAccent =
+        json.containsKey('accentColor') && json['accentColor'] != null;
+    final accent = hasAccent ? (json['accentColor'] as String) : null;
     return UserThemeSettings(
-      primaryColor: (json['primaryColor'] as String?) ?? '#BA68C8',
-      accentColor: (json['accentColor'] as String?) ?? '#00E676',
+      primaryColor: primary,
+      accentColor: accent,
       glassStyle: GlassStyle.fromString(json['glassStyle'] as String?),
     );
   }
 
   Map<String, dynamic> toJson() => {
     'primaryColor': primaryColor,
-    'accentColor': accentColor,
+    'accentColor': accentColor ?? '#00E676',
     'glassStyle': glassStyle.toValue(),
   };
 
   Color get primary =>
       _parseHexColor(primaryColor, fallback: const Color(0xFFBA68C8));
-  Color get accent =>
-      _parseHexColor(accentColor, fallback: const Color(0xFF00E676));
+
+  Color get accent {
+    final hex = accentColor;
+    if (hex != null && hex.trim().isNotEmpty) {
+      return _parseHexColor(
+        hex,
+        fallback: deriveHarmonicSecondary(primary),
+      );
+    }
+    return deriveHarmonicSecondary(primary);
+  }
 
   LinearGradient get borderGradient => LinearGradient(
     begin: Alignment.topLeft,

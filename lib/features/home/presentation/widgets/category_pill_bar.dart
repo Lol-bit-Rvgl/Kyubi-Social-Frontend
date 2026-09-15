@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 
 /// Barra horizontal de categorías tipo píldora.
@@ -57,6 +56,8 @@ class _Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final primaryColor = scheme.primary;
+    final secondaryColor = scheme.secondary;
 
     return GestureDetector(
       onTap: onTap,
@@ -65,21 +66,37 @@ class _Pill extends StatelessWidget {
         curve: AppDimens.curveStandard,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? Colors.white : Colors.transparent,
+          gradient: isActive
+              ? LinearGradient(
+                  colors: [primaryColor, secondaryColor],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                )
+              : null,
+          color: isActive ? null : Colors.transparent,
           borderRadius: BorderRadius.circular(AppDimens.radiusFull),
           border: Border.all(
             color: isActive
-                ? Colors.white
+                ? primaryColor.withValues(alpha: 0.4)
                 : scheme.outlineVariant.withValues(alpha: 0.5),
             width: 1.2,
           ),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: AnimatedDefaultTextStyle(
           duration: AppDimens.motionFast,
           style: TextStyle(
             fontSize: 13,
             fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-            color: isActive ? AppColors.ink900 : scheme.onSurfaceVariant,
+            color: isActive ? Colors.white : scheme.onSurfaceVariant,
           ),
           child: Text(label),
         ),
