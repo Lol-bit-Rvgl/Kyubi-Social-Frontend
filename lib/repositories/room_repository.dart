@@ -14,6 +14,7 @@ class RoomRepository {
     int limit = 30,
     String? circleId,
     String? query,
+    String? category,
   }) async {
     final json = await _api.getJson(
       AppConfig.salasBase,
@@ -21,6 +22,7 @@ class RoomRepository {
         'limit': limit,
         if (circleId != null && circleId.isNotEmpty) 'circleId': circleId,
         if (query != null && query.isNotEmpty) 'q': query,
+        if (category != null && category.isNotEmpty) 'category': category,
       },
     );
     return _roomList(json);

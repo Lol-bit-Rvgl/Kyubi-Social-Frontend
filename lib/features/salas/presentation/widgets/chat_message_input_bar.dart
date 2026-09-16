@@ -16,6 +16,7 @@ import 'animated_emoji_keyboard.dart';
 import 'dice_selector_modal.dart';
 import 'poll_creation_modal.dart';
 import 'rich_text_roleplay_modal.dart';
+import 'package:kyubi/features/roles/presentation/role_library_screen.dart';
 
 /// Barra de Input y Herramientas Rápidas de Chat con selector de identidad,
 /// editor A⁺ enriquecido y panel de grabación de audio en vivo.
@@ -1479,6 +1480,32 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                       ),
                     );
                   }),
+
+                const SizedBox(height: 10),
+                const Divider(color: Color(0xFF262038), height: 1),
+                const SizedBox(height: 10),
+
+                // Opción: Abrir Biblioteca de Roles (OCs)
+                _buildIdentityTile(
+                  ctx: ctx,
+                  title: 'Mi Biblioteca de Roles',
+                  subtitle: 'Elegir o equipar una ficha de personaje (OC)',
+                  avatarUrl: null,
+                  isSelected: false,
+                  fallbackColor: const Color(0xFFFFD600),
+                  roleBadgeColor: const Color(0xFFFFD600),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final picked = await RoleLibraryScreen.showPicker(context);
+                    if (picked != null && mounted) {
+                      setState(() {
+                        _selectedRole = picked;
+                      });
+                      widget.onRoleChanged?.call(picked);
+                      widget.onIdentityChanged?.call(picked);
+                    }
+                  },
+                ),
               ],
             ),
           ),

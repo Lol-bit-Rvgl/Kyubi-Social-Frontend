@@ -905,12 +905,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const ProfileStatDivider(),
           Expanded(
             child: GestureDetector(
-              onTap: () => context.push('/profile/${user.username}/followers'),
+              onTap: () => context.push('/profile/${user.username}/connections?tab=followers'),
               child: ProfileStatItem(
                 value: '$followers',
                 label: 'Seguidores',
                 icon: Icons.people_outline_rounded,
                 color: Colors.white,
+              ),
+            ),
+          ),
+          const ProfileStatDivider(),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => context.push('/profile/${user.username}/connections?tab=following'),
+              child: ProfileStatItem(
+                value: '${user.followingCount}',
+                label: 'Siguiendo',
+                icon: Icons.person_add_alt_1_rounded,
+                color: const Color(0xFFA594F9),
               ),
             ),
           ),
@@ -942,7 +954,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             onTap: () => context.push('/edit-profile'),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
+        LiquidGlassButton(
+          label: 'Fichas de Rol',
+          icon: Icons.theater_comedy_rounded,
+          borderColor: const Color(0xFFFFD600),
+          onTap: () => context.push('/roles/library'),
+        ),
+        const SizedBox(width: 8),
         NebulaeToolIconButton(
           icon: Icons.settings_outlined,
           onTap: () => context.push('/settings'),

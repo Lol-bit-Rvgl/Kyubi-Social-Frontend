@@ -51,6 +51,22 @@ class CharacterRepository {
     }
   }
 
+  /// Obtiene las fichas de personaje creadas por el usuario autenticado.
+  Future<List<Character>> getMyRoles() async {
+    try {
+      final json = await _client.getJson('/users/me/roles');
+      final data = json['data'] ?? json['characters'] ?? json['roles'];
+      if (data is List) {
+        return data
+            .map((item) => Character.fromJson(item as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (_) {
+      // Fallback a /users/me/characters
+    }
+    return getUserCharacters('me');
+  }
+
   Future<Character> createCharacter(Map<String, dynamic> body) async {
     final json = await _client.postJson('/characters', data: body);
     final data = json['data'] ?? json;

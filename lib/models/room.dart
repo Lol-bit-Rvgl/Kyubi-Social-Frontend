@@ -150,6 +150,59 @@ class Room {
     return cinemaCurrentTime + elapsed;
   }
 
+  /// Determina si la sala tiene actividad de voz / charla.
+  bool get isVoice {
+    final mode = currentMode.toLowerCase().trim();
+    if (mode == 'voice') return true;
+    return tags.any((t) {
+      final s = t.toLowerCase().trim();
+      return s.contains('voz') ||
+          s.contains('voice') ||
+          s.contains('chill') ||
+          s.contains('charla');
+    });
+  }
+
+  /// Determina si la sala tiene actividad de cine o reproducción compartida.
+  bool get isScreening {
+    final mode = currentMode.toLowerCase().trim();
+    if (mode == 'screening' || mode == 'cinema') return true;
+    if (cinemaVideoId != null && cinemaVideoId!.isNotEmpty) return true;
+    return tags.any((t) {
+      final s = t.toLowerCase().trim();
+      return s.contains('screening') ||
+          s.contains('cine') ||
+          s.contains('video') ||
+          s.contains('pelicula') ||
+          s.contains('película');
+    });
+  }
+
+  /// Determina si la sala tiene escenario o temática de juego de rol (Roleplay/RP/OCs).
+  bool get isRoleplay {
+    final mode = currentMode.toLowerCase().trim();
+    if (mode == 'roleplay' || mode == 'rpg' || mode == 'stage') return true;
+    if (stageRoles.isNotEmpty) return true;
+    return tags.any((t) {
+      final s = t.toLowerCase().trim();
+      return s.contains('rol') || s.contains('rp') || s.contains('roleplay');
+    });
+  }
+
+  /// Verifica si la sala coincide con una categoría o actividad seleccionada.
+  bool matchesCategory(String category) {
+    final cat = category.toLowerCase().trim();
+    if (cat.isEmpty) return true;
+    if (cat.contains('voice') || cat.contains('voz')) return isVoice;
+    if (cat.contains('screening') || cat.contains('cinema') || cat.contains('cine')) {
+      return isScreening;
+    }
+    if (cat.contains('roleplay') || cat.contains('rol') || cat.contains('rp')) {
+      return isRoleplay;
+    }
+    return tags.any((t) => t.toLowerCase().trim().contains(cat));
+  }
+
   static DateTime? _parseDateTime(dynamic value) {
     if (value is String) return DateTime.tryParse(value);
     return null;

@@ -516,27 +516,9 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
     // Filtrar por categoría seleccionada si aplica
     final filteredRooms = _selectedCategoryTag == null
         ? allRooms
-        : allRooms.where((r) {
-            final tag = _selectedCategoryTag!.toLowerCase();
-            return r.tags.any((t) => t.toLowerCase().contains(tag)) ||
-                (tag == 'voice' &&
-                    r.tags.any(
-                      (t) =>
-                          t.toLowerCase().contains('voz') ||
-                          t.contains('voice'),
-                    )) ||
-                (tag == 'screening' &&
-                    r.tags.any(
-                      (t) =>
-                          t.toLowerCase().contains('cine') ||
-                          t.contains('video'),
-                    )) ||
-                (tag == 'roleplay' &&
-                    r.tags.any(
-                      (t) =>
-                          t.toLowerCase().contains('rol') || t.contains('rp'),
-                    ));
-          }).toList();
+        : allRooms
+            .where((r) => r.matchesCategory(_selectedCategoryTag!))
+            .toList();
 
     if (filteredRooms.isEmpty) {
       return SliverToBoxAdapter(
@@ -706,24 +688,9 @@ class _ProjectZRoomCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isVoice = room.tags.any(
-      (t) =>
-          t.toLowerCase().contains('voz') ||
-          t.toLowerCase().contains('voice') ||
-          t.toLowerCase().contains('chill'),
-    );
-    final isScreening = room.tags.any(
-      (t) =>
-          t.toLowerCase().contains('screening') ||
-          t.toLowerCase().contains('cine') ||
-          t.toLowerCase().contains('video'),
-    );
-    final isRoleplay = room.tags.any(
-      (t) =>
-          t.toLowerCase().contains('rol') ||
-          t.toLowerCase().contains('rp') ||
-          t.toLowerCase().contains('roleplay'),
-    );
+    final isVoice = room.isVoice;
+    final isScreening = room.isScreening;
+    final isRoleplay = room.isRoleplay;
 
     final displayTag = room.tags.isNotEmpty
         ? '#${room.tags.first}'
@@ -800,17 +767,23 @@ class _ProjectZRoomCard extends StatelessWidget {
                               size: 11,
                               color: AppColors.accentTeal,
                             )
-                          : (isScreening
-                                ? const Icon(
-                                    Icons.live_tv_rounded,
-                                    size: 11,
-                                    color: Color(0xFFD500F9),
-                                  )
-                                : const Icon(
-                                    Icons.theater_comedy_rounded,
-                                    size: 11,
-                                    color: Color(0xFFFFD600),
-                                  )),
+                          : isScreening
+                              ? const Icon(
+                                  Icons.live_tv_rounded,
+                                  size: 11,
+                                  color: Color(0xFFD500F9),
+                                )
+                              : isRoleplay
+                                  ? const Icon(
+                                      Icons.theater_comedy_rounded,
+                                      size: 11,
+                                      color: Color(0xFFFFD600),
+                                    )
+                                  : const Icon(
+                                      Icons.forum_rounded,
+                                      size: 11,
+                                      color: Color(0xFF00E5FF),
+                                    ),
                     ),
                   ),
 
@@ -899,6 +872,13 @@ class _ProjectZRoomCard extends StatelessWidget {
   }
 
   Widget _fallbackCover(bool isVoice, bool isScreening, bool isRoleplay) {
+    final iconData = isVoice
+        ? Icons.graphic_eq_rounded
+        : isScreening
+            ? Icons.live_tv_rounded
+            : isRoleplay
+                ? Icons.theater_comedy_rounded
+                : Icons.forum_rounded;
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -909,11 +889,7 @@ class _ProjectZRoomCard extends StatelessWidget {
       ),
       child: Center(
         child: Icon(
-          isVoice
-              ? Icons.graphic_eq_rounded
-              : (isScreening
-                    ? Icons.live_tv_rounded
-                    : Icons.theater_comedy_rounded),
+          iconData,
           size: 32,
           color: Colors.white.withValues(alpha: 0.25),
         ),

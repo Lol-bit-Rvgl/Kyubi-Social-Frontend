@@ -28,6 +28,7 @@ import '../../messages/presentation/conversations_controller.dart';
 import '../../profile/presentation/user_follow_controller.dart';
 import '../../roles/presentation/role_editor_screen.dart';
 import '../../roles/presentation/widgets/role_info_modal.dart';
+import '../../roles/presentation/role_library_screen.dart';
 import 'edit_room_screen.dart';
 import 'sala_detail_controller.dart';
 import 'salas_controller.dart';
@@ -2481,6 +2482,46 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         .catchError((err) {
       debugPrint('[STAGE_ROLE] Error al liberar rol en backend: $err');
     });
+  }
+
+  /// Adopta una ficha de personaje elegida desde la Biblioteca de Roles (OCs).
+  void _onRoleSelectedFromLibrary(RoleCharacter chosen) {
+    final user = ref.read(authControllerProvider).user;
+    final myId = user?.id ?? '';
+    final myUsername = user?.displayName.isNotEmpty == true
+        ? user!.displayName
+        : (user?.username ?? 'Tú');
+
+    final adopted = chosen.copyWith(
+      isTaken: true,
+      takenByUserId: myId,
+      takenByUsername: myUsername,
+    );
+
+    setState(() {
+      _currentActiveRole = adopted;
+      final idx = _stageRoles.indexWhere((r) => r.id == adopted.id);
+      if (idx >= 0) {
+        _stageRoles[idx] = adopted;
+      } else {
+        _stageRoles.add(adopted);
+      }
+    });
+
+    _salas.updateRoomRole(widget.roomId, adopted);
+    ref
+        .read(roomRepositoryProvider)
+        .updateStageRole(widget.roomId, role: adopted, isTake: true)
+        .catchError((err) {
+      debugPrint('[STAGE_ROLE] Error al adoptar rol de biblioteca: $err');
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Identidad cambiada a: ${adopted.name}'),
+        backgroundColor: const Color(0xFF2A121E),
+      ),
+    );
   }
 
   void _openRoleInfo(RoleCharacter role) {
@@ -5063,16 +5104,12 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           ),
           const SizedBox(width: 8),
 
-          // Botón Switch (Cambiar rol / Adoptar)
+          // Botón Switch (Cambiar rol / Adoptar desde la Biblioteca de Roles)
           GestureDetector(
             onTap: () async {
-              if (_stageRoles.isNotEmpty) {
-                final targetRole = _currentActiveRole ?? _stageRoles.firstOrNull;
-                if (targetRole != null) {
-                  _openRoleInfo(targetRole);
-                }
-              } else {
-                _openRoleCreatorOrSelector();
+              final chosen = await RoleLibraryScreen.showPicker(context);
+              if (chosen != null && mounted) {
+                _onRoleSelectedFromLibrary(chosen);
               }
             },
             child: Container(

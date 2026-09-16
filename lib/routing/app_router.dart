@@ -21,7 +21,7 @@ import '../features/profile/presentation/profile_screen.dart';
 import '../features/profile/presentation/user_bio_screen.dart';
 import '../features/profile/presentation/user_wall_detail_screen.dart';
 import '../features/profile/presentation/visit_profile_screen.dart';
-import '../features/profile/presentation/follow_list_screen.dart';
+import '../features/profile/presentation/user_connections_screen.dart';
 import '../features/profile/presentation/visitor_list_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/create_post/presentation/create_post_screen.dart';
@@ -34,6 +34,7 @@ import '../models/story.dart';
 import '../models/user.dart';
 import '../features/roles/presentation/role_detail_screen.dart';
 import '../features/roles/presentation/role_editor_screen.dart';
+import '../features/roles/presentation/role_library_screen.dart';
 import '../features/roles/presentation/role_slot_detail_screen.dart';
 import '../features/roles/presentation/role_slot_editor_screen.dart';
 import '../models/role_slot.dart';
@@ -188,12 +189,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/salas', builder: (_, _) => const SalasScreen()),
       GoRoute(
         path: '/salas/create',
-        builder: (_, _) => const CreateSalaScreen(),
+        builder: (_, state) {
+          final isPrivate = state.uri.queryParameters['private'] == 'true' ||
+              state.extra == true ||
+              (state.extra is Map && (state.extra as Map)['private'] == true) ||
+              (state.extra is Map && (state.extra as Map)['isPrivate'] == true);
+          return CreateSalaScreen(isPrivateInitial: isPrivate);
+        },
       ),
       GoRoute(
         path: '/salas/create/:circleId',
-        builder: (_, state) =>
-            CreateSalaScreen(circleId: state.pathParameters['circleId']),
+        builder: (_, state) {
+          final isPrivate = state.uri.queryParameters['private'] == 'true' ||
+              state.extra == true ||
+              (state.extra is Map && (state.extra as Map)['private'] == true) ||
+              (state.extra is Map && (state.extra as Map)['isPrivate'] == true);
+          return CreateSalaScreen(
+            circleId: state.pathParameters['circleId'],
+            isPrivateInitial: isPrivate,
+          );
+        },
       ),
       GoRoute(
         path: '/salas/:salaId',
@@ -203,6 +218,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: '/roles/create', redirect: (_, _) => '/characters/create'),
+      GoRoute(
+        path: '/roles/library',
+        builder: (_, _) => const RoleLibraryScreen(),
+      ),
+      GoRoute(
+        path: '/characters/library',
+        redirect: (_, _) => '/roles/library',
+      ),
       GoRoute(
         path: '/characters/create',
         builder: (_, state) => RoleEditorScreen(
@@ -356,17 +379,27 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/profile/:username/connections',
+        builder: (_, state) {
+          final tab = state.uri.queryParameters['tab'] ?? 'followers';
+          return UserConnectionsScreen(
+            username: state.pathParameters['username']!,
+            initialTab: tab,
+          );
+        },
+      ),
+      GoRoute(
         path: '/profile/:username/followers',
-        builder: (_, state) => FollowListScreen(
+        builder: (_, state) => UserConnectionsScreen(
           username: state.pathParameters['username']!,
-          type: FollowListType.followers,
+          initialTab: 'followers',
         ),
       ),
       GoRoute(
         path: '/profile/:username/following',
-        builder: (_, state) => FollowListScreen(
+        builder: (_, state) => UserConnectionsScreen(
           username: state.pathParameters['username']!,
-          type: FollowListType.following,
+          initialTab: 'following',
         ),
       ),
       GoRoute(

@@ -25,10 +25,17 @@ import 'salas_controller.dart';
 /// Al crear la sala se envían las invitaciones seleccionadas de forma atómica
 /// y se navega directamente al interior de la sala recién creada.
 class CreateSalaScreen extends ConsumerStatefulWidget {
-  const CreateSalaScreen({super.key, this.circleId});
+  const CreateSalaScreen({
+    super.key,
+    this.circleId,
+    this.isPrivateInitial = false,
+  });
 
   /// Círculo preseleccionado (si se abre desde un círculo).
   final String? circleId;
+
+  /// Estado inicial de privacidad de la sala (Privada vs Pública).
+  final bool isPrivateInitial;
 
   @override
   ConsumerState<CreateSalaScreen> createState() => _CreateSalaScreenState();
@@ -41,7 +48,7 @@ class _CreateSalaScreenState extends ConsumerState<CreateSalaScreen> {
   final _capacityController = TextEditingController();
   final _friendSearchController = TextEditingController();
 
-  String _access = 'PUBLIC';
+  late String _access;
   String? _circleId;
   bool _saving = false;
 
@@ -64,6 +71,7 @@ class _CreateSalaScreenState extends ConsumerState<CreateSalaScreen> {
   @override
   void initState() {
     super.initState();
+    _access = widget.isPrivateInitial ? 'PRIVATE' : 'PUBLIC';
     _circleId = widget.circleId;
     _loadMyCircles();
     _loadFriends();
