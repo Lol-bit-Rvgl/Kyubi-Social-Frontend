@@ -100,7 +100,7 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
   bool _showEmojiPicker = false;
   bool _showAudioPanel = false;
 
-  // Estado de cooldown anti-spam (1.5 segundos entre envíos)
+  // Estado de cooldown anti-spam (800 ms entre envíos, solo anti-doble-tap)
   bool _isCoolingDown = false;
   Timer? _cooldownTimer;
 
@@ -183,7 +183,7 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
       _isCoolingDown = true;
     });
     _cooldownTimer?.cancel();
-    _cooldownTimer = Timer(const Duration(milliseconds: 1500), () {
+    _cooldownTimer = Timer(const Duration(milliseconds: 800), () {
       if (mounted) {
         setState(() {
           _isCoolingDown = false;

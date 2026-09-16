@@ -201,6 +201,7 @@ class AppConfig {
   static const String salasBase = '/salas';
   static String salaDetail(String id) => '/salas/$id';
   static String salaJoin(String id) => '/salas/$id/join';
+  static String salaInvite(String id) => '/salas/$id/invite';
   static String salaLeave(String id) => '/salas/$id/leave';
   static String salaMessages(String id) => '/salas/$id/messages';
   static String salaVoiceToken(String id) => '/salas/$id/voice/token';

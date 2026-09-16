@@ -1,11 +1,15 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
 /// Barra de pestañas sticky del perfil (SliverAppBar → SliverPersistentHeader).
 ///
-/// Fondo sólido `obsidianBg` con borde inferior glass e indicador en gradiente
-/// Nebulæ (#D100D1 → #7B2CBF) redondeado de 3px.
+/// Fondo "liquid glass" casi opaco (`0xFF0D0A14` @ α0.95 + blur 16) con borde
+/// inferior glass e indicador en gradiente Nebulæ (#D100D1 → #7B2CBF)
+/// redondeado de 3px. El blur + fondo opaco garantizan que el contenido del
+/// feed NUNCA se lea a través de la barra al hacer scroll.
 class ProfileTabsHeader extends StatelessWidget {
   const ProfileTabsHeader({super.key, required this.tabs});
 
@@ -18,30 +22,37 @@ class ProfileTabsHeader extends StatelessWidget {
       delegate: _TabsHeaderDelegate(
         minHeight: 46,
         maxHeight: 46,
-        child: Container(
-          decoration: const BoxDecoration(
-            color: AppColors.obsidianBg,
-            border: Border(
-              bottom: BorderSide(color: AppColors.borderGlass, width: 0.8),
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: const BoxDecoration(
+                // Fondo neutro cósmico casi opaco: los posts pasan por debajo
+                // del blur sin transliterse hacia las etiquetas de los tabs.
+                color: Color(0xF20D0A14),
+                border: Border(
+                  bottom: BorderSide(color: AppColors.borderGlass, width: 0.8),
+                ),
+              ),
+              child: TabBar(
+                tabs: [for (final label in tabs) Tab(text: label)],
+                dividerColor: Colors.transparent,
+                labelColor: Colors.white,
+                unselectedLabelColor: const Color(0xFF6E6E78),
+                labelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicator: const _GradientTabIndicator(),
+                indicatorPadding: const EdgeInsets.symmetric(horizontal: 24),
+                overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+              ),
             ),
-          ),
-          child: TabBar(
-            tabs: [for (final label in tabs) Tab(text: label)],
-            dividerColor: Colors.transparent,
-            labelColor: Colors.white,
-            unselectedLabelColor: const Color(0xFF6E6E78),
-            labelStyle: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-            unselectedLabelStyle: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-            indicatorSize: TabBarIndicatorSize.tab,
-            indicator: const _GradientTabIndicator(),
-            indicatorPadding: const EdgeInsets.symmetric(horizontal: 24),
-            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
           ),
         ),
       ),

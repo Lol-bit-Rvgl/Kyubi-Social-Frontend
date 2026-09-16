@@ -250,40 +250,49 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
 
   Widget _buildUniversalSearchBar() {
     final hasQuery = _searchQuery.isNotEmpty;
+    final scheme = Theme.of(context).colorScheme;
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
-        child: LiquidGlassContainer(
-          borderRadius: 16,
-          blur: 14,
+        child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            // Cápsula translúcida neutra: reacciona al tema vía scheme.primary.
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: scheme.primary.withValues(alpha: 0.35),
+              width: 1.2,
+            ),
+          ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.search_rounded,
-                color: Color(0xFF5BC8AF),
+                color: scheme.primary,
                 size: 22,
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: TextField(
                   controller: _searchController,
+                  cursorColor: scheme.primary,
                   onChanged: (val) => setState(() => _searchQuery = val.trim()),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13.5,
                     fontWeight: FontWeight.w500,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Buscar personas, comunidades, salas...',
                     hintStyle: TextStyle(
-                      color: Color(0xFF6E6E82),
+                      color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 13.5,
                       fontWeight: FontWeight.w500,
                     ),
                     border: InputBorder.none,
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 13),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
                   ),
                 ),
               ),
@@ -293,10 +302,10 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
                   },
-                  child: const Icon(
+                  child: Icon(
                     Icons.close_rounded,
                     size: 18,
-                    color: AppColors.textSecondary,
+                    color: scheme.primary.withValues(alpha: 0.7),
                   ),
                 ),
             ],

@@ -33,10 +33,40 @@ abstract class Conversation with _$Conversation {
 
   String get displayName {
     if (title != null && title!.isNotEmpty) return title!;
-    return otherMember?.displayName ?? 'Conversación';
+    final name = otherMember?.displayName;
+    if (name != null && name.isNotEmpty) return name;
+    final uname = otherMember?.username;
+    if (uname != null && uname.isNotEmpty) return uname;
+    return 'Usuario';
   }
 
   String? get avatarUrl => otherMember?.avatarUrl;
+
+  /// Resuelve dinámicamente al otro participante de una conversación 1-a-1.
+  ///
+  /// Prioriza [otherMember]; si es nulo o apunta a mí mismo (serialización
+  /// incompleta vía socket/caché), busca en [members] al integrante cuyo id
+  /// difiera del usuario actual. Nunca devuelve null si hay al menos un
+  /// miembro distinto de mí.
+  ChatAuthor? resolveOtherMember(String currentUserId) {
+    final other = otherMember;
+    final otherIsValid = other != null &&
+        other.id.isNotEmpty &&
+        other.id != currentUserId;
+    if (otherIsValid) return other;
+    for (final m in members) {
+      if (m.id.isNotEmpty && m.id != currentUserId) {
+        return ChatAuthor(
+          id: m.id,
+          username: m.username,
+          displayName: m.displayName,
+          avatarUrl: m.avatarUrl,
+          isOnline: m.isOnline,
+        );
+      }
+    }
+    return otherIsValid ? other : null;
+  }
 
   /// Días consecutivos de conversación (racha de amistad) entre ambos participantes.
   int get streakDays {

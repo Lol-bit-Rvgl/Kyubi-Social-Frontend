@@ -157,16 +157,21 @@ class UserWallCommentsNotifier
     }
   }
 
-  Future<void> delete(WallEntry entry) async {
-    if (_disposed) return;
+  Future<bool> delete(WallEntry entry) async {
+    if (_disposed) return false;
+    final previousEntries = state.entries;
+    // Eliminación optimista inmediata en memoria para respuesta instantánea
+    state = state.copyWith(
+      entries: state.entries.where((e) => e.id != entry.id).toList(),
+    );
     try {
       await _repo.deleteEntry(entry.id);
-      if (_disposed) return;
-      state = state.copyWith(
-        entries: state.entries.where((e) => e.id != entry.id).toList(),
-      );
+      return true;
     } catch (_) {
-      if (_disposed) return;
+      if (_disposed) return false;
+      // Revertir estado si el backend falla
+      state = state.copyWith(entries: previousEntries);
+      return false;
     }
   }
 }

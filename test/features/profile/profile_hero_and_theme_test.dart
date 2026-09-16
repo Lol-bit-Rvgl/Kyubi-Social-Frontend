@@ -119,6 +119,10 @@ void main() {
   });
 
   group('AuthController - Protección de Tema ante getMe retrasado', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
     test('updateUser preserva el tema activo si el usuario entrante carece de themeSettings', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);

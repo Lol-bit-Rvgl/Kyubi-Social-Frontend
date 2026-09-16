@@ -37,6 +37,7 @@ class RoomRepository {
     required String name,
     String? description,
     String? imageUrl,
+    String? chatBackgroundUrl,
     int? capacity,
     String access = 'PUBLIC',
     String? circleId,
@@ -49,6 +50,8 @@ class RoomRepository {
         if (description != null && description.isNotEmpty)
           'description': description,
         if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+        if (chatBackgroundUrl != null && chatBackgroundUrl.isNotEmpty)
+          'chatBackgroundUrl': chatBackgroundUrl,
         'capacity': ?capacity,
         'access': access,
         if (circleId != null && circleId.isNotEmpty) 'circleId': circleId,
@@ -56,6 +59,21 @@ class RoomRepository {
       },
     );
     return Room.fromJson(json);
+  }
+
+  /// Invita a uno o varios usuarios a la sala ya creada.
+  /// Devuelve el número de invitaciones efectivas.
+  Future<int> inviteUsers(String roomId, List<String> userIds) async {
+    final ids = userIds
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (ids.isEmpty) return 0;
+    final json = await _api.postJson(
+      AppConfig.salaInvite(roomId),
+      data: {'userIds': ids},
+    );
+    return (json['invited'] as num?)?.toInt() ?? ids.length;
   }
 
   /// Actualiza la sala (solo el host).

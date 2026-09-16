@@ -140,8 +140,15 @@ class ConversationChatNotifier
 
   Future<void> loadFor(String conversationId) async {
     await _socket.connect();
+    if (_disposed) return;
+    // Limpia el estado previo antes de cargar: evita reciclar mensajes o
+    // conversationId de un chat anterior mientras se resuelve el nuevo.
+    // Va tras el primer `await` para no mutar el provider dentro del
+    // initState del llamante.
+    state = const ConversationChatState();
     _socket.joinConversation(conversationId);
     final conversation = await _repo.getConversation(conversationId);
+    if (_disposed) return;
     state = state.copyWith(conversation: conversation);
     await _load();
   }
@@ -185,16 +192,20 @@ class ConversationChatNotifier
     Map<String, dynamic>? extensions,
   }) async {
     final text = body.trim();
-    if ((text.isEmpty && mediaUrl == null) || state.sending) return false;
+    final hasMedia = mediaUrl != null && mediaUrl.isNotEmpty;
+    final hasExtensions = extensions != null && extensions.isNotEmpty;
+    final hasSpecialType = mediaType != null && mediaType.isNotEmpty;
+    if ((text.isEmpty && !hasMedia && !hasExtensions && !hasSpecialType) ||
+        state.sending) {
+      return false;
+    }
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     final optimistic = Message(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}',
       conversationId: _conversationId,
       senderId: myId,
       sender: ChatAuthor(id: myId, username: '', displayName: 'Tú'),
-      body: text.isNotEmpty
-          ? text
-          : (mediaUrl != null ? '📷 [Imagen adjunta]' : ''),
+      body: text,
       mediaUrl: mediaUrl,
       mediaType: mediaType ?? (mediaUrl != null ? 'image' : null),
       extensions: extensions,
@@ -207,9 +218,7 @@ class ConversationChatNotifier
     try {
       final sent = await _repo.sendMessage(
         _conversationId,
-        body: text.isNotEmpty
-            ? text
-            : (mediaUrl != null ? '📷 [Imagen adjunta]' : ''),
+        body: text,
         mediaUrl: mediaUrl,
         mediaType: mediaType ?? (mediaUrl != null ? 'image' : null),
         extensions: extensions,

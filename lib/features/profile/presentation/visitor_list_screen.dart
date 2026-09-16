@@ -60,9 +60,24 @@ class _VisitorListScreenState extends ConsumerState<VisitorListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Visitas')),
-      body: _buildBody(),
+    // Retorno seguro: al salir (botón atrás o gesto del sistema) se devuelve
+    // el conteo real para que el perfil no caiga a 0 al volver.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        Navigator.of(context).pop(_items.isNotEmpty ? _items.length : null);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Visitas'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.of(context).pop(_items.isNotEmpty ? _items.length : null),
+          ),
+        ),
+        body: _buildBody(),
+      ),
     );
   }
 

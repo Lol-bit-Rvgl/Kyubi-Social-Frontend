@@ -20,6 +20,7 @@ import 'profile_metrics.dart';
 import 'user_follow_controller.dart';
 import 'user_posts_controller.dart';
 import 'user_wall_comments_controller.dart';
+import 'widgets/badges_modal_sheet.dart';
 import 'widgets/media_grid_tab.dart';
 import 'widgets/nebulae_buttons.dart';
 import 'widgets/nebulae_profile_avatar.dart';
@@ -51,6 +52,7 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
   bool _busy = false;
   bool _visitRegistered = false;
   String? _error;
+  int? _lastKnownVisitsCount;
 
   @override
   void initState() {
@@ -78,6 +80,9 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
         await repo.registerVisit(widget.username);
       }
       if (!mounted) return;
+      if (user.profileViews > 0) {
+        _lastKnownVisitsCount = user.profileViews;
+      }
       ref.read(userFollowNotifierProvider(user.id).notifier).initialize(
             isFollowing: user.isFollowing,
             followersCount: user.followersCount,
@@ -201,180 +206,7 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
   }
 
   void _showBadgesModal(User user) {
-    HapticFeedback.selectionClick();
-    final badges = [
-      {
-        'id': 'pioneer',
-        'icon': '🌟',
-        'title': 'Pionero Kyubi',
-        'desc': 'Miembro de la primera generación',
-      },
-      {
-        'id': 'streak',
-        'icon': '🔥',
-        'title': 'Racha Legendaria',
-        'desc': 'Más de 7 días consecutivos',
-      },
-      {
-        'id': 'roleplay',
-        'icon': '🎭',
-        'title': 'Maestro de Rol',
-        'desc': 'Participante activo en salas de roleplay',
-      },
-      {
-        'id': 'creator',
-        'icon': '🎨',
-        'title': 'Creador Visual',
-        'desc': 'Publicaciones destacadas en el feed',
-      },
-      {
-        'id': 'guardian',
-        'icon': '🛡️',
-        'title': 'Guardián Social',
-        'desc': 'Contribuyente ejemplar en círculos',
-      },
-      if (user.isVip) ...[
-        {
-          'id': 'vip',
-          'icon': '👑',
-          'title': 'Rango VIP',
-          'desc': 'Membresía premium activa',
-        },
-      ],
-    ];
-    final ownedBadges = user.badges;
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.surfaceCards,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Row(
-                children: [
-                  Icon(
-                    Icons.military_tech_rounded,
-                    color: Color(0xFFFFD600),
-                    size: 22,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Insignias y Medallas',
-                    style: TextStyle(
-                      fontSize: 16.5,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              ...badges.map((b) {
-                final owned = ownedBadges.contains(b['id']);
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1B172B),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: owned
-                          ? const Color(0xFF2C2542)
-                          : Colors.white12,
-                      width: 0.8,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Opacity(
-                        opacity: owned ? 1 : 0.3,
-                        child: Text(
-                          b['icon']!,
-                          style: const TextStyle(fontSize: 22),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              b['title']!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: owned
-                                    ? Colors.white
-                                    : Colors.white
-                                          .withValues(alpha: 0.45),
-                              ),
-                            ),
-                            Text(
-                              b['desc']!,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            if (!owned) ...[
-                              const SizedBox(height: 3),
-                              const Text(
-                                'Bloqueada',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.4,
-                                  color: Color(0xFF9E9EA8),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      if (owned)
-                        const Icon(
-                          Icons.check_circle_rounded,
-                          color: AppColors.accentCyan,
-                          size: 18,
-                        )
-                      else
-                        const Icon(
-                          Icons.lock_outline_rounded,
-                          color: Color(0xFF6E6E78),
-                          size: 18,
-                        ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
-      ),
-    );
+    BadgesModalSheet.show(context, user);
   }
 
   @override
@@ -911,7 +743,12 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
 
   Widget _buildStats(User user, ProfileMetrics metrics) {
     final followState = ref.watch(userFollowNotifierProvider(user.id));
-    final visits = user.profileViews;
+    if (user.profileViews > 0) {
+      _lastKnownVisitsCount = user.profileViews;
+    }
+    final displayVisits = (user.profileViews > 0)
+        ? user.profileViews
+        : (_lastKnownVisitsCount ?? 0);
     final followers = followState.followersCount ?? user.followersCount;
     final levelName = metrics.levelName.isNotEmpty
         ? metrics.levelName
@@ -935,9 +772,17 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () => context.push('/profile/${user.username}/visitors'),
+              onTap: () async {
+                final result =
+                    await context.push<dynamic>('/profile/${user.username}/visitors');
+                if (!context.mounted) return;
+                if (result is int && result > 0) {
+                  _lastKnownVisitsCount = result;
+                  if (mounted) setState(() {});
+                }
+              },
               child: ProfileStatItem(
-                value: '$visits',
+                value: '$displayVisits',
                 label: 'Visitas',
                 icon: Icons.visibility_outlined,
                 color: AppColors.accentCyan,

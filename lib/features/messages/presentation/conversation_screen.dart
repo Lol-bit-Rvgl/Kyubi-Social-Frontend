@@ -84,7 +84,28 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       },
     );
     final conversation = state.conversation;
-    final title = conversation?.displayName ?? 'Conversación';
+    final myId = ref.watch(authControllerProvider).user?.id ?? '';
+    // Resolución dinámica del destinatario: otherMember → members. Evita
+    // 'Conversación' y '@usuario' cuando otherMember viene nulo (socket/caché).
+    final otherUser = conversation?.resolveOtherMember(myId);
+    final isGroup = conversation?.isGroup ?? false;
+    final String title;
+    if (isGroup) {
+      final t = conversation?.title ?? '';
+      title = t.isNotEmpty ? t : 'Conversación';
+    } else {
+      final name = otherUser?.displayName ?? '';
+      final uname = otherUser?.username ?? '';
+      title = name.isNotEmpty
+          ? name
+          : uname.isNotEmpty
+              ? uname
+              : 'Usuario';
+    }
+    final subtitle = (otherUser?.username.isNotEmpty ?? false)
+        ? '@${otherUser!.username}'
+        : null;
+    final isOnline = otherUser?.isOnline ?? false;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -115,6 +136,19 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                   color: AppColors.accentCyan,
                   fontStyle: FontStyle.italic,
                   fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
+            else if (subtitle != null)
+              Text(
+                isOnline ? '$subtitle · 🟢 En línea' : subtitle,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isOnline
+                      ? AppColors.accentTeal
+                      : const Color(0xFF8A8A9A),
+                  fontWeight: FontWeight.w500,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -237,18 +271,30 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
           media: message.media,
           mediaUrl: message.mediaUrl,
           mediaType: message.mediaType,
+          type: message.extensions?['type'] as String?,
+          extensions: message.extensions,
         );
       },
     );
   }
 
-  Future<void> _send([String? customText]) async {
+  Future<void> _send(
+    String? customText, {
+    String? mediaUrl,
+    String? mediaType,
+    Map<String, dynamic>? extensions,
+  }) async {
     final body = customText ?? _inputController.text;
-    if (body.trim().isEmpty) return;
+    if (body.trim().isEmpty && mediaUrl == null && extensions == null) return;
     _inputController.clear();
     final ok = await ref
         .read(conversationChatProvider(widget.conversationId).notifier)
-        .send(body);
+        .send(
+          body,
+          mediaUrl: mediaUrl,
+          mediaType: mediaType,
+          extensions: extensions,
+        );
     if (!mounted) return;
     if (ok) {
       _scrollToBottom();
@@ -262,15 +308,53 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   }
 
   void _sendDiceRoll(String diceName, String result, String emoji) {
-    _send('$emoji Ha lanzado $diceName: $result');
+    ref.read(conversationChatProvider(widget.conversationId).notifier).send(
+      '$emoji Ha lanzado $diceName: $result',
+      mediaType: 'dice',
+      extensions: {
+        'dice': {
+          'name': diceName,
+          'result': result,
+          'emoji': emoji,
+        },
+      },
+    );
+    _scrollToBottom();
   }
 
   void _sendPoll(String question, List<String> options) {
-    _send('📊 Encuesta: $question\n${options.map((o) => '• $o').join('\n')}');
+    ref.read(conversationChatProvider(widget.conversationId).notifier).send(
+      '📊 Encuesta: $question\n${options.map((o) => '• $o').join('\n')}',
+      mediaType: 'poll',
+      extensions: {
+        'poll': {
+          'question': question,
+          'options': options
+              .asMap()
+              .entries
+              .map((e) => {'id': 'opt_${e.key}', 'text': e.value, 'votes': 0})
+              .toList(),
+          'totalVotes': 0,
+        },
+      },
+    );
+    _scrollToBottom();
   }
 
   void _sendSticker(StickerItem sticker) {
-    _send(sticker.emoji.isNotEmpty ? sticker.emoji : '✨ ${sticker.name}');
+    ref.read(conversationChatProvider(widget.conversationId).notifier).send(
+      '',
+      mediaUrl: sticker.assetPath,
+      mediaType: 'sticker',
+      extensions: {
+        'isAnimated': true,
+        'stickerId': sticker.id,
+        'assetPath': sticker.assetPath,
+        'emoji': sticker.emoji,
+        'name': sticker.name,
+      },
+    );
+    _scrollToBottom();
   }
 
   Future<void> _sendImage(String imagePath, [ImageSource source = ImageSource.gallery]) async {
@@ -320,7 +404,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
       final ok = await ref
           .read(conversationChatProvider(widget.conversationId).notifier)
-          .send('📷 [Imagen adjunta]', mediaUrl: url, mediaType: 'image');
+          .send('', mediaUrl: url, mediaType: 'image');
 
       if (!mounted) return;
       if (ok) {
@@ -348,8 +432,45 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     return 'image/jpeg';
   }
 
-  void _sendAudio(int durationMs, Uint8List bytes, String filename) {
-    _send('🎤 [Nota de voz (${durationMs ~/ 1000}s)]');
+  Future<void> _sendAudio(int durationMs, Uint8List bytes, String filename) async {
+    if (bytes.isNotEmpty) {
+      try {
+        final uploadRepo = ref.read(uploadRepositoryProvider);
+        final url = await uploadRepo.uploadFile(
+          'media',
+          bytes: bytes,
+          filename: filename,
+          contentType: 'audio/m4a',
+        );
+        if (url.isNotEmpty) {
+          final ok = await ref
+              .read(conversationChatProvider(widget.conversationId).notifier)
+              .send(
+                '🎤 [Nota de voz (${durationMs ~/ 1000}s)]',
+                mediaUrl: url,
+                mediaType: 'audio',
+                extensions: {
+                  'voice': true,
+                  'durationMs': durationMs,
+                  'audioUrl': url,
+                },
+              );
+          if (ok) {
+            _scrollToBottom();
+            ref.read(conversationsControllerProvider.notifier).refresh();
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+    _send(
+      '🎤 [Nota de voz (${durationMs ~/ 1000}s)]',
+      mediaType: 'audio',
+      extensions: {
+        'voice': true,
+        'durationMs': durationMs,
+      },
+    );
   }
 
   void _showAttachmentsModal() {

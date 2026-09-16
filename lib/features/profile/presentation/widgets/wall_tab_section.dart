@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_view/photo_view.dart';
 
@@ -41,6 +42,7 @@ class _WallTabSectionState extends ConsumerState<WallTabSection> {
   }
 
   Future<void> _post() async {
+    HapticFeedback.mediumImpact();
     final ok = await ref
         .read(userWallCommentsProvider(widget.ownerId).notifier)
         .post(_controller.text);
@@ -55,21 +57,102 @@ class _WallTabSectionState extends ConsumerState<WallTabSection> {
   }
 
   Future<void> _toggleLike(WallEntry entry) async {
+    HapticFeedback.lightImpact();
     await ref
         .read(userWallCommentsProvider(widget.ownerId).notifier)
         .toggleLike(entry);
   }
 
-  Future<void> _delete(WallEntry entry) async {
-    await ref
-        .read(userWallCommentsProvider(widget.ownerId).notifier)
-        .delete(entry);
+  Future<void> _confirmAndDelete(WallEntry entry) async {
+    HapticFeedback.selectionClick();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) {
+        final scheme = Theme.of(context).colorScheme;
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E192E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(
+              color: scheme.primary.withValues(alpha: 0.25),
+            ),
+          ),
+          title: const Text(
+            '¿Eliminar firma?',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          content: const Text(
+            'Esta firma se eliminará permanentemente de este muro.',
+            style: TextStyle(
+              fontSize: 13.5,
+              color: Color(0xFFB3B0C7),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      final ok = await ref
+          .read(userWallCommentsProvider(widget.ownerId).notifier)
+          .delete(entry);
+      if (!mounted) return;
+      if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Firma eliminada del muro'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo eliminar la firma'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(userWallCommentsProvider(widget.ownerId));
-    final myId = ref.watch(authControllerProvider).user?.id;
+    final me = ref.watch(authControllerProvider).user;
+    final myId = me?.id;
+    final myUsername = me?.username.toLowerCase().trim();
+    final ownerLower = widget.ownerId.toLowerCase().trim();
+
+    // Puede borrar si es el dueño del perfil del muro
+    final isProfileOwner = (myId != null && ownerLower == myId.toLowerCase()) ||
+        (myUsername != null && ownerLower == myUsername) ||
+        ownerLower == 'me';
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(
@@ -148,12 +231,27 @@ class _WallTabSectionState extends ConsumerState<WallTabSection> {
           )
         else ...[
           for (final entry in state.entries) ...[
-            _WallEntryTile(
-              entry: entry,
-              canDelete: entry.authorId == myId || widget.ownerId == myId,
-              onLike: () => _toggleLike(entry),
-              onDelete: () => _delete(entry),
-              onSpecialTextTap: widget.onSpecialTextTap,
+            Builder(
+              builder: (ctx) {
+                final isAuthor = (myId != null && entry.authorId == myId) ||
+                    (myUsername != null &&
+                        entry.authorName.toLowerCase().trim() == myUsername) ||
+                    entry.isAuthor;
+                final canDelete = isAuthor || isProfileOwner;
+
+                return AnimatedSize(
+                  key: ValueKey(entry.id),
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeInOut,
+                  child: _WallEntryTile(
+                    entry: entry,
+                    canDelete: canDelete,
+                    onLike: () => _toggleLike(entry),
+                    onDelete: () => _confirmAndDelete(entry),
+                    onSpecialTextTap: widget.onSpecialTextTap,
+                  ),
+                );
+              },
             ),
           ],
           if (state.loadingMore)
@@ -185,12 +283,20 @@ class _WallTabSectionState extends ConsumerState<WallTabSection> {
   }
 
   Widget _buildComposerCard(UserWallCommentsState state) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final primaryColor = scheme.primary;
+    final secondaryColor = scheme.secondary;
+
     return Container(
       padding: const EdgeInsets.all(AppDimens.md),
       decoration: BoxDecoration(
         color: const Color(0xFF14141B).withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(AppDimens.radiusCard),
-        border: Border.all(color: const Color(0xFF22222E), width: 0.8),
+        border: Border.all(
+          color: primaryColor.withValues(alpha: 0.22),
+          width: 0.9,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.25),
@@ -238,23 +344,23 @@ class _WallTabSectionState extends ConsumerState<WallTabSection> {
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF2E2E3E),
+                  borderSide: BorderSide(
+                    color: primaryColor.withValues(alpha: 0.2),
                     width: 0.8,
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF2E2E3E),
+                  borderSide: BorderSide(
+                    color: primaryColor.withValues(alpha: 0.2),
                     width: 0.8,
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(
-                    color: AppColors.accentCrimson,
-                    width: 1,
+                  borderSide: BorderSide(
+                    color: primaryColor,
+                    width: 1.2,
                   ),
                 ),
               ),
@@ -266,28 +372,41 @@ class _WallTabSectionState extends ConsumerState<WallTabSection> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                gradient: AppColors.crimsonGlow,
+                gradient: LinearGradient(
+                  colors: [
+                    primaryColor,
+                    secondaryColor != primaryColor
+                        ? secondaryColor
+                        : primaryColor.withValues(alpha: 0.85),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.accentCrimson.withValues(alpha: 0.3),
+                    color: primaryColor.withValues(alpha: 0.35),
                     blurRadius: 8,
                   ),
                 ],
               ),
               child: state.posting
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: primaryColor.computeLuminance() > 0.5
+                            ? const Color(0xFF0D0A14)
+                            : Colors.white,
                       ),
                     )
-                  : const Icon(
+                  : Icon(
                       Icons.send_rounded,
                       size: 16,
-                      color: Colors.white,
+                      color: primaryColor.computeLuminance() > 0.5
+                          ? const Color(0xFF0D0A14)
+                          : Colors.white,
                     ),
             ),
           ),
@@ -316,6 +435,9 @@ class _WallEntryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasImage =
         entry.imageUrl != null && entry.imageUrl!.trim().isNotEmpty;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final primaryColor = scheme.primary;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -323,7 +445,10 @@ class _WallEntryTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF161622),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF262638), width: 0.8),
+        border: Border.all(
+          color: primaryColor.withValues(alpha: 0.22),
+          width: 0.8,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.2),
@@ -343,7 +468,7 @@ class _WallEntryTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppColors.accentCrimson.withValues(alpha: 0.4),
+                    color: primaryColor.withValues(alpha: 0.45),
                     width: 1.2,
                   ),
                 ),
@@ -455,12 +580,12 @@ class _WallEntryTile extends StatelessWidget {
                   imageUrl: entry.imageUrl!,
                   fit: BoxFit.cover,
                   width: double.infinity,
-                  placeholder: (_, _) => const SizedBox(
+                  placeholder: (_, _) => SizedBox(
                     height: 160,
                     child: Center(
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: AppColors.accentCrimson,
+                        color: primaryColor,
                       ),
                     ),
                   ),
@@ -484,7 +609,7 @@ class _WallEntryTile extends StatelessWidget {
                           : Icons.favorite_border_rounded,
                       size: 16,
                       color: entry.isLikedByMe
-                          ? AppColors.accentCrimson
+                          ? primaryColor
                           : const Color(0xFF7A7A8E),
                     ),
                     const SizedBox(width: 4),
@@ -494,7 +619,7 @@ class _WallEntryTile extends StatelessWidget {
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         color: entry.isLikedByMe
-                            ? AppColors.accentCrimson
+                            ? primaryColor
                             : const Color(0xFF7A7A8E),
                       ),
                     ),

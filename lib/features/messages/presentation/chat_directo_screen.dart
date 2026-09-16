@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,19 +11,17 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/constants/room_backgrounds.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_avatar.dart';
-import '../../../core/widgets/fullscreen_image_viewer.dart';
-import '../../../core/widgets/kyubi_rich_text.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/sticker_catalog.dart';
 import '../../../models/chat_conversation.dart';
 import '../../../models/chat_message.dart';
-import '../../../models/media.dart';
 import '../../../services/auth_controller.dart';
 import '../../../services/providers.dart';
 import '../../salas/presentation/widgets/chat_message_input_bar.dart';
 import '../../salas/presentation/widgets/room_user_profile_sheet.dart';
 import 'conversation_controller.dart';
 import 'conversations_controller.dart';
+import 'widgets/chat_bubble.dart';
 
 /// Pantalla dedicada de Mensajería Directa (DM) 1-a-1.
 ///
@@ -91,13 +88,23 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
     });
   }
 
-  Future<void> _send([String? customText]) async {
+  Future<void> _send(
+    String? customText, {
+    String? mediaUrl,
+    String? mediaType,
+    Map<String, dynamic>? extensions,
+  }) async {
     final body = customText ?? _inputController.text;
-    if (body.trim().isEmpty) return;
+    if (body.trim().isEmpty && mediaUrl == null && extensions == null) return;
     _inputController.clear();
     final ok = await ref
         .read(conversationChatProvider(widget.conversationId).notifier)
-        .send(body);
+        .send(
+          body,
+          mediaUrl: mediaUrl,
+          mediaType: mediaType,
+          extensions: extensions,
+        );
     if (!mounted) return;
     if (ok) {
       _scrollToBottom();
@@ -111,15 +118,53 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
   }
 
   void _sendDiceRoll(String diceName, String result, String emoji) {
-    _send('$emoji Ha lanzado $diceName: $result');
+    ref.read(conversationChatProvider(widget.conversationId).notifier).send(
+      '$emoji Ha lanzado $diceName: $result',
+      mediaType: 'dice',
+      extensions: {
+        'dice': {
+          'name': diceName,
+          'result': result,
+          'emoji': emoji,
+        },
+      },
+    );
+    _scrollToBottom();
   }
 
   void _sendPoll(String question, List<String> options) {
-    _send('📊 Encuesta: $question\n${options.map((o) => '• $o').join('\n')}');
+    ref.read(conversationChatProvider(widget.conversationId).notifier).send(
+      '📊 Encuesta: $question\n${options.map((o) => '• $o').join('\n')}',
+      mediaType: 'poll',
+      extensions: {
+        'poll': {
+          'question': question,
+          'options': options
+              .asMap()
+              .entries
+              .map((e) => {'id': 'opt_${e.key}', 'text': e.value, 'votes': 0})
+              .toList(),
+          'totalVotes': 0,
+        },
+      },
+    );
+    _scrollToBottom();
   }
 
   void _sendSticker(StickerItem sticker) {
-    _send(sticker.emoji.isNotEmpty ? sticker.emoji : '✨ ${sticker.name}');
+    ref.read(conversationChatProvider(widget.conversationId).notifier).send(
+      '',
+      mediaUrl: sticker.assetPath,
+      mediaType: 'sticker',
+      extensions: {
+        'isAnimated': true,
+        'stickerId': sticker.id,
+        'assetPath': sticker.assetPath,
+        'emoji': sticker.emoji,
+        'name': sticker.name,
+      },
+    );
+    _scrollToBottom();
   }
 
   Future<void> _sendImage(String imagePath, [ImageSource source = ImageSource.gallery]) async {
@@ -169,7 +214,7 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
 
       final ok = await ref
           .read(conversationChatProvider(widget.conversationId).notifier)
-          .send('📷 [Imagen adjunta]', mediaUrl: url, mediaType: 'image');
+          .send('', mediaUrl: url, mediaType: 'image');
 
       if (!mounted) return;
       if (ok) {
@@ -197,8 +242,45 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
     return 'image/jpeg';
   }
 
-  void _sendAudio(int durationMs, Uint8List bytes, String filename) {
-    _send('🎤 [Nota de voz (${durationMs ~/ 1000}s)]');
+  Future<void> _sendAudio(int durationMs, Uint8List bytes, String filename) async {
+    if (bytes.isNotEmpty) {
+      try {
+        final uploadRepo = ref.read(uploadRepositoryProvider);
+        final url = await uploadRepo.uploadFile(
+          'media',
+          bytes: bytes,
+          filename: filename,
+          contentType: 'audio/m4a',
+        );
+        if (url.isNotEmpty) {
+          final ok = await ref
+              .read(conversationChatProvider(widget.conversationId).notifier)
+              .send(
+                '🎤 [Nota de voz (${durationMs ~/ 1000}s)]',
+                mediaUrl: url,
+                mediaType: 'audio',
+                extensions: {
+                  'voice': true,
+                  'durationMs': durationMs,
+                  'audioUrl': url,
+                },
+              );
+          if (ok) {
+            _scrollToBottom();
+            ref.read(conversationsControllerProvider.notifier).refresh();
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+    _send(
+      '🎤 [Nota de voz (${durationMs ~/ 1000}s)]',
+      mediaType: 'audio',
+      extensions: {
+        'voice': true,
+        'durationMs': durationMs,
+      },
+    );
   }
 
   void _showAttachmentsModal() {
@@ -247,6 +329,17 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
         ),
       ),
     );
+  }
+
+  /// Resuelve dinámicamente al destinatario del chat: otherMember → members
+  /// (excluyendo al usuario actual). Evita el fallback 'Conversación'/'@usuario'
+  /// cuando la serialización vía socket/caché no incluye otherMember.
+  ChatAuthor? _otherMember(Conversation? conversation) {
+    if (conversation == null) return null;
+    final currentUserId = ref.read(authControllerProvider).user?.id ?? '';
+    final resolved = conversation.resolveOtherMember(currentUserId);
+    if (resolved != null) return resolved;
+    return conversation.otherMember;
   }
 
   void _openUserProfile(BuildContext context, ChatAuthor? member) {
@@ -568,13 +661,27 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
     );
 
     final conversation = state.conversation;
-    final other = conversation?.otherMember;
-    final displayName =
-        other?.displayName ?? conversation?.displayName ?? 'Conversación';
-    final username = other?.username ?? 'usuario';
+    // Resolución dinámica del destinatario: otherMember → members (excluyendo
+    // al usuario actual). Evita 'Conversación'/'@usuario' cuando otherMember
+    // viene nulo (serialización vía socket o caché sin otherMember).
+    final currentUserId = ref.watch(authControllerProvider).user?.id ?? '';
+    final other = (conversation != null)
+        ? (conversation.resolveOtherMember(currentUserId) ??
+            conversation.otherMember)
+        : null;
+    final displayName = (other != null && other.displayName.isNotEmpty)
+        ? other.displayName
+        : (other != null && other.username.isNotEmpty)
+            ? other.username
+            : (conversation?.displayName.isNotEmpty ?? false)
+                ? conversation!.displayName
+                : 'Usuario';
+    final username = (other != null && other.username.isNotEmpty)
+        ? other.username
+        : 'usuario';
     final avatarUrl = other?.avatarUrl ?? conversation?.avatarUrl;
     final isOnline = other?.isOnline ?? false;
-    final myId = ref.watch(authControllerProvider).user?.id ?? '';
+    final myId = currentUserId;
 
     final rawStreak = conversation?.streakDays ?? 0;
     final streakDays = rawStreak > 0
@@ -850,6 +957,8 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
           media: message.media,
           mediaUrl: message.mediaUrl,
           mediaType: message.mediaType,
+          type: message.extensions?['type'] as String?,
+          extensions: message.extensions,
           isDeleted: message.isDeleted,
           onAvatarTap: () => _openUserProfile(context, message.sender),
         );
@@ -923,7 +1032,8 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
               ),
               onTap: () {
                 Navigator.pop(context);
-                final username = conversation.otherMember?.username;
+                final other = _otherMember(conversation);
+                final username = other?.username;
                 if (username != null && username.isNotEmpty) {
                   context.push('/profile/$username');
                 }
@@ -1049,248 +1159,8 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
   }
 }
 
-/// Burbuja moderna y pulida de Mensaje Directo (Ref: Requerimiento de DMs).
-class _DirectMessageBubble extends StatelessWidget {
-  const _DirectMessageBubble({
-    required this.body,
-    required this.timestamp,
-    required this.isMine,
-    required this.senderName,
-    this.avatarUrl,
-    this.media,
-    this.mediaUrl,
-    this.mediaType,
-    this.isDeleted = false,
-    this.onAvatarTap,
-  });
-
-  final String body;
-  final String timestamp;
-  final bool isMine;
-  final String senderName;
-  final String? avatarUrl;
-  final Media? media;
-  final String? mediaUrl;
-  final String? mediaType;
-  final bool isDeleted;
-  final VoidCallback? onAvatarTap;
-
-  /// Renderiza la imagen del mensaje si la hay (media o mediaUrl de tipo
-  /// imagen). Tap abre el visor a pantalla completa con `BoxFit.contain`.
-  Widget? _buildImage(BuildContext context) {
-    final url = media?.url ?? mediaUrl;
-    if (url == null || url.isEmpty) return null;
-    final type = media?.type ?? MediaType.fromValue(mediaType);
-    if (type != MediaType.image) return null;
-    return GestureDetector(
-      onTap: () => showFullscreenImage(context, url),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: CachedNetworkImage(
-          imageUrl: url,
-          width: 200,
-          height: 220,
-          fit: BoxFit.cover,
-          placeholder: (_, _) => Container(
-            width: 200,
-            height: 220,
-            color: Colors.black26,
-            child: const Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-          errorWidget: (_, _, _) => Container(
-            width: 200,
-            height: 220,
-            color: Colors.black26,
-            child: const Icon(
-              Icons.broken_image_outlined,
-              color: Colors.white54,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final image = _buildImage(context);
-
-    if (isMine) {
-      // ── Mensaje Propio: Fondo morado noche calmo (#231B38), alineado a la derecha ──
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4.5),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Container(
-              constraints: BoxConstraints(maxWidth: screenWidth * 0.78),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: const Color(0xFF231B38),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(4),
-                ),
-                border: Border.all(
-                  color: const Color(0xFF9E8CD9).withValues(alpha: 0.35),
-                  width: 0.9,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF9B6FCB).withValues(alpha: 0.12),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (isDeleted)
-                    const Text(
-                      'Mensaje eliminado',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
-                        color: AppColors.textSecondary,
-                      ),
-                    )
-                  else ...[
-                    ?image,
-                    if (body.trim().isNotEmpty)
-                      _buildFormattedText(body, isMine: true),
-                  ],
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        timestamp,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFFD4A0B0),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.done_all_rounded,
-                        size: 13,
-                        color: Color(0xFF00E5FF),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // ── Mensaje Receptor: Fondo gris/azulado obsidiana (#14141E), alineado a la izquierda ──
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          GestureDetector(
-            onTap: onAvatarTap,
-            child: AppAvatar(imageUrl: avatarUrl, name: senderName, radius: 16),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            constraints: BoxConstraints(maxWidth: screenWidth * 0.76),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceCards,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(4),
-                bottomRight: Radius.circular(16),
-              ),
-              border: Border.all(color: const Color(0xFF2A2640), width: 0.9),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (isDeleted)
-                  const Text(
-                    'Mensaje eliminado',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontStyle: FontStyle.italic,
-                      color: AppColors.textSecondary,
-                    ),
-                  )
-                else ...[
-                  ?image,
-                  if (body.trim().isNotEmpty)
-                    _buildFormattedText(body, isMine: false),
-                ],
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: Text(
-                    timestamp,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFormattedText(String text, {required bool isMine}) {
-    if (text.startsWith('**') && text.endsWith('**') && text.length > 4) {
-      return Text(
-        text.substring(2, text.length - 2),
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          height: 1.35,
-          color: Colors.white,
-        ),
-      );
-    } else if (text.startsWith('*') && text.endsWith('*') && text.length > 2) {
-      return Text(
-        text.substring(1, text.length - 1),
-        style: const TextStyle(
-          fontSize: 13.5,
-          fontStyle: FontStyle.italic,
-          height: 1.35,
-          color: AppColors.accentCyan,
-        ),
-      );
-    }
-    return KyubiRichText(
-      text: text,
-      style: const TextStyle(fontSize: 14, height: 1.35, color: Colors.white),
-    );
-  }
-}
+/// Burbuja moderna y pulida de Mensaje Directo delegada a [DirectChatMessageBubble].
+typedef _DirectMessageBubble = DirectChatMessageBubble;
 
 String _timeLabel(DateTime dt) {
   final local = dt.toLocal();

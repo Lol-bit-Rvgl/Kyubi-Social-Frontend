@@ -16,6 +16,7 @@ import '../../salas/presentation/widgets/live_room_card.dart';
 import 'conversations_controller.dart';
 import 'follow_requests_controller.dart';
 import 'widgets/follow_requests_list.dart';
+import 'widgets/new_chat_sheet.dart';
 
 enum _MessageSection { private, rooms, invites, mentions }
 
@@ -62,9 +63,18 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
     final directs = conversations.where((c) => !c.isGroup).toList();
     if (query.trim().isEmpty) return directs;
     final q = query.toLowerCase();
+    final myId = ref.read(authControllerProvider).user?.id ?? '';
+    // Filtro local en memoria (sin navegación): nombre visible, username
+    // del otro miembro o contenido del último mensaje.
     return directs.where((c) {
-      return c.displayName.toLowerCase().contains(q) ||
-          (c.otherMember?.username.toLowerCase().contains(q) ?? false);
+      final other = c.resolveOtherMember(myId);
+      final nameHit =
+          c.displayName.toLowerCase().contains(q) ||
+          (other?.displayName.toLowerCase().contains(q) ?? false) ||
+          (other?.username.toLowerCase().contains(q) ?? false);
+      final messageHit =
+          (c.lastMessage?.body ?? '').toLowerCase().contains(q);
+      return nameHit || messageHit;
     }).toList();
   }
 
@@ -84,12 +94,12 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
         backgroundColor: Colors.transparent,
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            if (_tabController.index == 0) {
-              context.push('/search');
-            } else if (_tabController.index == 1) {
+            if (_tabController.index == 1) {
               context.push('/salas/create');
             } else {
-              context.push('/search');
+              // Flujo estándar "Nuevo chat": sheet de contactos, sin pasar
+              // por la búsqueda global de seguimiento.
+              NewChatSheet.show(context);
             }
           },
           backgroundColor: const Color(0xFF3B2D60),
@@ -218,9 +228,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
               ),
             if (totalUnread > 0) const SizedBox(width: 8),
 
-            // ── Botón: Crear sala/chat ──
+            // ── Botón: Crear sala (acceso directo, sin intermedios) ──
             GestureDetector(
-              onTap: _showCreateMenu,
+              onTap: () => context.push('/salas/create'),
               child: Container(
                 width: 38,
                 height: 38,
@@ -308,10 +318,13 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
   Widget _buildTabBar() {
     final state = ref.watch(conversationsControllerProvider);
     final totalUnread = _totalUnread(state);
+    final currentUserId = ref.watch(authControllerProvider).user?.id ?? '';
     final activeDirectUserIds = state.conversations
         .where((c) => !c.isGroup)
-        .map((c) => c.otherMember?.id)
+        // Resolución dinámica: otherMember puede venir nulo (socket/caché).
+        .map((c) => c.resolveOtherMember(currentUserId)?.id)
         .whereType<String>()
+        .where((id) => id.isNotEmpty)
         .toSet();
     final inviteCount = ref
         .watch(followRequestsControllerProvider)
@@ -396,6 +409,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
 
   Widget _buildPrivateTab(ConversationsState state) {
     final directs = _filterDirects(state.conversations, _query);
+    final currentUserId = ref.watch(authControllerProvider).user?.id ?? '';
 
     if (state.loading && state.conversations.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -439,6 +453,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
           final conversation = directs[index];
           return _ConversationCard(
             conversation: conversation,
+            currentUserId: currentUserId,
             pinned: state.pinnedIds.contains(conversation.id),
             onTap: () => _open(conversation),
           );
@@ -543,327 +558,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
       }
     }
   }
-
-  void _showCreateMenu() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF14141B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12, bottom: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3A3A4A),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
-            // Title
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppDimens.md),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Crear',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 🌐 Sala Pública
-            _buildCreateOption(
-              icon: Icons.public_rounded,
-              iconColor: AppColors.accentCyan,
-              title: 'Sala Pública',
-              subtitle: 'Abierta para todos',
-              onTap: () {
-                Navigator.pop(context);
-                _showPublicRoomTypeSelector();
-              },
-            ),
-
-            // 🔒 Sala / Chat Privado
-            _buildCreateOption(
-              icon: Icons.lock_rounded,
-              iconColor: const Color(0xFFBA68C8),
-              title: 'Sala / Chat Privado',
-              subtitle: 'Genera enlace de invitación',
-              onTap: () {
-                Navigator.pop(context);
-                _showPrivateRoomOptions();
-              },
-            ),
-
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCreateOption({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.md,
-          vertical: 12,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFF7A7A8A),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF5A5A6A),
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showPublicRoomTypeSelector() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF14141B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12, bottom: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3A3A4A),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppDimens.md),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Tipo de sala pública',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildRoomTypeOption(
-              emoji: '🎭',
-              title: 'Roleplay',
-              subtitle: 'Sesiones de rol con personajes',
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/salas/create');
-              },
-            ),
-            _buildRoomTypeOption(
-              emoji: '🎬',
-              title: 'Cine',
-              subtitle: 'Ver películas en grupo',
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/salas/create');
-              },
-            ),
-            _buildRoomTypeOption(
-              emoji: '🎙️',
-              title: 'Voz',
-              subtitle: 'Chat de voz general',
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/salas/create');
-              },
-            ),
-            _buildRoomTypeOption(
-              emoji: '🎲',
-              title: 'Matchmaking Aleatorio',
-              subtitle: 'Conecta con personas afines en tiempo real',
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/matchmaking');
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRoomTypeOption({
-    required String emoji,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.md,
-          vertical: 14,
-        ),
-        child: Row(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 24)),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFF7A7A8A),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF5A5A6A),
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showPrivateRoomOptions() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF14141B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12, bottom: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3A3A4A),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppDimens.md),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Crear sala privada',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildCreateOption(
-              icon: Icons.link_rounded,
-              iconColor: AppColors.accentCyan,
-              title: 'Generar enlace',
-              subtitle: 'Comparte el enlace con amigos',
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/salas/create');
-              },
-            ),
-            _buildCreateOption(
-              icon: Icons.person_add_rounded,
-              iconColor: const Color(0xFFBA68C8),
-              title: 'Seleccionar amigos',
-              subtitle: 'Invita directamente a usuarios',
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/search');
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -873,17 +567,29 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
 class _ConversationCard extends StatelessWidget {
   const _ConversationCard({
     required this.conversation,
+    required this.currentUserId,
     required this.onTap,
     this.pinned = false,
   });
 
   final Conversation conversation;
+  final String currentUserId;
   final VoidCallback onTap;
   final bool pinned;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // Resolución dinámica del destinatario: otherMember → members. Evita los
+    // fallbacks quemados ('Conversación', avatar 'C', '@usuario').
+    final otherUser = conversation.resolveOtherMember(currentUserId);
+    final otherName = otherUser?.displayName.isNotEmpty == true
+        ? otherUser!.displayName
+        : otherUser?.username;
+    final title = (otherName != null && otherName.isNotEmpty)
+        ? otherName
+        : conversation.displayName;
+    final otherHandle = otherUser?.username ?? '';
     final lastMessage = conversation.lastMessage;
     final preview = lastMessage == null
         ? 'Nueva conversación'
@@ -924,11 +630,11 @@ class _ConversationCard extends StatelessWidget {
             Row(
               children: [
                 AppAvatar(
-                  imageUrl: conversation.avatarUrl,
-                  name: conversation.displayName,
+                  imageUrl: otherUser?.avatarUrl ?? conversation.avatarUrl,
+                  name: title,
                   radius: 24,
                   showOnline: true,
-                  isOnline: conversation.otherMember?.isOnline ?? false,
+                  isOnline: otherUser?.isOnline ?? false,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -942,7 +648,7 @@ class _ConversationCard extends StatelessWidget {
                               children: [
                                 Flexible(
                                   child: Text(
-                                    conversation.displayName,
+                                    title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -985,6 +691,19 @@ class _ConversationCard extends StatelessWidget {
                             ),
                         ],
                       ),
+                      if (otherHandle.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          '@$otherHandle',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF7A7A8A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 3),
                       Row(
                         children: [

@@ -70,7 +70,9 @@ abstract class User with _$User {
 
   /// Number of profile views, stored in extensions by the backend.
   int get profileViews {
-    final raw = extensions?['profileViews'];
+    final raw = extensions?['profileViews'] ??
+        extensions?['visitorsCount'] ??
+        extensions?['viewsCount'];
     return raw is num ? raw.toInt() : 0;
   }
 

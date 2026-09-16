@@ -18,10 +18,8 @@ import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/chat_animated_media.dart';
 import '../../../../core/widgets/sticker_catalog.dart';
 import '../../../../core/widgets/system_toast.dart';
-import '../../../../core/widgets/user_preview_card.dart';
 import '../../../../models/role_character.dart';
 import '../../../../models/room.dart';
-import '../../../../models/user.dart';
 import '../../../../services/auth_controller.dart';
 import '../../../../services/providers.dart';
 import '../../../../services/room_socket.dart';
@@ -1772,43 +1770,6 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     );
   }
 
-  void _mentionUserInChat(String username) {
-    final clean = username.replaceAll('@', '').trim();
-    if (clean.isEmpty) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Mencionando a @$clean en el chat'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void showUserPreviewDialog(BuildContext context, User user) {
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.65),
-      builder: (context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Material(
-            color: Colors.transparent,
-            child: UserPreviewCard(
-              user: user,
-              onViewProfile: () {
-                Navigator.pop(context);
-                context.push('/profile/${user.username}/bio', extra: user);
-              },
-              onMention: () {
-                Navigator.pop(context);
-                _mentionUserInChat(user.username);
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   /// Abre la hoja de perfil/moderación de un participante efectivo del canal
   /// LiveKit (live_voice_bar). Resuelve datos reales por el userId del avatar.
   void _openVoiceParticipantSheet(VoiceParticipant vp) {
@@ -1857,16 +1818,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       isMuted: isVoiceMuted,
       onViewProfile: cleanUsername.isNotEmpty
           ? () {
+              // Perfil social completo (publicaciones, seguidores,
+              // insignias y bio real). `push` conserva la sala montada:
+              // la voz sigue conectada en segundo plano al volver atrás.
               Navigator.pop(context);
-              showUserPreviewDialog(
-                context,
-                User(
-                  id: userId,
-                  username: cleanUsername,
-                  displayName: displayName,
-                  avatarUrl: avatarUrl,
-                ),
-              );
+              context.push('/profile/$cleanUsername');
             }
           : null,
       onStartDirectChat: () =>
@@ -3018,6 +2974,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
   /// Inicia o reabre una conversación directa con el usuario indicado usando
   /// siempre su `userId` real y su `username` (handle) para la petición.
+  /// Navega al DM dedicado (`/dm/:id`) y verifica que la conversación
+  /// devuelta pertenezca al usuario objetivo antes de navegar.
   Future<void> _startDirectChatWith(String userId, String username) async {
     if (userId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -3028,6 +2986,16 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       );
       return;
     }
+    Future<void> failChat(String message) async {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: const Color(0xFF1E1A2E),
+        ),
+      );
+    }
+
     try {
       final chat = ref.read(chatRepositoryProvider);
       final cleanUsername = username.replaceAll('@', '').trim();
@@ -3036,18 +3004,24 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         username: cleanUsername.isNotEmpty ? cleanUsername : null,
       );
       if (!mounted) return;
+      if (conversation.id.isEmpty) {
+        await failChat('No se pudo iniciar la conversación');
+        return;
+      }
+      // Verificación anti-chat-equivocado: la conversación devuelta debe
+      // incluir al usuario objetivo como contraparte.
+      final myId = ref.read(authControllerProvider).user?.id ?? '';
+      final otherId = conversation.resolveOtherMember(myId)?.id ?? '';
+      if (otherId.isNotEmpty && otherId != userId) {
+        await failChat('No se pudo abrir el chat con este usuario');
+        return;
+      }
       ref
           .read(conversationsControllerProvider.notifier)
           .upsertConversation(conversation);
-      context.push('/conversation/${conversation.id}');
+      context.push('/dm/${conversation.id}');
     } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo iniciar la conversación'),
-          backgroundColor: Color(0xFF1E1A2E),
-        ),
-      );
+      await failChat('No se pudo iniciar la conversación');
     }
   }
 
@@ -4344,16 +4318,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                                           .replaceAll('@', '')
                                           .trim();
                                       Navigator.pop(context);
-                                      showUserPreviewDialog(
-                                        context,
-                                        User(
-                                          id: senderId,
-                                          username: cleanU,
-                                          displayName: senderName,
-                                          avatarUrl:
-                                              msg['userAvatar'] as String?,
-                                        ),
-                                      );
+                                      context.push('/profile/$cleanU');
                                     }
                                   },
                                   onStartDirectChat: () {

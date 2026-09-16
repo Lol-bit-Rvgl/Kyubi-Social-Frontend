@@ -18,6 +18,7 @@ import '../../../../services/providers.dart';
 import 'profile_metrics.dart';
 import 'user_posts_controller.dart';
 import 'user_wall_comments_controller.dart';
+import 'widgets/badges_modal_sheet.dart';
 import 'widgets/media_grid_tab.dart';
 import 'widgets/nebulae_buttons.dart';
 import 'widgets/nebulae_profile_avatar.dart';
@@ -42,6 +43,10 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _refreshing = false;
 
+  /// Último conteo conocido y positivo de visitas. Evita que la estadística
+  /// caiga transitoriamente a 0 al volver de la lista o durante refrescos.
+  int? _lastKnownVisitsCount;
+
   /// Estado editable solo si el usuario lo configuró manualmente. Cuando está
   /// vacío se refleja la presencia real (`user.isOnline` / `lastSeenAt`).
   String _currentStatus = '';
@@ -60,7 +65,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     try {
       final me = await ref.read(userRepositoryProvider).getMe();
       if (!mounted) return;
-      ref.read(authControllerProvider.notifier).updateUser(me);
+      // Guardia anti-cero: nunca sobreescribir un conteo válido con 0 por un
+      // refresco transitorio. Se conserva el valor previo en memoria.
+      final previousViews = ref.read(authControllerProvider).user?.profileViews ?? 0;
+      final fallbackViews = previousViews > 0
+          ? previousViews
+          : (_lastKnownVisitsCount ?? 0);
+      var effectiveMe = me;
+      if (me.profileViews == 0 && fallbackViews > 0) {
+        effectiveMe = me.copyWith(
+          extensions: {
+            ...?me.extensions,
+            'profileViews': fallbackViews,
+            'visitorsCount': fallbackViews,
+          },
+        );
+      }
+      if (effectiveMe.profileViews > 0) {
+        _lastKnownVisitsCount = effectiveMe.profileViews;
+      }
+      ref.read(authControllerProvider.notifier).updateUser(effectiveMe);
       await ref.read(userPostsProvider(me.id).notifier).refresh();
       await ref.read(userWallCommentsProvider(me.username).notifier).load();
       // Sincronización defensiva: si el contador de visitas del backend resuelve
@@ -71,30 +95,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (backendViews == 0 && visits.isNotEmpty) {
         // El backend no reportó visitas correctamente; usar el conteo real de la lista.
         final realCount = visits.length;
+        _lastKnownVisitsCount = realCount;
         ref.read(authControllerProvider.notifier).updateUser(
-          me.copyWith(
+          effectiveMe.copyWith(
             extensions: {
-              ...?me.extensions,
+              ...?effectiveMe.extensions,
               'profileViews': realCount,
               'visitorsCount': realCount,
             },
           ),
         );
+        if (mounted) setState(() {});
       } else if (backendViews != 0 && visits.isNotEmpty) {
         // Cross-check: si el backend reporta menos visitas de las que tenemos en lista,
         // priorizar el conteo más reciente (la lista viene de /users/[username]/visits).
         final realCount = visits.length;
+        final bestCount = realCount > backendViews ? realCount : backendViews;
+        _lastKnownVisitsCount = bestCount;
         if (realCount > backendViews) {
           ref.read(authControllerProvider.notifier).updateUser(
-            me.copyWith(
+            effectiveMe.copyWith(
               extensions: {
-                ...?me.extensions,
+                ...?effectiveMe.extensions,
                 'profileViews': realCount,
                 'visitorsCount': realCount,
               },
             ),
           );
         }
+        if (mounted) {
+          setState(() {});
+        }
+      } else if (backendViews > 0) {
+        _lastKnownVisitsCount = backendViews;
+        if (mounted) setState(() {});
       }
     } catch (_) {
       // Mantiene sesión local si la red falla
@@ -214,156 +248,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _showBadgesModal(User user) {
-    HapticFeedback.selectionClick();
-    final badges = [
-      {
-        'id': 'pioneer',
-        'icon': '🌟',
-        'title': 'Pionero Kyubi',
-        'desc': 'Miembro de la primera generación',
-      },
-      {
-        'id': 'streak',
-        'icon': '🔥',
-        'title': 'Racha Legendaria',
-        'desc': 'Más de 7 días consecutivos',
-      },
-      {
-        'id': 'roleplay',
-        'icon': '🎭',
-        'title': 'Maestro de Rol',
-        'desc': 'Participante activo en salas',
-      },
-      if (user.isVip) ...[
-        {
-          'id': 'vip',
-          'icon': '👑',
-          'title': 'Rango VIP',
-          'desc': 'Membresía premium activa',
-        },
-      ],
-    ];
-    final ownedBadges = user.badges;
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF1E1B2E),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Insignias',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 14),
-              ...badges.map(
-                (b) {
-                  final owned = ownedBadges.contains(b['id']);
-                  final titleColor = owned
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: 0.45);
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1B172B),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: owned
-                            ? const Color(0xFF2C2542)
-                            : Colors.white12,
-                        width: 0.8,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Opacity(
-                          opacity: owned ? 1 : 0.3,
-                          child: Text(
-                            b['icon']!,
-                            style: const TextStyle(fontSize: 22),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                b['title']!,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: titleColor,
-                                ),
-                              ),
-                              Text(
-                                b['desc']!,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              if (!owned) ...[
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Bloqueada',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.4,
-                                    color: Color(0xFF9E9EA8),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        if (owned)
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            color: AppColors.accentCyan,
-                            size: 18,
-                          )
-                        else
-                          const Icon(
-                            Icons.lock_outline_rounded,
-                            color: Color(0xFF6E6E78),
-                            size: 18,
-                          ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    BadgesModalSheet.show(context, user);
   }
 
   @override
@@ -964,7 +849,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildStats(User user, ProfileMetrics metrics) {
-    final visits = user.profileViews;
+    if (user.profileViews > 0) {
+      _lastKnownVisitsCount = user.profileViews;
+    }
+    // Erradicar el 0 transitorio: nunca mostrar 0 si previamente había un conteo positivo.
+    final displayVisits = (user.profileViews > 0)
+        ? user.profileViews
+        : (_lastKnownVisitsCount ?? 0);
     final followers = user.followersCount;
     final levelName = metrics.levelName.isNotEmpty
         ? metrics.levelName
@@ -980,11 +871,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Expanded(
             child: GestureDetector(
               onTap: () async {
-                await context.push('/profile/${user.username}/visitors');
+                final result =
+                    await context.push<dynamic>('/profile/${user.username}/visitors');
+                if (!context.mounted) return;
+                // Retorno seguro: la lista devuelve su conteo real; alinear en
+                // silencio sin parpadeos a cero antes del refresco de red.
+                if (result is int && result > 0) {
+                  _lastKnownVisitsCount = result;
+                  setState(() {});
+                  final current = ref.read(authControllerProvider).user;
+                  if (current != null && current.profileViews != result) {
+                    ref.read(authControllerProvider.notifier).updateUser(
+                          current.copyWith(
+                            extensions: {
+                              ...?current.extensions,
+                              'profileViews': result,
+                              'visitorsCount': result,
+                            },
+                          ),
+                        );
+                  }
+                }
                 if (context.mounted) _refreshAfterVisitors();
               },
               child: ProfileStatItem(
-                value: '$visits',
+                value: '$displayVisits',
                 label: 'Visitas',
                 icon: Icons.visibility_outlined,
                 color: const Color(0xFF64B5F6), // azul acero
