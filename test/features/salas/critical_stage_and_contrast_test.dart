@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kyubi/core/widgets/app_button.dart';
-import 'package:kyubi/features/circles/presentation/circles_screen.dart';
 import 'package:kyubi/features/salas/presentation/widgets/roleplay_stage_view.dart';
 import 'package:kyubi/models/role_character.dart';
 import 'package:kyubi/routing/app_router.dart';
