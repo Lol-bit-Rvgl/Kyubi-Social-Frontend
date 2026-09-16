@@ -40,6 +40,7 @@ class ChatMessageInputBar extends StatefulWidget {
     this.isHost = false,
     this.onTypingChanged,
     this.enabled = true,
+    this.disabledHint,
     this.replyingToMessage,
     this.onCancelReply,
     this.editingMessage,
@@ -48,6 +49,7 @@ class ChatMessageInputBar extends StatefulWidget {
   });
 
   final bool enabled;
+  final String? disabledHint;
 
   final Function(String text) onSendMessage;
   final Function(String imagePath) onSendImage;
@@ -485,13 +487,18 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         hintText: !widget.enabled
-                            ? 'Envío de mensajes bloqueado por moderación'
+                            ? (widget.disabledHint ?? 'No puedes enviar mensajes en este momento')
                             : (activeRole != null
                                 ? 'Mensaje como ${activeRole.name}...'
                                 : 'Escribe un mensaje...'),
                         hintStyle: TextStyle(
                           color: !widget.enabled
-                              ? const Color(0xFFFF8A9D)
+                              ? ((widget.disabledHint != null &&
+                                      (widget.disabledHint!.toLowerCase().contains('moderación') ||
+                                          widget.disabledHint!.toLowerCase().contains('sancionada') ||
+                                          widget.disabledHint!.toLowerCase().contains('bloqueado')))
+                                  ? const Color(0xFFFF8A9D)
+                                  : const Color(0xFF7A7A8E))
                               : const Color(0xFF7A7A8E),
                           fontSize: 14,
                         ),

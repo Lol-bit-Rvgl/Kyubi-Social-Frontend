@@ -169,7 +169,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/create-post',
         builder: (_, _) => const CreatePostScreen(),
       ),
-      GoRoute(path: '/circles', redirect: (_, _) => '/app/circles'),
+      GoRoute(path: '/circles', builder: (_, _) => const CirclesScreen()),
       GoRoute(path: '/circles/mine', redirect: (_, _) => '/circles'),
       GoRoute(
         path: '/circles/create',

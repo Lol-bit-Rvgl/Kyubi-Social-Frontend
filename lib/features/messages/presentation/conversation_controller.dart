@@ -178,16 +178,26 @@ class ConversationChatNotifier
     }
   }
 
-  Future<bool> send(String body) async {
+  Future<bool> send(
+    String body, {
+    String? mediaUrl,
+    String? mediaType,
+    Map<String, dynamic>? extensions,
+  }) async {
     final text = body.trim();
-    if (text.isEmpty || state.sending) return false;
+    if ((text.isEmpty && mediaUrl == null) || state.sending) return false;
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     final optimistic = Message(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}',
       conversationId: _conversationId,
       senderId: myId,
       sender: ChatAuthor(id: myId, username: '', displayName: 'Tú'),
-      body: text,
+      body: text.isNotEmpty
+          ? text
+          : (mediaUrl != null ? '📷 [Imagen adjunta]' : ''),
+      mediaUrl: mediaUrl,
+      mediaType: mediaType ?? (mediaUrl != null ? 'image' : null),
+      extensions: extensions,
       createdAt: DateTime.now(),
     );
     state = state.copyWith(
@@ -195,7 +205,15 @@ class ConversationChatNotifier
       sending: true,
     );
     try {
-      final sent = await _repo.sendMessage(_conversationId, body: text);
+      final sent = await _repo.sendMessage(
+        _conversationId,
+        body: text.isNotEmpty
+            ? text
+            : (mediaUrl != null ? '📷 [Imagen adjunta]' : ''),
+        mediaUrl: mediaUrl,
+        mediaType: mediaType ?? (mediaUrl != null ? 'image' : null),
+        extensions: extensions,
+      );
       state = state.copyWith(
         messages: [
           ...state.messages.where(

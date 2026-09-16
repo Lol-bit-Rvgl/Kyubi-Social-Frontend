@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +18,7 @@ import '../../../../core/widgets/liquid_glass_container.dart';
 import '../../../../models/user.dart';
 import '../../../../services/auth_controller.dart';
 import '../../../../services/providers.dart';
+import '../../../../services/user_theme_provider.dart';
 import 'widgets/hex_color_picker_tile.dart';
 
 Color _parseColorHex(String hex, Color fallback) {
@@ -342,6 +344,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         accentColor: _themeAccentColor,
         glassStyle: _themeGlassStyle,
       );
+      await ref.read(userThemeProvider.notifier).updateTheme(updatedThemeSettings);
       final finalUser = updated.copyWith(
         usernameColor: _usernameColor ?? updated.usernameColor,
         extensions: {
@@ -352,17 +355,31 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         },
       );
       ref.read(authControllerProvider.notifier).updateUser(finalUser);
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Perfil actualizado')));
       context.pop();
     } catch (e) {
       if (!mounted) return;
+      String errorMsg = 'No se pudo guardar el perfil';
+      if (e is DioException) {
+        final data = e.response?.data;
+        if (data is Map && data['error'] is String) {
+          errorMsg = data['error'] as String;
+        } else if (data is Map && data['message'] is String) {
+          errorMsg = data['message'] as String;
+        } else if (e.response?.statusCode == 400) {
+          errorMsg = 'Datos inválidos o texto demasiado largo.';
+        }
+      } else {
+        errorMsg = e.toString();
+      }
       setState(() {
         _saving = false;
-        _error = e.toString();
+        _error = errorMsg;
       });
-      _snack('No se pudo guardar el perfil');
+      _snack(errorMsg);
     }
   }
 
@@ -1045,26 +1062,37 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 style: TextStyle(color: scheme.error),
               ),
             ),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  label: 'Cancelar',
-                  icon: Icons.close_rounded,
-                  isOutlined: true,
-                  onPressed: _saving ? null : () => context.pop(),
-                ),
-              ),
-              const SizedBox(width: AppDimens.sm),
-              Expanded(
-                child: AppButton(
-                  label: 'Guardar',
-                  icon: Icons.check_rounded,
-                  loading: _saving,
-                  onPressed: _save,
-                ),
-              ),
-            ],
+          Builder(
+            builder: (context) {
+              final saveColor = _parseColorHex(_themePrimaryColor, scheme.primary);
+              final isLightSaveColor = saveColor.computeLuminance() > 0.5;
+              final saveContentColor =
+                  isLightSaveColor ? const Color(0xFF0D0A14) : Colors.white;
+
+              return Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Cancelar',
+                      icon: Icons.close_rounded,
+                      isOutlined: true,
+                      onPressed: _saving ? null : () => context.pop(),
+                    ),
+                  ),
+                  const SizedBox(width: AppDimens.sm),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Guardar',
+                      icon: Icons.check_rounded,
+                      backgroundColor: saveColor,
+                      foregroundColor: saveContentColor,
+                      loading: _saving,
+                      onPressed: _save,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppDimens.lg),
         ],

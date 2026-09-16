@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
-import '../../../../core/widgets/animated_fluid_background.dart';
 import '../../../../core/widgets/list_pagination.dart';
 import '../../../../core/widgets/liquid_glass_container.dart';
 import '../../../../core/widgets/skeleton_list.dart';
@@ -34,34 +33,26 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     final notifier = ref.read(feedControllerProvider.notifier);
 
     if (feed.loading && feed.posts.isEmpty) {
-      return const AnimatedFluidBackground(
-        assetPath: 'assets/images/bg_fluid_ambient.webp',
-        child: ColoredBox(
-          color: Colors.transparent,
-          child: SafeArea(child: SkeletonList()),
-        ),
+      return const ColoredBox(
+        color: Colors.transparent,
+        child: SafeArea(child: SkeletonList()),
       );
     }
 
     if (feed.error != null && feed.posts.isEmpty) {
-      return AnimatedFluidBackground(
-        assetPath: 'assets/images/bg_fluid_ambient.webp',
-        child: ColoredBox(
-          color: Colors.transparent,
-          child: SafeArea(
-            child: ErrorView(message: feed.error!, onRetry: notifier.refresh),
-          ),
+      return ColoredBox(
+        color: Colors.transparent,
+        child: SafeArea(
+          child: ErrorView(message: feed.error!, onRetry: notifier.refresh),
         ),
       );
     }
 
-    return AnimatedFluidBackground(
-      assetPath: 'assets/images/bg_fluid_ambient.webp',
-      child: ColoredBox(
-        color: Colors.transparent,
-        child: SafeArea(
-          bottom: false,
-          child: RefreshIndicator(
+    return ColoredBox(
+      color: Colors.transparent,
+      child: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
             onRefresh: notifier.refresh,
             color: Theme.of(context).colorScheme.primary,
             backgroundColor: const Color(0xFF0D0A14),
@@ -112,8 +103,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   // ── 2. Barra de búsqueda horizontal ──────────────────────────────────────

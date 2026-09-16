@@ -63,11 +63,50 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ref.read(authControllerProvider.notifier).updateUser(me);
       await ref.read(userPostsProvider(me.id).notifier).refresh();
       await ref.read(userWallCommentsProvider(me.username).notifier).load();
+      // Sincronización defensiva: si el contador de visitas del backend resuelve
+      // a 0 pero tenemos visitas en caché (o las cargamos), cross-check con la
+      // lista real para evitar la discrepancia reportada.
+      final visits = await ref.read(userRepositoryProvider).getVisits(me.username);
+      final backendViews = me.profileViews;
+      if (backendViews == 0 && visits.isNotEmpty) {
+        // El backend no reportó visitas correctamente; usar el conteo real de la lista.
+        final realCount = visits.length;
+        ref.read(authControllerProvider.notifier).updateUser(
+          me.copyWith(
+            extensions: {
+              ...?me.extensions,
+              'profileViews': realCount,
+              'visitorsCount': realCount,
+            },
+          ),
+        );
+      } else if (backendViews != 0 && visits.isNotEmpty) {
+        // Cross-check: si el backend reporta menos visitas de las que tenemos en lista,
+        // priorizar el conteo más reciente (la lista viene de /users/[username]/visits).
+        final realCount = visits.length;
+        if (realCount > backendViews) {
+          ref.read(authControllerProvider.notifier).updateUser(
+            me.copyWith(
+              extensions: {
+                ...?me.extensions,
+                'profileViews': realCount,
+                'visitorsCount': realCount,
+              },
+            ),
+          );
+        }
+      }
     } catch (_) {
       // Mantiene sesión local si la red falla
     } finally {
       if (mounted) setState(() => _refreshing = false);
     }
+  }
+
+  /// Refresca el perfil tras regresar de la pantalla de visitantes para mantener
+  /// el contador alineado con la lista de visitas (evita discrepancia 0 vs N).
+  Future<void> _refreshAfterVisitors() async {
+    await _refreshMe();
   }
 
   void _showStatusSelectorModal() {
@@ -438,10 +477,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
                 ProfileSliverAppBar(
                   user: user,
-                  leading: IconButton(
-                    onPressed: () => Scaffold.of(context).openDrawer(),
-                    icon: const Icon(Icons.menu_rounded, color: Colors.white),
-                  ),
                   actions: [
                     if (_refreshing)
                       Padding(
@@ -455,75 +490,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ),
                       ),
-                    IconButton(
-                      onPressed: () => context.push('/settings'),
-                      icon: const Icon(
-                        Icons.settings_rounded,
-                        color: Colors.white,
+                    Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: IconButton(
+                        onPressed: () => context.push('/settings'),
+                        icon: const Icon(
+                          Icons.settings_rounded,
+                          color: Colors.white,
+                        ),
+                        tooltip: 'Ajustes',
                       ),
                     ),
                   ],
                 ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: _buildAvatarWithStatus(user),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppDimens.md,
-                      12,
-                      AppDimens.md,
-                      0,
-                    ),
-                    child: _buildIdentity(user),
-                  ),
-                ),
-                if (user.titles.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppDimens.md,
-                        12,
-                        AppDimens.md,
-                        0,
-                      ),
-                      child: _buildCircleTitles(user),
-                    ),
-                  ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppDimens.md,
-                      16,
-                      AppDimens.md,
-                      0,
-                    ),
-                    child: _buildStats(user, metrics),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppDimens.md,
-                      16,
-                      AppDimens.md,
-                      16,
-                    ),
-                    child: _buildActionButtons(user),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppDimens.md,
-                      0,
-                      AppDimens.md,
-                      16,
-                    ),
-                    child: _buildSobreMi(user),
+                SliverPersistentHeader(
+                  pinned: false,
+                  floating: false,
+                  delegate: _ProfileHeroHeaderDelegate(
+                    maxHeight: _calculateHeroHeight(user),
+                    child: _buildProfileHero(user, metrics),
                   ),
                 ),
                 const ProfileTabsHeader(
@@ -559,6 +544,95 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildSavedTab() {
     return const SavedPostsList();
+  }
+
+  double _calculateHeroHeight(User user) {
+    // 1. Avatar con estado: padding (12) + diámetro avatar (96) + status offset (~12) = 120
+    double h = 120;
+    // 2. Identidad: padding (12) + nombre (26) + handle (16) + fecha (15) + badge (26) + espacios (14) = 109
+    h += 109;
+    // 3. Títulos de círculos (si existen): padding (12) + chip wrap (~28) = 40
+    if (user.titles.isNotEmpty) {
+      h += 40;
+    }
+    // 4. Estadísticas (visitas, seguidores, nivel): padding (16) + contenedor glass (~76) = 92
+    h += 92;
+    // 5. Botones de acción: padding (16) + botón (44) + padding inferior (16) = 76
+    h += 76;
+    // 6. Sobre mí (bio y tags de intereses)
+    final hasBio = user.bio != null && user.bio!.trim().isNotEmpty;
+    final tags = user.interests;
+    double sobreMi = 92;
+    if (hasBio) {
+      final bioLength = user.bio!.trim().length;
+      sobreMi += bioLength > 80 ? 60 : 36;
+    } else {
+      sobreMi += 24;
+    }
+    if (tags.isNotEmpty) {
+      sobreMi += tags.length > 3 ? 72 : 36;
+    }
+    h += sobreMi;
+    return h;
+  }
+
+  Widget _buildProfileHero(User user, ProfileMetrics metrics) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: _buildAvatarWithStatus(user),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppDimens.md,
+            12,
+            AppDimens.md,
+            0,
+          ),
+          child: _buildIdentity(user),
+        ),
+        if (user.titles.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppDimens.md,
+              12,
+              AppDimens.md,
+              0,
+            ),
+            child: _buildCircleTitles(user),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppDimens.md,
+            16,
+            AppDimens.md,
+            0,
+          ),
+          child: _buildStats(user, metrics),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppDimens.md,
+            16,
+            AppDimens.md,
+            16,
+          ),
+          child: _buildActionButtons(user),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppDimens.md,
+            0,
+            AppDimens.md,
+            16,
+          ),
+          child: _buildSobreMi(user),
+        ),
+      ],
+    );
   }
 
   Widget _buildAvatarWithStatus(User user) {
@@ -905,7 +979,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () => context.push('/profile/${user.username}/visitors'),
+              onTap: () async {
+                await context.push('/profile/${user.username}/visitors');
+                if (context.mounted) _refreshAfterVisitors();
+              },
               child: ProfileStatItem(
                 value: '$visits',
                 label: 'Visitas',
@@ -1097,5 +1174,59 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Delegate para el colapso fluido del hero del perfil con desvanecimiento de opacidad suave
+/// y protección contra desbordes (`OverflowBox` + `ClipRect` + `SingleChildScrollView`).
+class _ProfileHeroHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _ProfileHeroHeaderDelegate({
+    required this.maxHeight,
+    required this.child,
+  });
+
+  final double maxHeight;
+  final Widget child;
+
+  @override
+  double get minExtent => 0.0;
+
+  @override
+  double get maxExtent => maxHeight;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    if (shrinkOffset >= maxExtent) {
+      return const SizedBox.shrink();
+    }
+    final rawOpacity = 1.0 - (shrinkOffset / maxExtent);
+    final opacity = rawOpacity.clamp(0.0, 1.0);
+
+    return Opacity(
+      opacity: opacity,
+      child: ClipRect(
+        child: OverflowBox(
+          minHeight: 0,
+          maxHeight: maxExtent,
+          alignment: Alignment.topCenter,
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: SizedBox(
+              height: maxExtent,
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _ProfileHeroHeaderDelegate oldDelegate) {
+    return oldDelegate.maxHeight != maxHeight || oldDelegate.child != child;
   }
 }

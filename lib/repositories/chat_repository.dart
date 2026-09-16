@@ -44,11 +44,20 @@ class ChatRepository {
   Future<Message> sendMessage(
     String conversationId, {
     required String body,
+    String? mediaUrl,
+    String? mediaType,
     String? replyToId,
+    Map<String, dynamic>? extensions,
   }) async {
     final json = await _api.postJson(
       AppConfig.roomMessages(conversationId),
-      data: {'body': body, 'replyToId': ?replyToId},
+      data: {
+        'body': body,
+        'mediaUrl': ?mediaUrl,
+        'mediaType': ?mediaType,
+        'replyToId': ?replyToId,
+        'extensions': ?extensions,
+      },
     );
     return Message.fromJson(json);
   }

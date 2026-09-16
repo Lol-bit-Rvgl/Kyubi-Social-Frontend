@@ -2531,8 +2531,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     final canManage = _canManageRoles();
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     final isMyRole = _currentActiveRole?.id == role.id ||
-        (myId.isNotEmpty && role.takenByUserId == myId);
-    final isOccupied = role.isTaken && role.takenByUserId != null;
+        (myId.isNotEmpty &&
+            (role.takenByUserId == myId || role.occupiedBy == myId));
+    final isOccupied = role.isTaken &&
+        (role.takenByUserId != null || role.occupiedBy != null);
 
     showModalBottomSheet(
       context: context,
@@ -3985,19 +3987,29 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     onLeaveStageTap: () {
                       final myId = ref.read(authControllerProvider).user?.id;
                       if (myId != null && myId.isNotEmpty) {
-                        final myRole = _stageRoles
-                            .where((r) => r.takenByUserId == myId)
+                        final myRoles = _stageRoles
+                            .where((r) =>
+                                r.takenByUserId == myId ||
+                                r.occupiedBy == myId ||
+                                r.id == _currentActiveRole?.id)
                             .toList();
-                        if (myRole.isNotEmpty) {
-                          // Libera el slot (quien lea el stage verá el rol
-                          // libre) y resetea la identidad a la cuenta personal.
-                          _leaveRole(myRole.first);
+                        if (myRoles.isNotEmpty) {
+                          for (final role in myRoles) {
+                            _leaveRole(role);
+                          }
+                        } else if (_currentActiveRole != null) {
+                          _leaveRole(_currentActiveRole!);
                         } else {
                           setState(() {
-                            _stageRoles.removeWhere((r) => r.id == myId);
                             _currentActiveRole = null;
                           });
+                          ref
+                              .read(roomRepositoryProvider)
+                              .updateStageRole(widget.roomId, role: null, isTake: false)
+                              .catchError((_) {});
                         }
+                      } else if (_currentActiveRole != null) {
+                        _leaveRole(_currentActiveRole!);
                       }
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -4446,6 +4458,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                 if (_isConnected)
                   ChatMessageInputBar(
                     enabled: _canSendMessage,
+                    disabledHint: 'Envío de mensajes bloqueado por moderación',
                     onSendMessage: _sendMessage,
                     onSendImage: _sendImageFromPath,
                     onSendAudio: _sendVoiceNote,

@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -277,10 +278,26 @@ class _UserBioScreenState extends ConsumerState<UserBioScreen> {
                               } catch (e) {
                                 if (!ctx.mounted) return;
                                 setModalState(() => saving = false);
+                                String errorMsg = 'Error al guardar';
+                                if (e is DioException) {
+                                  final data = e.response?.data;
+                                  if (data is Map && data['error'] is String) {
+                                    errorMsg = data['error'] as String;
+                                  } else if (data is Map && data['message'] is String) {
+                                    errorMsg = data['message'] as String;
+                                  } else if (e.response?.statusCode == 400) {
+                                    errorMsg = 'Datos inválidos o la biografía excede el límite permitido (1000 caracteres).';
+                                  } else {
+                                    errorMsg = 'Error al conectar con el servidor (${e.response?.statusCode ?? 'red'}).';
+                                  }
+                                } else {
+                                  errorMsg = e.toString();
+                                }
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Error al guardar: $e'),
+                                      content: Text(errorMsg),
+                                      backgroundColor: AppColors.accentCrimson,
                                     ),
                                   );
                                 }

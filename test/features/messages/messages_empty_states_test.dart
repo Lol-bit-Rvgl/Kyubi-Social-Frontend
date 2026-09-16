@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kyubi/core/constants/app_assets.dart';
@@ -11,6 +11,8 @@ import 'package:kyubi/features/messages/presentation/follow_requests_controller.
 import 'package:kyubi/features/messages/presentation/widgets/follow_requests_list.dart';
 import 'package:kyubi/models/user.dart';
 import 'package:kyubi/services/auth_controller.dart';
+import 'package:kyubi/features/messages/presentation/messages_screen.dart';
+import 'package:kyubi/features/salas/presentation/salas_controller.dart';
 
 void main() {
   group('AppAssets - Constantes de Assets Oficiales de Estados Vacíos', () {
@@ -148,6 +150,43 @@ void main() {
       expect(imageWidget.height, 90);
     });
   });
+
+  group('MessagesScreen - Layout Anclado sin NestedScrollView', () {
+    testWidgets('Header, barra de búsqueda y TabBar permanecen anclados en Column', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authControllerProvider.overrideWith(() => _MockAuthNotifier()),
+            conversationsControllerProvider.overrideWith(
+              () => _MockConversationsNotifier(
+                const ConversationsState(loading: false, conversations: []),
+              ),
+            ),
+            followRequestsControllerProvider.overrideWith(
+              () => _MockFollowRequestsNotifier(
+                const FollowRequestsState(loading: false, items: []),
+              ),
+            ),
+            salasControllerProvider.overrideWith(
+              () => _MockSalasNotifier(),
+            ),
+          ],
+          child: const MaterialApp(
+            home: MessagesScreen(),
+          ),
+        ),
+      );
+
+      // Verificamos que no exista NestedScrollView
+      expect(find.byType(NestedScrollView), findsNothing);
+
+      // Verificamos que los componentes principales estén montados dentro de Column
+      expect(find.byType(TabBarView), findsOneWidget);
+      expect(find.text('My Chats'), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.byType(TabBar), findsOneWidget);
+    });
+  });
 }
 
 // ── Notificadores simulados para las pruebas ──
@@ -186,4 +225,9 @@ class _MockAuthNotifier extends AuthNotifier {
           displayName: 'Tester',
         ),
       );
+}
+
+class _MockSalasNotifier extends SalasNotifier {
+  @override
+  SalasState build() => const SalasState(loading: false, rooms: []);
 }

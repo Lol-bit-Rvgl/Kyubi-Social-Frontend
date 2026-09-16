@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -271,8 +273,79 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     _send(sticker.emoji.isNotEmpty ? sticker.emoji : '✨ ${sticker.name}');
   }
 
-  void _sendImage(String imagePath) {
-    _send('📷 [Imagen adjunta]');
+  Future<void> _sendImage(String imagePath, [ImageSource source = ImageSource.gallery]) async {
+    String resolvedPath = imagePath;
+    if (resolvedPath.isEmpty) {
+      try {
+        final picker = ImagePicker();
+        final picked = await picker.pickImage(source: source);
+        if (picked == null) return;
+        resolvedPath = picked.path;
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo acceder a las imágenes')),
+        );
+        return;
+      }
+    }
+
+    try {
+      final file = File(resolvedPath);
+      if (!await file.exists()) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo leer la imagen seleccionada')),
+        );
+        return;
+      }
+
+      final bytes = await file.readAsBytes();
+      final filename = resolvedPath.split(RegExp(r'[\\/]')).last;
+      final uploadRepo = ref.read(uploadRepositoryProvider);
+      final url = await uploadRepo.uploadFile(
+        'media',
+        bytes: bytes,
+        filename: filename,
+        contentType: _contentTypeForFilename(resolvedPath),
+      );
+
+      if (url.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo subir la imagen')),
+        );
+        return;
+      }
+
+      final ok = await ref
+          .read(conversationChatProvider(widget.conversationId).notifier)
+          .send('📷 [Imagen adjunta]', mediaUrl: url, mediaType: 'image');
+
+      if (!mounted) return;
+      if (ok) {
+        _scrollToBottom();
+        ref.read(conversationsControllerProvider.notifier).refresh();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo enviar la imagen')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al procesar la imagen')),
+      );
+    }
+  }
+
+  String? _contentTypeForFilename(String filename) {
+    final ext = filename.toLowerCase();
+    if (ext.endsWith('.jpg') || ext.endsWith('.jpeg')) return 'image/jpeg';
+    if (ext.endsWith('.png')) return 'image/png';
+    if (ext.endsWith('.webp')) return 'image/webp';
+    if (ext.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
   }
 
   void _sendAudio(int durationMs, Uint8List bytes, String filename) {
@@ -309,7 +382,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 title: const Text('Galería de fotos', style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _sendImage('');
+                  _sendImage('', ImageSource.gallery);
                 },
               ),
               ListTile(
@@ -317,7 +390,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 title: const Text('Cámara', style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _sendImage('');
+                  _sendImage('', ImageSource.camera);
                 },
               ),
             ],
@@ -335,6 +408,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
     return ChatMessageInputBar(
       enabled: !state.sending,
+      disabledHint: state.sending ? 'Enviando...' : 'Escribe un mensaje...',
       isRoleplay: false,
       userName: myName,
       userAvatarUrl: user?.avatarUrl,

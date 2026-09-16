@@ -171,7 +171,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Future<void> _search([String? forcedQuery]) async {
     final query = (forcedQuery ?? _controller.text).trim();
     if (query.isEmpty) return;
-    FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
       _error = null;
@@ -259,6 +258,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         child: SafeArea(
           bottom: false,
           child: CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             slivers: [
               _buildSliverSearchBar(),
               _buildCategoryPills(),
@@ -313,7 +313,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             if (canPop) ...[
               IconButton(
                 icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () {
+                  _focusNode.unfocus();
+                  Navigator.of(context).pop();
+                },
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               ),
@@ -353,7 +356,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           ),
                           onPressed: () {
                             _controller.clear();
-                            _onQueryChanged('');
+                            _focusNode.unfocus();
+                            _clearSearch();
                           },
                         )
                       : null,
@@ -1004,6 +1008,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 for (final search in _recentSearches)
                   GestureDetector(
                     onTap: () {
+                      _focusNode.unfocus();
                       _controller.text = search;
                       _search(search);
                     },
@@ -1097,6 +1102,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   for (final trend in _trendingTags.take(10))
                     GestureDetector(
                       onTap: () {
+                        _focusNode.unfocus();
                         _controller.text = trend.tag;
                         _search(trend.tag);
                       },

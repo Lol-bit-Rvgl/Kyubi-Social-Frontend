@@ -126,6 +126,14 @@ abstract class User with _$User {
       extensionsMap['themeSettings'] =
           Map<String, dynamic>.from(json['themeSettings'] as Map);
     }
+    // Inyectar profileViews/visitorsCount desde extensions si no están
+    // presentes en el JSON raíz (defensive parsing).
+    if (!json.containsKey('profileViews') && extensionsMap['profileViews'] != null) {
+      json['profileViews'] = extensionsMap['profileViews'];
+    }
+    if (!json.containsKey('visitorsCount') && extensionsMap['visitorsCount'] != null) {
+      json['visitorsCount'] = extensionsMap['visitorsCount'];
+    }
     return _$UserFromJson(<String, dynamic>{
       ...json,
       'id': json['id'] ?? '',

@@ -100,23 +100,23 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
         ),
         body: SafeArea(
           bottom: false,
-          child: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                _buildSliverHeader(totalUnread),
-                SliverToBoxAdapter(child: _buildSearchBar()),
-                SliverToBoxAdapter(child: _buildTabBar()),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildPrivateTab(state),
-                _buildRoomsTab(salasState),
-                _buildInvitesTab(),
-                _buildMentionsTab(),
-              ],
-            ),
+          child: Column(
+            children: [
+              _buildHeader(totalUnread),
+              _buildSearchBar(),
+              _buildTabBar(),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildPrivateTab(state),
+                    _buildRoomsTab(salasState),
+                    _buildInvitesTab(),
+                    _buildMentionsTab(),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -125,14 +125,13 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
 
   // ── Header ────────────────────────────────────────────────────────────
 
-  Widget _buildSliverHeader(int totalUnread) {
+  Widget _buildHeader(int totalUnread) {
     final auth = ref.watch(authControllerProvider);
     final user = auth.user;
     final avatarUrl = user?.effectiveAvatarUrl;
     final displayName = user?.displayName ?? 'Lolbit';
 
-    return SliverToBoxAdapter(
-      child: Padding(
+    return Padding(
         padding: const EdgeInsets.fromLTRB(
           AppDimens.md,
           AppDimens.sm,
@@ -242,8 +241,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   // ── Search bar ────────────────────────────────────────────────────────

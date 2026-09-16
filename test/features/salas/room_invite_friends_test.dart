@@ -189,4 +189,63 @@ void main() {
     // Verificar que el botón cambió a "Invitado"
     expect(find.text('Invitado'), findsOneWidget);
   });
+
+  testWidgets('RoomInviteFriendsSheet filters out users who are already room participants or host',
+      (tester) async {
+    final roomWithParticipants = Room(
+      id: 'room-102',
+      name: 'Gaming Room',
+      currentMode: 'standard',
+      host: const PostAuthor(
+        id: 'friend-1', // Naruto es el host
+        username: 'naruto',
+        displayName: 'Naruto Uzumaki',
+      ),
+      participants: const [
+        RoomParticipant(
+          user: PostAuthor(
+            id: 'friend-2', // Sasuke ya es participante
+            username: 'sasuke',
+            displayName: 'Sasuke Uchiha',
+          ),
+          role: 'PARTICIPANT',
+          joinedAt: '2026-09-15T00:00:00Z',
+        ),
+      ],
+      status: RoomStatus.active,
+      access: RoomAccess.public,
+      kind: RoomKind.social,
+    );
+
+    final fakeRepo = _FakeUserRepository(
+      followingUsers: testFollowing,
+      followerUsers: testFollowers,
+    );
+    final fakeSocket = _FakeRoomSocketService();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(() => _FakeAuthNotifier(currentUser)),
+          userRepositoryProvider.overrideWithValue(fakeRepo),
+          roomSocketProvider.overrideWithValue(fakeSocket),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: RoomInviteFriendsSheet(room: roomWithParticipants),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Naruto (host) y Sasuke (participante) deben estar excluidos
+    expect(find.text('Naruto Uzumaki'), findsNothing);
+    expect(find.text('Sasuke Uchiha'), findsNothing);
+
+    // Sakura (no participante) debe estar disponible
+    expect(find.text('Sakura Haruno'), findsOneWidget);
+    expect(find.text('Invitar'), findsOneWidget);
+  });
 }

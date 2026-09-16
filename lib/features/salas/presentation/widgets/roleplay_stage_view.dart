@@ -367,9 +367,11 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
   }
 
   Widget _buildStageActionButtons(List<RoleCharacter> validRoles) {
-    final isOnStage =
-        widget.currentUserId != null &&
-        validRoles.any((r) => r.id == widget.currentUserId);
+    final isOnStage = widget.currentUserId != null &&
+        validRoles.any((r) =>
+            r.takenByUserId == widget.currentUserId ||
+            r.occupiedBy == widget.currentUserId ||
+            r.id == widget.currentUserId);
 
     if (!isOnStage) {
       return Row(
@@ -448,6 +450,43 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
                     fontSize: 13.5,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            widget.onLeaveStageTap?.call();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.accentCrimson.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.accentCrimson.withValues(alpha: 0.6),
+                width: 1,
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.logout_rounded,
+                  color: AppColors.accentCrimson,
+                  size: 16,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  'Bajar',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.accentCrimson,
                   ),
                 ),
               ],

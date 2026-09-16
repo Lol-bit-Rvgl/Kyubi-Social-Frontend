@@ -53,6 +53,17 @@ class _RoomInviteFriendsSheetState
     super.dispose();
   }
 
+  Set<String> get _currentParticipantIds {
+    final ids = widget.room.participants
+        .map((p) => p.user.id)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (widget.room.host.id.isNotEmpty) {
+      ids.add(widget.room.host.id);
+    }
+    return ids;
+  }
+
   Future<void> _fetchFriends() async {
     setState(() {
       _loading = true;
@@ -67,16 +78,21 @@ class _RoomInviteFriendsSheetState
       // Cargar seguidos y seguidores para armar lista de amigos
       final following = await repo.getFollowing(usernameOrId);
       final followers = await repo.getFollowers(usernameOrId);
+      final currentParticipants = _currentParticipantIds;
 
-      // Deduplicar por id excluyendo al usuario actual
+      // Deduplicar por id excluyendo al usuario actual y a los que ya están en la sala
       final Map<String, FollowItem> map = <String, FollowItem>{};
       for (final item in following.items) {
-        if (item.id != user?.id && item.username != user?.username) {
+        if (item.id != user?.id &&
+            item.username != user?.username &&
+            !currentParticipants.contains(item.id)) {
           map[item.id] = item;
         }
       }
       for (final item in followers.items) {
-        if (item.id != user?.id && item.username != user?.username) {
+        if (item.id != user?.id &&
+            item.username != user?.username &&
+            !currentParticipants.contains(item.id)) {
           map.putIfAbsent(item.id, () => item);
         }
       }
@@ -113,6 +129,7 @@ class _RoomInviteFriendsSheetState
   }
 
   void _inviteUser(FollowItem user) {
+    if (_currentParticipantIds.contains(user.id)) return;
     if (_invitedUserIds.contains(user.id)) return;
 
     HapticFeedback.lightImpact();
@@ -359,6 +376,7 @@ class _RoomInviteFriendsSheetState
       ),
       itemBuilder: (context, index) {
         final friend = _filteredFriends[index];
+        final isAlreadyInRoom = _currentParticipantIds.contains(friend.id);
         final isInvited = _invitedUserIds.contains(friend.id);
 
         return Padding(
@@ -418,8 +436,41 @@ class _RoomInviteFriendsSheetState
               ),
               const SizedBox(width: 8),
 
-              // Botón Invitar / Invitado
-              if (isInvited)
+              // Botón Invitar / En la sala / Invitado
+              if (isAlreadyInRoom)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.15),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.meeting_room_rounded,
+                        color: Colors.white60,
+                        size: 14,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'En la sala',
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (isInvited)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,

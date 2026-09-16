@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-/// Fondo ambiental cyberpunk: resplandores radiales de crimson y purple
-/// sobre obsidiana, con textura sutil opcional.
+/// Fondo ambiental cósmico: resplandores radiales dinámicos de 2 colores
+/// (primario y secundario) sobre base obsidiana (#0D0A14).
 ///
 /// Da profundidad a pantallas sin llenar la interfaz de color. Se coloca
 /// detrás del contenido y se ignora la interacción.
 class BrandBackdrop extends StatelessWidget {
-  const BrandBackdrop({super.key, this.strength = 1.0, this.texture = true});
+  const BrandBackdrop({super.key, this.strength = 1.0, this.texture = false});
 
   final double strength;
   final bool texture;
@@ -39,18 +39,6 @@ class BrandBackdrop extends StatelessWidget {
             ),
           ),
         ),
-        // Textura sutil (si existe el asset)
-        if (texture)
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.08,
-              child: Image.asset(
-                'assets/images/profile/background_texture.jpg',
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
-            ),
-          ),
         // Top-left primary glow
         Positioned(
           top: -120,

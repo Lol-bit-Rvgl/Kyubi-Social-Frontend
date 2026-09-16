@@ -258,8 +258,20 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   void updateUser(User user) {
-    state = state.copyWith(user: user);
-    LastUserStorage.save(user.toJson());
+    final currentTheme = state.user?.themeSettings;
+    User resolvedUser = user;
+    if (currentTheme != null &&
+        (user.extensions == null || user.extensions!['themeSettings'] == null)) {
+      resolvedUser = user.copyWith(
+        extensions: {
+          ...?user.extensions,
+          'themeColor': currentTheme.primaryColor,
+          'themeSettings': currentTheme.toJson(),
+        },
+      );
+    }
+    state = state.copyWith(user: resolvedUser);
+    LastUserStorage.save(resolvedUser.toJson());
   }
 
   Future<void> loadCurrentUser() async {

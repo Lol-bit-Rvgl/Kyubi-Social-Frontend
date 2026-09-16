@@ -13,6 +13,8 @@ class AppButton extends StatelessWidget {
     this.icon,
     this.isOutlined = false,
     this.danger = false,
+    this.backgroundColor,
+    this.foregroundColor,
   });
 
   final String label;
@@ -21,11 +23,18 @@ class AppButton extends StatelessWidget {
   final IconData? icon;
   final bool isOutlined;
   final bool danger;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = danger ? scheme.error : scheme.primary;
+    final color = backgroundColor ?? (danger ? scheme.error : scheme.primary);
+    final isLightColor = color.computeLuminance() > 0.5;
+    final defaultContentColor =
+        isLightColor ? const Color(0xFF0D0A14) : Colors.white;
+    final contentColor =
+        foregroundColor ?? (isOutlined ? color : defaultContentColor);
 
     final child = loading
         ? SizedBox(
@@ -33,7 +42,7 @@ class AppButton extends StatelessWidget {
             height: 22,
             child: CircularProgressIndicator(
               strokeWidth: 2.4,
-              color: isOutlined ? scheme.primary : Colors.white,
+              color: contentColor,
             ),
           )
         : Row(
@@ -41,7 +50,7 @@ class AppButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 20),
+                Icon(icon, size: 20, color: contentColor),
                 const SizedBox(width: 8),
               ],
               Flexible(
@@ -49,6 +58,10 @@ class AppButton extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: contentColor,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -58,6 +71,7 @@ class AppButton extends StatelessWidget {
       return OutlinedButton(
         onPressed: loading ? null : onPressed,
         style: OutlinedButton.styleFrom(
+          foregroundColor: contentColor,
           side: BorderSide(color: danger ? color : scheme.outline),
         ),
         child: child,
@@ -74,6 +88,7 @@ class AppButton extends StatelessWidget {
             },
       style: FilledButton.styleFrom(
         backgroundColor: color,
+        foregroundColor: contentColor,
         padding: const EdgeInsets.symmetric(
           horizontal: AppDimens.xl,
           vertical: AppDimens.md,

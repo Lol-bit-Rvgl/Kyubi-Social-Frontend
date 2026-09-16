@@ -12,6 +12,7 @@ import 'services/providers.dart';
 import 'services/notification_socket.dart';
 import 'services/auth_controller.dart';
 import 'services/theme_controller.dart';
+import 'services/user_theme_provider.dart';
 
 /// Raíz de Kyubi: tema + router.
 class KyubiApp extends ConsumerStatefulWidget {
@@ -163,7 +164,7 @@ class _KyubiAppState extends ConsumerState<KyubiApp> {
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeControllerProvider);
-    final userTheme = ref.watch(authControllerProvider).user?.themeSettings;
+    final userTheme = ref.watch(userThemeProvider);
 
     return MaterialApp.router(
       title: AppConstants.appName,

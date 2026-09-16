@@ -65,13 +65,16 @@ class _KyubiFoxHeroAnimationState extends State<KyubiFoxHeroAnimation> {
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final secondaryColor = Theme.of(context).colorScheme.secondary;
+
     return SizedBox(
       width: widget.width,
       height: widget.height,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Aura de resplandor difuso violeta y cian
+          // Aura de resplandor difuso con colores temáticos dinámicos
           Container(
             width: widget.width * 0.78,
             height: widget.height * 0.78,
@@ -79,12 +82,12 @@ class _KyubiFoxHeroAnimationState extends State<KyubiFoxHeroAnimation> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFA594F9).withValues(alpha: 0.45),
+                  color: primaryColor.withValues(alpha: 0.40),
                   blurRadius: 36,
                   spreadRadius: 4,
                 ),
                 BoxShadow(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.30),
+                  color: secondaryColor.withValues(alpha: 0.28),
                   blurRadius: 42,
                   spreadRadius: 2,
                 ),

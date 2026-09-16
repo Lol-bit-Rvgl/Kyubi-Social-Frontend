@@ -14,12 +14,12 @@ class ProfileSliverAppBar extends StatelessWidget {
   const ProfileSliverAppBar({
     super.key,
     required this.user,
-    required this.leading,
+    this.leading,
     required this.actions,
   });
 
   final User user;
-  final Widget leading;
+  final Widget? leading;
   final List<Widget> actions;
 
   static const double expandedHeight = 112;
@@ -34,13 +34,16 @@ class ProfileSliverAppBar extends StatelessWidget {
       scrolledUnderElevation: 0,
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
-      leadingWidth: 44,
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: Center(
-          child: _WithIconShadow(child: leading),
-        ),
-      ),
+      automaticallyImplyLeading: leading != null,
+      leadingWidth: leading != null ? 44 : 0,
+      leading: leading != null
+          ? Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Center(
+                child: _WithIconShadow(child: leading!),
+              ),
+            )
+          : null,
       actions: [
         for (final action in actions) _WithIconShadow(child: action),
         const SizedBox(width: 8),

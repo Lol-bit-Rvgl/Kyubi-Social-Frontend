@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kyubi/services/voice/voice_room_controller.dart';
@@ -25,19 +25,34 @@ void main() {
           reason: 'Modificaciones de mute o audio no deben disparar el selector de conexión');
     });
 
-    test('Manejadores globales de error despachan de forma segura sin excepciones', () {
-      expect(() {
-        final details = FlutterErrorDetails(
-          exception: Exception('Simulated test crash'),
-          stack: StackTrace.current,
-        );
-        FlutterError.onError?.call(details);
-      }, returnsNormally);
+    testWidgets('Manejadores globales de error despachan de forma segura sin excepciones', (tester) async {
+      // Guardar el handler anterior
+      final originalOnError = FlutterError.onError;
+      FlutterErrorDetails? caughtDetails;
 
-      expect(() {
-        final error = Exception('Simulated async crash');
-        PlatformDispatcher.instance.onError?.call(error, StackTrace.current);
-      }, returnsNormally);
+      FlutterError.onError = (details) {
+        caughtDetails = details;
+      };
+
+      try {
+        expect(() {
+          FlutterError.reportError(FlutterErrorDetails(
+            exception: Exception('Simulated test crash'),
+            stack: StackTrace.current,
+          ));
+        }, returnsNormally);
+
+        expect(caughtDetails, isNotNull);
+        expect(caughtDetails!.exception.toString(), contains('Simulated test crash'));
+
+        expect(() {
+          final error = Exception('Simulated async crash');
+          PlatformDispatcher.instance.onError?.call(error, StackTrace.current);
+        }, returnsNormally);
+      } finally {
+        // Restaurar handler original
+        FlutterError.onError = originalOnError;
+      }
     });
   });
 }
