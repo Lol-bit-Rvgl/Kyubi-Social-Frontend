@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kyubi/features/messages/presentation/conversation_controller.dart';
 import 'package:kyubi/features/messages/presentation/conversation_screen.dart';
 import 'package:kyubi/features/salas/presentation/widgets/chat_message_input_bar.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:kyubi/models/character.dart';
 import 'package:kyubi/models/role_character.dart';
 import 'package:kyubi/models/user.dart';
 import 'package:kyubi/services/auth_controller.dart';
@@ -223,6 +225,80 @@ void main() {
       expect(find.byIcon(Icons.mic_none_rounded), findsOneWidget);
       expect(find.byIcon(Icons.photo_outlined), findsNothing);
       expect(find.byIcon(Icons.casino_rounded), findsOneWidget);
+    });
+  });
+
+  group('Sincronización de Estado de Rol y Avatares', () {
+    test('RoleCharacter.toVacant y copyWith(isTaken: false) limpian takenByUserId y takenByUsername', () {
+      const occupied = RoleCharacter(
+        id: 'role-test',
+        name: 'Protagonista',
+        avatarUrl: 'https://example.com/avatar.png',
+        isTaken: true,
+        takenByUserId: 'user-123',
+        takenByUsername: 'PlayerOne',
+      );
+
+      final vacant = occupied.toVacant();
+      expect(vacant.isTaken, isFalse);
+      expect(vacant.takenByUserId, isNull);
+      expect(vacant.takenByUsername, isNull);
+      expect(vacant.occupiedBy, isNull);
+      expect(vacant.occupiedByName, isNull);
+
+      final freed = occupied.copyWith(isTaken: false);
+      expect(freed.isTaken, isFalse);
+      expect(freed.takenByUserId, isNull);
+      expect(freed.takenByUsername, isNull);
+    });
+
+    test('Character.fromJson y RoleCharacter.fromJson leen avatarUrl desde múltiples claves alternativas', () {
+      final jsonWithAvatar = {
+        'id': 'char-1',
+        'name': 'Ficha 1',
+        'avatar': 'https://example.com/from_avatar.png',
+      };
+      final rc = RoleCharacter.fromJson(jsonWithAvatar);
+      expect(rc.avatarUrl, equals('https://example.com/from_avatar.png'));
+
+      final ch = Character.fromJson(jsonWithAvatar);
+      expect(ch.avatarUrl, equals('https://example.com/from_avatar.png'));
+
+      final converted = ch.toRoleCharacter(currentUserId: 'u1', currentUsername: 'tester');
+      expect(converted.avatarUrl, equals('https://example.com/from_avatar.png'));
+    });
+
+    testWidgets('ChatMessageInputBar renderiza CachedNetworkImage para el rol seleccionado con avatar', (tester) async {
+      const roleWithImg = RoleCharacter(
+        id: 'role-img',
+        name: 'Aria',
+        avatarUrl: 'https://example.com/aria.png',
+        isTaken: true,
+        takenByUserId: 'my-user-id',
+        takenByUsername: 'Tester',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChatMessageInputBar(
+              isRoleplay: true,
+              userName: 'Tester',
+              currentUserId: 'my-user-id',
+              currentRole: roleWithImg,
+              availableRoles: const [roleWithImg],
+              onSendMessage: (_) {},
+              onSendImage: (_) {},
+              onSendAudio: (_, _, _) {},
+              onSendDiceRoll: (_, _, _) {},
+              onSendPoll: (_, _) {},
+            ),
+          ),
+        ),
+      );
+
+      final cachedImage = tester.widget<CachedNetworkImage>(find.byType(CachedNetworkImage));
+      expect(cachedImage.imageUrl, equals('https://example.com/aria.png'));
     });
   });
 }

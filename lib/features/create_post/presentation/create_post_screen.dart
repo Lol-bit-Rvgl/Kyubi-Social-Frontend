@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../models/circle.dart';
 import '../../../../services/providers.dart';
 import '../../feed/presentation/feed_controller.dart';
 
@@ -22,6 +23,10 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final _bodyController = TextEditingController();
   final _tagsController = TextEditingController();
   String _visibility = 'PUBLIC';
+  String? _selectedCircleId;
+  List<Circle> _myCircles = [];
+  bool _loadingCircles = false;
+  bool _circlesLoaded = false;
   bool _warnViolence = false;
   bool _warnAdult = false;
   bool _warnDark = false;
@@ -34,6 +39,35 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   final List<_PickedImage> _selectedImages = [];
   bool _uploadingMedia = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMyCircles();
+  }
+
+  Future<void> _loadMyCircles() async {
+    setState(() => _loadingCircles = true);
+    try {
+      final circles = await ref.read(circleRepositoryProvider).getMyCircles();
+      if (!mounted) return;
+      setState(() {
+        _myCircles = circles;
+        _circlesLoaded = true;
+        _loadingCircles = false;
+        if (_selectedCircleId == null && circles.isNotEmpty) {
+          _selectedCircleId = circles.first.id;
+        }
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _circlesLoaded = true;
+          _loadingCircles = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -78,6 +112,26 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_visibility == 'CIRCLE') {
+      if (_myCircles.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No perteneces a ningún círculo para publicar con visibilidad Círculo',
+            ),
+          ),
+        );
+        return;
+      }
+      if (_selectedCircleId == null || _selectedCircleId!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Debes seleccionar un círculo'),
+          ),
+        );
+        return;
+      }
+    }
     FocusScope.of(context).unfocus();
     // Gamefeel: impacto medio al publicar (acción principal).
     HapticFeedback.mediumImpact();
@@ -116,6 +170,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
             title: _titleController.text.trim(),
             body: _bodyController.text.trim(),
             visibility: _visibility,
+            circleId: _visibility == 'CIRCLE' ? _selectedCircleId : null,
             tags: tags,
             mediaUrls: mediaUrls,
             warnViolence: _warnViolence,
@@ -450,9 +505,189 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                     DropdownMenuItem(value: 'CIRCLE', child: Text('Círculo')),
                     DropdownMenuItem(value: 'PRIVATE', child: Text('Privado')),
                   ],
-                  onChanged: (v) => setState(() => _visibility = v ?? 'PUBLIC'),
+                  onChanged: (v) {
+                    setState(() {
+                      _visibility = v ?? 'PUBLIC';
+                      if (_visibility == 'CIRCLE' && !_circlesLoaded && !_loadingCircles) {
+                        _loadMyCircles();
+                      }
+                    });
+                  },
                 ),
               ),
+
+              // ── Selector de Círculo (si visibilidad es Círculo) ──
+              if (_visibility == 'CIRCLE') ...[
+                const SizedBox(height: 12),
+                if (_loadingCircles)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF14141B),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF22222E),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: const Row(
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.accentCyan,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Cargando tus círculos...',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            color: Color(0xFFB0B0C0),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (_myCircles.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1624),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.accentCyan.withValues(alpha: 0.4),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.bubble_chart_rounded,
+                              size: 20,
+                              color: AppColors.accentCyan,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'No perteneces a ningún círculo aún',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Únete a un círculo para compartir publicaciones temáticas con su comunidad.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.65),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () => context.push('/circles'),
+                            style: TextButton.styleFrom(
+                              backgroundColor: AppColors.accentCyan.withValues(alpha: 0.15),
+                              foregroundColor: AppColors.accentCyan,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                            ),
+                            icon: const Icon(Icons.explore_rounded, size: 16),
+                            label: const Text(
+                              'Explorar Círculos',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF14141B),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF22222E),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedCircleId ?? (_myCircles.isNotEmpty ? _myCircles.first.id : null),
+                      dropdownColor: const Color(0xFF191924),
+                      style: const TextStyle(fontSize: 13.5, color: Colors.white),
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Seleccionar Círculo',
+                        border: InputBorder.none,
+                        prefixIcon: Icon(
+                          Icons.bubble_chart_rounded,
+                          size: 20,
+                          color: AppColors.accentCyan,
+                        ),
+                      ),
+                      validator: (v) {
+                        if (_visibility == 'CIRCLE' && (v == null || v.isEmpty)) {
+                          return 'Debes seleccionar un círculo';
+                        }
+                        return null;
+                      },
+                      items: _myCircles.map((circle) {
+                        return DropdownMenuItem<String>(
+                          value: circle.id,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  circle.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              if (circle.isPrivate) ...[
+                                const SizedBox(width: 6),
+                                const Icon(
+                                  Icons.lock_rounded,
+                                  size: 13,
+                                  color: Colors.white38,
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (v) => setState(() => _selectedCircleId = v),
+                    ),
+                  ),
+              ],
 
               const SizedBox(height: 16),
 
@@ -646,22 +881,25 @@ class _WarningCheck extends StatelessWidget {
           width: 0.8,
         ),
       ),
-      child: CheckboxListTile(
-        value: value,
-        onChanged: (v) => onChanged(v ?? false),
-        activeColor: AppColors.accentCrimson,
-        checkColor: Colors.white,
-        title: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: value ? FontWeight.w700 : FontWeight.w500,
-            color: value ? Colors.white : const Color(0xFFB0B0C0),
+      child: Material(
+        color: Colors.transparent,
+        child: CheckboxListTile(
+          value: value,
+          onChanged: (v) => onChanged(v ?? false),
+          activeColor: AppColors.accentCrimson,
+          checkColor: Colors.white,
+          title: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: value ? FontWeight.w700 : FontWeight.w500,
+              color: value ? Colors.white : const Color(0xFFB0B0C0),
+            ),
           ),
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+          controlAffinity: ListTileControlAffinity.leading,
         ),
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-        controlAffinity: ListTileControlAffinity.leading,
       ),
     );
   }

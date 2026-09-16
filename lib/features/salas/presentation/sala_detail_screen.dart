@@ -2464,17 +2464,50 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   /// stage —vuelve a quedar vacante para cualquiera—, resetea la identidad
   /// activa a la Cuenta Personal y actualiza el stage de forma reactiva.
   void _leaveRole(RoleCharacter role) {
-    final freed = role.copyWith(
-      isTaken: false,
-      takenByUserId: null,
-      takenByUsername: null,
-    );
+    final freed = role.toVacant();
     _salas.updateRoomRole(widget.roomId, freed);
+    final myId = ref.read(authControllerProvider).user?.id ?? '';
     setState(() {
       final idx = _stageRoles.indexWhere((r) => r.id == role.id);
       if (idx >= 0 && idx < _stageRoles.length) _stageRoles[idx] = freed;
+      if (myId.isNotEmpty) {
+        for (int i = 0; i < _stageRoles.length; i++) {
+          if (_stageRoles[i].takenByUserId == myId ||
+              _stageRoles[i].occupiedBy == myId) {
+            _stageRoles[i] = _stageRoles[i].toVacant();
+            _salas.updateRoomRole(widget.roomId, _stageRoles[i]);
+          }
+        }
+      }
       _currentActiveRole = null;
     });
+
+    // Actualizar optimistamente la sala en el controlador
+    final currentRoom =
+        ref.read(salaDetailControllerProvider(widget.roomId)).room;
+    if (currentRoom != null) {
+      final updatedRoles = currentRoom.stageRoles.map((r) {
+        if (r.id == role.id ||
+            (myId.isNotEmpty &&
+                (r.takenByUserId == myId || r.occupiedBy == myId))) {
+          return r.toVacant();
+        }
+        return r;
+      }).toList();
+      final updatedActiveChar = (currentRoom.activeCharacter?.id == role.id ||
+              (myId.isNotEmpty &&
+                  (currentRoom.activeCharacter?.takenByUserId == myId ||
+                      currentRoom.activeCharacter?.occupiedBy == myId)))
+          ? null
+          : currentRoom.activeCharacter;
+      ref
+          .read(salaDetailControllerProvider(widget.roomId).notifier)
+          .applyRoom(currentRoom.copyWith(
+            stageRoles: updatedRoles,
+            activeCharacter: updatedActiveChar,
+          ));
+    }
+
     // Persistir liberación en el backend (best-effort)
     ref
         .read(roomRepositoryProvider)
@@ -2527,129 +2560,166 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   void _openRoleInfo(RoleCharacter role) {
     final canManage = _canManageRoles();
     final myId = ref.read(authControllerProvider).user?.id ?? '';
-    final isMyRole = _currentActiveRole?.id == role.id ||
-        (myId.isNotEmpty &&
-            (role.takenByUserId == myId || role.occupiedBy == myId));
-    final isOccupied = role.isTaken &&
-        (role.takenByUserId != null || role.occupiedBy != null);
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => RoleInfoModal(
-        role: role,
-        isCurrentRole: isMyRole,
-        isOccupied: isOccupied,
-        occupiedByUsername: role.takenByUsername,
-        onTakeRole: isOccupied && !isMyRole
-            ? null // No se puede tomar un rol ya ocupado por otro
-            : () {
-                if (isMyRole) {
-                  // Cerrar el modal de inmediato para dar retroalimentación instantánea
-                  Navigator.pop(context);
-                  // Dejar rol: liberar el slot y resetear la identidad.
-                  _leaveRole(role);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Has liberado el rol: ${role.name}'),
-                      backgroundColor: const Color(0xFF2A121E),
-                    ),
-                  );
-                } else {
-                  // Tomar rol vacante
-                  final user = ref.read(authControllerProvider).user;
-                  final taken = role.copyWith(
-                    isTaken: true,
-                    takenByUserId: myId,
-                    takenByUsername: user?.username ?? user?.displayName,
-                  );
-                  _salas.updateRoomRole(widget.roomId, taken);
-                  setState(() {
-                    final idx = _stageRoles.indexWhere((r) => r.id == role.id);
-                    if (idx >= 0 && idx < _stageRoles.length) _stageRoles[idx] = taken;
-                    _currentActiveRole = taken;
-                  });
-                  // Persistir adopción de rol en el backend (best-effort)
-                  ref
-                      .read(roomRepositoryProvider)
-                      .updateStageRole(widget.roomId, role: taken, isTake: true)
-                      .catchError((err) {
-                    debugPrint('[STAGE_ROLE] Error al adoptar rol en backend: $err');
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Has adoptado el rol: ${role.name}'),
-                      backgroundColor: const Color(0xFF1E1A2E),
-                    ),
-                  );
-                }
-              },
-        onEditRole: canManage
-            ? () async {
-                Navigator.pop(context);
-                final updated = await Navigator.push<RoleCharacter>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => RoleEditorScreen(initialRole: role),
-                  ),
-                );
-                if (!mounted) return;
-                if (updated != null) {
-                  // Mantener estado de ocupación del rol original.
-                  final merged = updated.copyWith(
-                    isTaken: role.isTaken,
-                    takenByUserId: role.takenByUserId,
-                    takenByUsername: role.takenByUsername,
-                  );
-                  _salas.updateRoomRole(widget.roomId, merged);
-                  setState(() {
-                    final index = _stageRoles.indexWhere(
-                      (r) => r.id == role.id,
+      builder: (modalCtx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final liveRole = _stageRoles.firstWhere(
+            (r) => r.id == role.id,
+            orElse: () => role,
+          );
+          final isMyRole = liveRole.isTaken &&
+              (_currentActiveRole?.id == liveRole.id ||
+                  (myId.isNotEmpty &&
+                      (liveRole.takenByUserId == myId ||
+                          liveRole.occupiedBy == myId)));
+          final isOccupied = liveRole.isTaken &&
+              (liveRole.takenByUserId != null || liveRole.occupiedBy != null);
+
+          return RoleInfoModal(
+            role: liveRole,
+            isCurrentRole: isMyRole,
+            isOccupied: isOccupied,
+            occupiedByUsername: liveRole.takenByUsername,
+            onTakeRole: isOccupied && !isMyRole
+                ? null // No se puede tomar un rol ya ocupado por otro
+                : () {
+                    if (isMyRole) {
+                      // Cerrar el modal de inmediato para dar retroalimentación instantánea
+                      Navigator.pop(modalCtx);
+                      // Dejar rol: liberar el slot y resetear la identidad.
+                      _leaveRole(liveRole);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Has liberado el rol: ${liveRole.name}'),
+                          backgroundColor: const Color(0xFF2A121E),
+                        ),
+                      );
+                    } else {
+                      // Tomar rol vacante
+                      final user = ref.read(authControllerProvider).user;
+                      final taken = liveRole.copyWith(
+                        isTaken: true,
+                        takenByUserId: myId,
+                        takenByUsername: user?.displayName.isNotEmpty == true
+                            ? user!.displayName
+                            : user?.username,
+                      );
+                      _salas.updateRoomRole(widget.roomId, taken);
+                      setState(() {
+                        final idx =
+                            _stageRoles.indexWhere((r) => r.id == liveRole.id);
+                        if (idx >= 0 && idx < _stageRoles.length) {
+                          _stageRoles[idx] = taken;
+                        }
+                        _currentActiveRole = taken;
+                      });
+
+                      final currentRoom = ref
+                          .read(salaDetailControllerProvider(widget.roomId))
+                          .room;
+                      if (currentRoom != null) {
+                        final updatedRoles = currentRoom.stageRoles.map((r) {
+                          if (r.id == liveRole.id) return taken;
+                          return r;
+                        }).toList();
+                        ref
+                            .read(salaDetailControllerProvider(widget.roomId)
+                                .notifier)
+                            .applyRoom(currentRoom.copyWith(
+                              stageRoles: updatedRoles,
+                              activeCharacter: taken,
+                            ));
+                      }
+
+                      // Persistir adopción de rol en el backend (best-effort)
+                      ref
+                          .read(roomRepositoryProvider)
+                          .updateStageRole(widget.roomId,
+                              role: taken, isTake: true)
+                          .catchError((err) {
+                        debugPrint(
+                            '[STAGE_ROLE] Error al adoptar rol en backend: $err');
+                      });
+                      Navigator.pop(modalCtx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Has adoptado el rol: ${liveRole.name}'),
+                          backgroundColor: const Color(0xFF1E1A2E),
+                        ),
+                      );
+                    }
+                  },
+            onEditRole: canManage
+                ? () async {
+                    Navigator.pop(modalCtx);
+                    final updated = await Navigator.push<RoleCharacter>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RoleEditorScreen(initialRole: liveRole),
+                      ),
                     );
-                    if (index >= 0 && index < _stageRoles.length) {
-                      _stageRoles[index] = merged;
+                    if (!mounted) return;
+                    if (updated != null) {
+                      // Mantener estado de ocupación del rol original.
+                      final merged = updated.copyWith(
+                        isTaken: liveRole.isTaken,
+                        takenByUserId: liveRole.takenByUserId,
+                        takenByUsername: liveRole.takenByUsername,
+                      );
+                      _salas.updateRoomRole(widget.roomId, merged);
+                      setState(() {
+                        final index = _stageRoles.indexWhere(
+                          (r) => r.id == liveRole.id,
+                        );
+                        if (index >= 0 && index < _stageRoles.length) {
+                          _stageRoles[index] = merged;
+                        }
+                        if (_currentActiveRole?.id == liveRole.id) {
+                          _currentActiveRole = merged;
+                        }
+                      });
+                      ref
+                          .read(roomRepositoryProvider)
+                          .saveStageRole(widget.roomId, merged)
+                          .catchError((err) {
+                        debugPrint(
+                            '[STAGE_ROLE] Error al persistir edición de rol: $err');
+                      });
                     }
-                    if (_currentActiveRole?.id == role.id) {
-                      _currentActiveRole = merged;
-                    }
-                  });
-                  ref
-                      .read(roomRepositoryProvider)
-                      .saveStageRole(widget.roomId, merged)
-                      .catchError((err) {
-                    debugPrint(
-                        '[STAGE_ROLE] Error al persistir edición de rol: $err');
-                  });
-                }
-              }
-            : null,
-        onDeleteRole: canManage
-            ? () {
-                Navigator.pop(context);
-                final roleIdStr = role.id.toString().trim();
-                _salas.removeRoomRole(widget.roomId, roleIdStr);
-                setState(() {
-                  _stageRoles = _stageRoles
-                      .where((r) => r.id.toString().trim() != roleIdStr)
-                      .toList();
-                  if (_currentActiveRole?.id.toString().trim() == roleIdStr) {
-                    _currentActiveRole = null;
                   }
-                });
-                ref
-                    .read(roomRepositoryProvider)
-                    .deleteStageRole(widget.roomId, roleIdStr)
-                    .catchError((err) {
-                  debugPrint(
-                      '[STAGE_ROLE] Error al eliminar rol en backend: $err');
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ficha de rol eliminada')),
-                );
-              }
-            : null,
+                : null,
+            onDeleteRole: canManage
+                ? () {
+                    Navigator.pop(modalCtx);
+                    final roleIdStr = liveRole.id.toString().trim();
+                    _salas.removeRoomRole(widget.roomId, roleIdStr);
+                    setState(() {
+                      _stageRoles = _stageRoles
+                          .where((r) => r.id.toString().trim() != roleIdStr)
+                          .toList();
+                      if (_currentActiveRole?.id.toString().trim() ==
+                          roleIdStr) {
+                        _currentActiveRole = null;
+                      }
+                    });
+                    ref
+                        .read(roomRepositoryProvider)
+                        .deleteStageRole(widget.roomId, roleIdStr)
+                        .catchError((err) {
+                      debugPrint(
+                          '[STAGE_ROLE] Error al eliminar rol en backend: $err');
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Ficha de rol eliminada')),
+                    );
+                  }
+                : null,
+          );
+        },
       ),
     );
   }
@@ -4007,8 +4077,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                       if (myId != null && myId.isNotEmpty) {
                         final myRoles = _stageRoles
                             .where((r) =>
-                                r.takenByUserId == myId ||
-                                r.occupiedBy == myId ||
+                                (r.isTaken &&
+                                    (r.takenByUserId == myId ||
+                                        r.occupiedBy == myId)) ||
                                 r.id == _currentActiveRole?.id)
                             .toList();
                         if (myRoles.isNotEmpty) {
@@ -4020,10 +4091,19 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                         } else {
                           setState(() {
                             _currentActiveRole = null;
+                            for (int i = 0; i < _stageRoles.length; i++) {
+                              if (_stageRoles[i].takenByUserId == myId ||
+                                  _stageRoles[i].occupiedBy == myId) {
+                                _stageRoles[i] = _stageRoles[i].toVacant();
+                                _salas.updateRoomRole(
+                                    widget.roomId, _stageRoles[i]);
+                              }
+                            }
                           });
                           ref
                               .read(roomRepositoryProvider)
-                              .updateStageRole(widget.roomId, role: null, isTake: false)
+                              .updateStageRole(widget.roomId,
+                                  role: null, isTake: false)
                               .catchError((_) {});
                         }
                       } else if (_currentActiveRole != null) {

@@ -7,8 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/sticker_catalog.dart';
 import '../../../../core/widgets/sticker_picker.dart';
 import '../../../../models/role_character.dart';
@@ -1187,30 +1189,32 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
             children: [
               if (activeRole != null) ...[
                 if (activeRole.avatarUrl != null &&
-                    activeRole.avatarUrl!.isNotEmpty)
+                    activeRole.avatarUrl!.trim().isNotEmpty)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      activeRole.avatarUrl!,
+                    child: CachedNetworkImage(
+                      imageUrl: activeRole.avatarUrl!.trim(),
                       width: 34,
                       height: 34,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => _roleInitial(activeRole),
+                      placeholder: (_, _) => _roleInitial(activeRole),
+                      errorWidget: (_, _, _) => _roleInitial(activeRole),
                     ),
                   )
                 else
                   _roleInitial(activeRole),
               ] else ...[
                 if (widget.userAvatarUrl != null &&
-                    widget.userAvatarUrl!.isNotEmpty)
+                    widget.userAvatarUrl!.trim().isNotEmpty)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      widget.userAvatarUrl!,
+                    child: CachedNetworkImage(
+                      imageUrl: widget.userAvatarUrl!.trim(),
                       width: 34,
                       height: 34,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => _userInitial(),
+                      placeholder: (_, _) => _userInitial(),
+                      errorWidget: (_, _, _) => _userInitial(),
                     ),
                   )
                 else
@@ -1402,6 +1406,7 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                   ctx: ctx,
                   title: 'Mi Perfil (${widget.userName})',
                   subtitle: 'Cuenta personal (Mensajes fuera de rol)',
+                  imageUrl: widget.userAvatarUrl,
                   avatarUrl: widget.userAvatarUrl,
                   isSelected: _selectedRole == null,
                   fallbackColor: primaryColor,
@@ -1474,6 +1479,7 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                         subtitle: role.tagline.isNotEmpty
                             ? role.tagline
                             : 'Ficha de Rol equipada',
+                        imageUrl: role.avatarUrl,
                         avatarUrl: role.avatarUrl,
                         isSelected: isRoleSelected,
                         fallbackColor: role.color,
@@ -1499,6 +1505,7 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                   ctx: ctx,
                   title: 'Mi Biblioteca de Roles',
                   subtitle: 'Elegir o equipar una ficha de personaje (OC)',
+                  imageUrl: null,
                   avatarUrl: null,
                   isSelected: false,
                   fallbackColor: const Color(0xFFFFD600),
@@ -1527,12 +1534,14 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
     required BuildContext ctx,
     required String title,
     required String subtitle,
-    required String? avatarUrl,
+    String? imageUrl,
+    String? avatarUrl,
     required bool isSelected,
     required Color fallbackColor,
     Color? roleBadgeColor,
     required VoidCallback onTap,
   }) {
+    final effectiveImageUrl = (imageUrl ?? avatarUrl)?.trim();
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -1554,30 +1563,34 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
         ),
         child: Row(
           children: [
-            // Avatar
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: roleBadgeColor ?? fallbackColor,
-                  width: 1.2,
+            // Avatar de rol o cuenta personal con soporte de imágenes y fallbacks
+            if (title.contains('Biblioteca'))
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: fallbackColor.withValues(alpha: 0.15),
+                  border: Border.all(
+                    color: fallbackColor,
+                    width: 1.2,
+                  ),
                 ),
+                child: Icon(
+                  Icons.theater_comedy_rounded,
+                  size: 20,
+                  color: fallbackColor,
+                ),
+              )
+            else
+              AppAvatar(
+                imageUrl: (effectiveImageUrl != null && effectiveImageUrl.isNotEmpty)
+                    ? effectiveImageUrl
+                    : null,
+                name: title,
+                radius: 19,
+                borderColor: roleBadgeColor ?? fallbackColor,
               ),
-              child: ClipOval(
-                child: avatarUrl != null && avatarUrl.isNotEmpty
-                    ? Image.network(
-                        avatarUrl,
-                        width: 38,
-                        height: 38,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            _fallbackTileAvatar(title, fallbackColor),
-                      )
-                    : _fallbackTileAvatar(title, fallbackColor),
-              ),
-            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -1632,22 +1645,6 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                 size: 20,
               ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _fallbackTileAvatar(String title, Color color) {
-    return Container(
-      color: color.withValues(alpha: 0.25),
-      child: Center(
-        child: Text(
-          title.isNotEmpty ? title[0].toUpperCase() : '?',
-          style: TextStyle(
-            color: color,
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
         ),
       ),
     );

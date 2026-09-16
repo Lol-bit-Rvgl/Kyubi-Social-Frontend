@@ -353,11 +353,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           child: RefreshIndicator(
             onRefresh: _refreshMe,
+            displacement: 40.0,
+            edgeOffset: 10.0,
             color: const Color(0xFF8A7EB8),
             backgroundColor: const Color(0xFF1E1B2E),
             child: NestedScrollView(
               physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
+                parent: ClampingScrollPhysics(),
               ),
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
                 ProfileSliverAppBar(

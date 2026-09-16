@@ -54,13 +54,15 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         bottom: false,
         child: RefreshIndicator(
             onRefresh: notifier.refresh,
+            displacement: 40.0,
+            edgeOffset: 10.0,
             color: Theme.of(context).colorScheme.primary,
             backgroundColor: const Color(0xFF0D0A14),
             child: EndReachedNotifier(
               onEndReached: notifier.loadMore,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
+                  parent: ClampingScrollPhysics(),
                 ),
                 slivers: [
                   // 1. Cabecera superior (Avatar + Notificaciones)

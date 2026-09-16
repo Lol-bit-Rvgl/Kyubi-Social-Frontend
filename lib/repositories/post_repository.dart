@@ -60,6 +60,7 @@ class PostRepository {
     bool? warnSpoiler,
     bool? allowComments,
     bool? allowReactions,
+    String? circleId,
   }) async {
     final json = await _api.postJson(
       AppConfig.postsBase,
@@ -68,6 +69,7 @@ class PostRepository {
         if (title != null && title.isNotEmpty) 'title': title,
         'type': type,
         'visibility': visibility,
+        if (circleId != null && circleId.isNotEmpty) 'circleId': circleId,
         if (mediaUrls != null && mediaUrls.isNotEmpty) 'mediaUrls': mediaUrls,
         if (tags != null && tags.isNotEmpty) 'tags': tags,
         if (genres != null && genres.isNotEmpty) 'genres': genres,

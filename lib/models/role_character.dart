@@ -55,7 +55,9 @@ class RoleCharacter {
     String? takenByUserId,
     String? takenByUsername,
     bool? hasActiveMic,
+    bool clearOccupant = false,
   }) {
+    final shouldClear = clearOccupant || isTaken == false;
     return RoleCharacter(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -64,17 +66,25 @@ class RoleCharacter {
       tagline: tagline ?? this.tagline,
       description: description ?? this.description,
       language: language ?? this.language,
-      isTaken: isTaken ?? this.isTaken,
-      takenByUserId: takenByUserId ?? this.takenByUserId,
-      takenByUsername: takenByUsername ?? this.takenByUsername,
+      isTaken: shouldClear ? false : (isTaken ?? this.isTaken),
+      takenByUserId: shouldClear
+          ? (isTaken == false && takenByUserId != null ? takenByUserId : null)
+          : (takenByUserId ?? this.takenByUserId),
+      takenByUsername: shouldClear
+          ? (isTaken == false && takenByUsername != null ? takenByUsername : null)
+          : (takenByUsername ?? this.takenByUsername),
       hasActiveMic: hasActiveMic ?? this.hasActiveMic,
     );
   }
+
+  /// Retorna una copia de la ficha de personaje completamente vacante y desvinculada de cualquier usuario.
+  RoleCharacter toVacant() => copyWith(clearOccupant: true);
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
     'avatarUrl': avatarUrl,
+    'avatar': avatarUrl,
     'colorHex': colorHex,
     'tagline': tagline,
     'description': description,
@@ -91,7 +101,11 @@ class RoleCharacter {
     return RoleCharacter(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: (json['avatarUrl'] ??
+              json['avatar'] ??
+              json['imageUrl'] ??
+              json['image'] ??
+              json['photoUrl']) as String?,
       colorHex: json['colorHex'] as String? ??
           json['roleColor'] as String? ??
           json['roleColorHex'] as String? ??

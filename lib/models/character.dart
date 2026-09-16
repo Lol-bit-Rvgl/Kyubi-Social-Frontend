@@ -50,7 +50,11 @@ class Character {
       id: json['id'] as String? ?? '',
       userId: json['userId'] as String? ?? '',
       name: json['name'] as String? ?? 'Sin nombre',
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: (json['avatarUrl'] ??
+              json['avatar'] ??
+              json['imageUrl'] ??
+              json['image'] ??
+              json['photoUrl']) as String?,
       bio: json['bio'] as String?,
       age: json['age'] as String?,
       gender: json['gender'] as String?,
@@ -85,6 +89,7 @@ class Character {
     'userId': userId,
     'name': name,
     'avatarUrl': avatarUrl,
+    'avatar': avatarUrl,
     'bio': bio,
     'age': age,
     'gender': gender,

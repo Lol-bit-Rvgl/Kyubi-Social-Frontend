@@ -1,8 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kyubi/models/room.dart';
 import 'package:kyubi/models/character.dart';
-import 'package:kyubi/models/role_character.dart';
 
 void main() {
   group('Filtros de Actividad en Salas (matchesCategory)', () {
