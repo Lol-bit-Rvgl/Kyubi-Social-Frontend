@@ -2922,6 +2922,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
   void _openRoomInfo(Room? room) {
     HapticFeedback.selectionClick();
+    // Refresca el detalle al abrir para que "Descripción y Lore" nunca
+    // muestre valores obsoletos en memoria.
+    ref.read(salaDetailControllerProvider(widget.roomId).notifier).refresh();
     Navigator.push<void>(
       context,
       MaterialPageRoute(

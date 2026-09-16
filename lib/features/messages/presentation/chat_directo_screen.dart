@@ -987,6 +987,9 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
       onSendPoll: (question, options) => _sendPoll(question, options),
       onSendSticker: (sticker) => _sendSticker(sticker),
       onOpenModesTap: _showAttachmentsModal,
+      // El "+" ya abre el sheet unificado (Galería/Cámara): se oculta el
+      // acceso rápido duplicado a galería.
+      hideQuickImageButton: true,
       onTypingChanged: (typing) {
         if (typing) {
           ref

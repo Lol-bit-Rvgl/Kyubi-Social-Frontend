@@ -12,6 +12,7 @@ class SalasState {
     this.rooms = const [],
     this.pinnedRoomIds = const {},
     this.circleId,
+    this.category,
     this.query = '',
     this.loading = false,
     this.refreshing = false,
@@ -28,6 +29,7 @@ class SalasState {
   /// Ids de salas fijadas (`Pin to My Chats`): van primero en la lista.
   final Set<String> pinnedRoomIds;
   final String? circleId;
+  final String? category;
   final String query;
   final bool loading;
   final bool refreshing;
@@ -37,6 +39,7 @@ class SalasState {
     List<Room>? rooms,
     Set<String>? pinnedRoomIds,
     String? circleId,
+    String? category,
     String? query,
     bool? loading,
     bool? refreshing,
@@ -46,6 +49,7 @@ class SalasState {
       rooms: rooms ?? this.rooms,
       pinnedRoomIds: pinnedRoomIds ?? this.pinnedRoomIds,
       circleId: circleId ?? this.circleId,
+      category: category ?? this.category,
       query: query ?? this.query,
       loading: loading ?? this.loading,
       refreshing: refreshing ?? this.refreshing,
@@ -84,6 +88,7 @@ class SalasNotifier extends Notifier<SalasState> {
     return _repo.getSalas(
       circleId: state.circleId,
       query: state.query.isEmpty ? null : state.query,
+      category: state.category,
     );
   }
 
@@ -127,7 +132,23 @@ class SalasNotifier extends Notifier<SalasState> {
   void search(String query) {
     final trimmed = query.trim();
     if (state.query == trimmed) return;
-    state = SalasState(circleId: state.circleId, query: trimmed);
+    state = SalasState(
+      circleId: state.circleId,
+      category: state.category,
+      query: trimmed,
+      pinnedRoomIds: state.pinnedRoomIds,
+    );
+    Future.microtask(_load);
+  }
+
+  void setCategory(String? category) {
+    if (state.category == category) return;
+    state = SalasState(
+      circleId: state.circleId,
+      category: category,
+      query: state.query,
+      pinnedRoomIds: state.pinnedRoomIds,
+    );
     Future.microtask(_load);
   }
 

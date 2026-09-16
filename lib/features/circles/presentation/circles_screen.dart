@@ -733,11 +733,18 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
   }
 
   Widget _buildRoomCard(BuildContext context, Room room) {
-    final isVoice = room.tags.any(
-      (t) =>
-          t.toLowerCase().contains('voice') || t.toLowerCase().contains('voz'),
-    );
-    final modeBadge = isVoice ? '🎙️' : '💬';
+    final isVoice = room.isVoice;
+    final isScreening = room.isScreening;
+    final isRoleplay = room.isRoleplay;
+
+    final (badgeIcon, badgeColor) = isScreening
+        ? (Icons.movie_creation_rounded, const Color(0xFFFF3366))
+        : isRoleplay
+            ? (Icons.theater_comedy_rounded, const Color(0xFFFFD600))
+            : isVoice
+                ? (Icons.mic_rounded, const Color(0xFF00E5FF))
+                : (Icons.chat_bubble_rounded, const Color(0xFF8E8EA0));
+
     final hostName = room.host.displayName;
     final categoryName =
         room.circle?.name ??
@@ -778,26 +785,33 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
                           fit: BoxFit.cover,
                           placeholder: (_, _) => const KyubiShimmer(),
                           errorWidget: (_, _, _) =>
-                              _fallbackRoomCover(room.name),
+                              _fallbackRoomCover(room),
                         )
-                      : _fallbackRoomCover(room.name),
+                      : _fallbackRoomCover(room),
                 ),
                 Positioned(
                   bottom: -2,
                   right: -2,
                   child: Container(
-                    padding: const EdgeInsets.all(2.5),
+                    padding: const EdgeInsets.all(3.5),
                     decoration: BoxDecoration(
                       color: const Color(0xFF14141B),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(7),
                       border: Border.all(
-                        color: const Color(0xFF2C2542),
+                        color: badgeColor.withValues(alpha: 0.5),
                         width: 0.8,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: badgeColor.withValues(alpha: 0.25),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      modeBadge,
-                      style: const TextStyle(fontSize: 11),
+                    child: Icon(
+                      badgeIcon,
+                      size: 11,
+                      color: badgeColor,
                     ),
                   ),
                 ),
@@ -905,7 +919,22 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
     );
   }
 
-  Widget _fallbackRoomCover(String name) {
+  Widget _fallbackRoomCover(Room room) {
+    final iconData = room.isScreening
+        ? Icons.movie_creation_rounded
+        : room.isRoleplay
+            ? Icons.theater_comedy_rounded
+            : room.isVoice
+                ? Icons.mic_rounded
+                : Icons.forum_rounded;
+    final iconColor = room.isScreening
+        ? const Color(0xFFFF3366)
+        : room.isRoleplay
+            ? const Color(0xFFFFD600)
+            : room.isVoice
+                ? const Color(0xFF00E5FF)
+                : AppColors.accentCyan;
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -914,10 +943,10 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
           colors: [Color(0xFF1E1430), Color(0xFF0A222E)],
         ),
       ),
-      child: const Center(
+      child: Center(
         child: Icon(
-          Icons.theater_comedy_rounded,
-          color: AppColors.accentCyan,
+          iconData,
+          color: iconColor,
           size: 24,
         ),
       ),

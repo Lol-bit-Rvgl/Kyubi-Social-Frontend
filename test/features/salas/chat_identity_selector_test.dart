@@ -217,10 +217,11 @@ void main() {
       expect(find.byIcon(Icons.swap_horiz_rounded), findsNothing);
       // Debe contener el placeholder estándar
       expect(find.text('Escribe un mensaje...'), findsOneWidget);
-      // Debe mostrar la botonera rápida de 7 herramientas
+      // Debe mostrar la botonera rápida (sin el acceso rápido duplicado a
+      // galería: el "+" abre el sheet unificado Galería/Cámara).
       expect(find.byIcon(Icons.add_circle_outline_rounded), findsOneWidget);
       expect(find.byIcon(Icons.mic_none_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.photo_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.photo_outlined), findsNothing);
       expect(find.byIcon(Icons.casino_rounded), findsOneWidget);
     });
   });

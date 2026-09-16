@@ -426,13 +426,11 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
     return Expanded(
       child: GestureDetector(
         onTap: () {
+          final nextTag = _selectedCategoryTag == tag ? null : tag;
           setState(() {
-            if (_selectedCategoryTag == tag) {
-              _selectedCategoryTag = null;
-            } else {
-              _selectedCategoryTag = tag;
-            }
+            _selectedCategoryTag = nextTag;
           });
+          ref.read(salasControllerProvider.notifier).setCategory(nextTag);
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
@@ -598,6 +596,7 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
         name: 'peaceful place 🌿',
         host: PostAuthor(id: 'u1', username: 'flora', displayName: 'Flora'),
         participantCount: 8,
+        currentMode: 'voice',
         tags: ['Voice', 'Chill', 'Small Talk'],
         imageUrl:
             'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=500&auto=format&fit=crop&q=60',
@@ -607,6 +606,7 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
         name: '༺•*•El reino infinito•*•༻',
         host: PostAuthor(id: 'u2', username: 'shogun', displayName: 'Shogun'),
         participantCount: 16,
+        currentMode: 'roleplay',
         tags: ['Videojuegos', 'Rol', 'Anime'],
         imageUrl:
             'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=500&auto=format&fit=crop&q=60',
@@ -616,6 +616,8 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
         name: '🥖 Family~Friends~Cafe 🥐',
         host: PostAuthor(id: 'u3', username: 'baker', displayName: 'Barista'),
         participantCount: 12,
+        currentMode: 'screening',
+        cinemaVideoId: 'dQw4w9WgXcQ',
         tags: ['Screening', 'Café', 'Charla'],
         imageUrl:
             'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&auto=format&fit=crop&q=60',
@@ -629,6 +631,7 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
           displayName: 'Valerius',
         ),
         participantCount: 24,
+        currentMode: 'roleplay',
         tags: ['Small Talk', 'Roleplay', 'Medieval'],
         imageUrl:
             'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop&q=60',
@@ -638,6 +641,7 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
         name: 'wonderland ❄️',
         host: PostAuthor(id: 'u5', username: 'alice', displayName: 'Alice'),
         participantCount: 10,
+        currentMode: 'voice',
         tags: ['Voice', 'Nieve', 'Música'],
         imageUrl:
             'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=500&auto=format&fit=crop&q=60',
@@ -647,6 +651,7 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
         name: 'Zver survivors',
         host: PostAuthor(id: 'u6', username: 'klaus', displayName: 'Klaus'),
         participantCount: 19,
+        currentMode: 'roleplay',
         tags: ['Z Survivor', 'Anime', 'Roleplay'],
         imageUrl:
             'https://images.unsplash.com/photo-1563089145-599997674d42?w=500&auto=format&fit=crop&q=60',
@@ -656,6 +661,7 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
         name: '⟫⟫Academy Kingdom⟪⟪',
         host: PostAuthor(id: 'u7', username: 'rector', displayName: 'Director'),
         participantCount: 29,
+        currentMode: 'roleplay',
         tags: ['Roleplay', 'Fantasía', 'Magia'],
         imageUrl:
             'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500&auto=format&fit=crop&q=60',
@@ -669,6 +675,8 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
           displayName: 'Nocturne',
         ),
         participantCount: 14,
+        currentMode: 'screening',
+        cinemaVideoId: '9bZkp7q19f0',
         tags: ['Anime & Manga', 'Screening', 'Late Night'],
         imageUrl:
             'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&auto=format&fit=crop&q=60',
@@ -752,37 +760,44 @@ class _ProjectZRoomCard extends StatelessWidget {
                     top: 8,
                     right: 8,
                     child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(4.5),
                       decoration: BoxDecoration(
                         color: const Color(0xCC14141B),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0x33FFFFFF),
-                          width: 0.6,
+                          color: (isScreening
+                                  ? const Color(0xFFFF3366)
+                                  : isRoleplay
+                                      ? const Color(0xFFFFD600)
+                                      : isVoice
+                                          ? const Color(0xFF00E5FF)
+                                          : const Color(0xFF8E8EA0))
+                              .withValues(alpha: 0.5),
+                          width: 0.8,
                         ),
                       ),
-                      child: isVoice
+                      child: isScreening
                           ? const Icon(
-                              Icons.graphic_eq_rounded,
+                              Icons.movie_creation_rounded,
                               size: 11,
-                              color: AppColors.accentTeal,
+                              color: Color(0xFFFF3366),
                             )
-                          : isScreening
+                          : isRoleplay
                               ? const Icon(
-                                  Icons.live_tv_rounded,
+                                  Icons.theater_comedy_rounded,
                                   size: 11,
-                                  color: Color(0xFFD500F9),
+                                  color: Color(0xFFFFD600),
                                 )
-                              : isRoleplay
+                              : isVoice
                                   ? const Icon(
-                                      Icons.theater_comedy_rounded,
-                                      size: 11,
-                                      color: Color(0xFFFFD600),
-                                    )
-                                  : const Icon(
-                                      Icons.forum_rounded,
+                                      Icons.mic_rounded,
                                       size: 11,
                                       color: Color(0xFF00E5FF),
+                                    )
+                                  : const Icon(
+                                      Icons.chat_bubble_rounded,
+                                      size: 11,
+                                      color: Color(0xFF8E8EA0),
                                     ),
                     ),
                   ),
@@ -872,13 +887,13 @@ class _ProjectZRoomCard extends StatelessWidget {
   }
 
   Widget _fallbackCover(bool isVoice, bool isScreening, bool isRoleplay) {
-    final iconData = isVoice
-        ? Icons.graphic_eq_rounded
-        : isScreening
-            ? Icons.live_tv_rounded
-            : isRoleplay
-                ? Icons.theater_comedy_rounded
-                : Icons.forum_rounded;
+    final (iconData, iconColor) = isScreening
+        ? (Icons.movie_creation_rounded, const Color(0xFFFF3366))
+        : isRoleplay
+            ? (Icons.theater_comedy_rounded, const Color(0xFFFFD600))
+            : isVoice
+                ? (Icons.mic_rounded, const Color(0xFF00E5FF))
+                : (Icons.chat_bubble_rounded, const Color(0xFF8E8EA0));
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -891,7 +906,7 @@ class _ProjectZRoomCard extends StatelessWidget {
         child: Icon(
           iconData,
           size: 32,
-          color: Colors.white.withValues(alpha: 0.25),
+          color: iconColor.withValues(alpha: 0.35),
         ),
       ),
     );

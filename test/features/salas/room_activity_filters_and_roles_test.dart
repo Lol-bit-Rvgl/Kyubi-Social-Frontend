@@ -1,4 +1,5 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:kyubi/models/room.dart';
 import 'package:kyubi/models/character.dart';
 import 'package:kyubi/models/role_character.dart';
@@ -72,6 +73,69 @@ void main() {
       expect(room.matchesCategory('gaming'), isTrue);
       expect(room.matchesCategory('party'), isTrue);
       expect(room.matchesCategory('roleplay'), isFalse);
+    });
+  });
+
+  group('Badge de Actividad Dinámico en Salas (Cine, Roleplay, Voz, Texto)', () {
+    (IconData, Color) resolveBadge(Room room) {
+      if (room.isScreening) {
+        return (Icons.movie_creation_rounded, const Color(0xFFFF3366));
+      }
+      if (room.isRoleplay) {
+        return (Icons.theater_comedy_rounded, const Color(0xFFFFD600));
+      }
+      if (room.isVoice) {
+        return (Icons.mic_rounded, const Color(0xFF00E5FF));
+      }
+      return (Icons.chat_bubble_rounded, const Color(0xFF8E8EA0));
+    }
+
+    test('asigna badge carmesí de cine a salas con video o screening activo', () {
+      final room = Room.fromJson({
+        'id': 'r-cinema',
+        'name': 'Cinema Kyubi',
+        'host': {'id': 'h1', 'username': 'host'},
+        'cinemaVideoId': 'dQw4w9WgXcQ',
+      });
+      final (icon, color) = resolveBadge(room);
+      expect(icon, Icons.movie_creation_rounded);
+      expect(color, const Color(0xFFFF3366));
+    });
+
+    test('asigna badge dorado de teatro a salas con stage o roleplay activo', () {
+      final room = Room.fromJson({
+        'id': 'r-rp',
+        'name': 'Reino Medieval',
+        'host': {'id': 'h1', 'username': 'host'},
+        'currentMode': 'roleplay',
+      });
+      final (icon, color) = resolveBadge(room);
+      expect(icon, Icons.theater_comedy_rounded);
+      expect(color, const Color(0xFFFFD600));
+    });
+
+    test('asigna badge cyan de micrófono a salas con voz activa', () {
+      final room = Room.fromJson({
+        'id': 'r-voice',
+        'name': 'Podcast Nocturno',
+        'host': {'id': 'h1', 'username': 'host'},
+        'currentMode': 'voice',
+      });
+      final (icon, color) = resolveBadge(room);
+      expect(icon, Icons.mic_rounded);
+      expect(color, const Color(0xFF00E5FF));
+    });
+
+    test('asigna badge neutral de chat a salas estándar o en reposo', () {
+      final room = Room.fromJson({
+        'id': 'r-chat',
+        'name': 'Charla General',
+        'host': {'id': 'h1', 'username': 'host'},
+        'currentMode': 'standard',
+      });
+      final (icon, color) = resolveBadge(room);
+      expect(icon, Icons.chat_bubble_rounded);
+      expect(color, const Color(0xFF8E8EA0));
     });
   });
 

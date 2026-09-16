@@ -9,6 +9,7 @@ import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/kyubi_rich_text.dart';
 import '../../../../models/room.dart';
 import '../../../../services/auth_controller.dart';
+import '../../../../services/providers.dart';
 import 'edit_room_screen.dart';
 import 'sala_detail_controller.dart';
 import 'widgets/room_invite_friends_sheet.dart';
@@ -99,12 +100,7 @@ class RoomDetailInfoScreen extends ConsumerWidget {
                       Navigator.pop(context);
                       onEditRoom!();
                     } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EditRoomScreen(room: r),
-                        ),
-                      );
+                      _editAndPersist(context, ref, r);
                     }
                   },
                 ),
@@ -687,6 +683,41 @@ class RoomDetailInfoScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Edición directa con persistencia (respaldo cuando no hay `onEditRoom`):
+  /// guarda vía PATCH y actualiza el provider de detalle para que la
+  /// descripción no se pierda al volver.
+  Future<void> _editAndPersist(
+    BuildContext context,
+    WidgetRef ref,
+    Room? r,
+  ) async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => EditRoomScreen(room: r)),
+    );
+    if (result == null || !context.mounted) return;
+    try {
+      final updated = await ref.read(roomRepositoryProvider).updateSala(
+            roomId,
+            name: result['name'] as String?,
+            description: result['description'] as String?,
+            imageUrl: result['coverUrl'] as String?,
+            chatBackgroundUrl: result['bgUrl'] as String?,
+            rules: (result['rules'] as List?)?.cast<String>(),
+            tags: (result['tags'] as List?)?.cast<String>(),
+          );
+      ref.read(salaDetailControllerProvider(roomId).notifier).applyRoom(updated);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo guardar la configuración de la sala'),
+          ),
+        );
+      }
+    }
   }
 
   Widget _sectionHeader(String title) {

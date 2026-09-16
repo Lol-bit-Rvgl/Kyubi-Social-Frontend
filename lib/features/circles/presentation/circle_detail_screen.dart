@@ -594,7 +594,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                         child: const Row(
                           children: [
                             Icon(
-                              Icons.theater_comedy_rounded,
+                              Icons.meeting_room_rounded,
                               color: AppColors.accentCyan,
                               size: 16,
                             ),
@@ -1108,7 +1108,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                       ),
                     ),
                     child: const Icon(
-                      Icons.theater_comedy_rounded,
+                      Icons.forum_rounded,
                       color: AppColors.accentCyan,
                       size: 22,
                     ),

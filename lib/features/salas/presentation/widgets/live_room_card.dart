@@ -2,7 +2,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/constants/app_assets.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/widgets/app_avatar.dart';
@@ -24,22 +23,17 @@ class LiveRoomCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = room.status == RoomStatus.active;
-    final isVoice = room.tags.any(
-      (t) =>
-          t.toLowerCase().contains('voice') || t.toLowerCase().contains('voz'),
-    );
-    final isRp = room.tags.any(
-      (t) =>
-          t.toLowerCase().contains('rp') ||
-          t.toLowerCase().contains('rol') ||
-          t.toLowerCase().contains('roleplay'),
-    );
-    // Micrófono para salas de voz; máscara para roleplay; chat el resto.
-    final (modeIcon, modeColor) = isVoice
-        ? (Icons.mic_rounded, AppColors.accentTeal)
+    final isVoice = room.isVoice;
+    final isScreening = room.isScreening;
+    final isRp = room.isRoleplay;
+
+    final (modeIcon, modeColor) = isScreening
+        ? (Icons.movie_creation_rounded, const Color(0xFFFF3366))
         : isRp
             ? (Icons.theater_comedy_rounded, const Color(0xFFFFD600))
-            : (Icons.chat_bubble_rounded, const Color(0xFF7EC8E3));
+            : isVoice
+                ? (Icons.mic_rounded, const Color(0xFF00E5FF))
+                : (Icons.chat_bubble_rounded, const Color(0xFF8E8EA0));
 
     final participantAvatars = room.participants
         .take(_maxVisibleAvatars)
@@ -132,13 +126,12 @@ class LiveRoomCard extends StatelessWidget {
                       ),
                     ),
                     child: isRp
-                        ? Image.asset(
-                            AppAssets.iconRoleplay,
-                            width: 22,
-                            height: 22,
-                            fit: BoxFit.contain,
+                        ? const Icon(
+                            Icons.theater_comedy_rounded,
+                            size: 13,
+                            color: Color(0xFFFFD600),
                           )
-                        : Icon(modeIcon, size: 12, color: modeColor),
+                        : Icon(modeIcon, size: 13, color: modeColor),
                   ),
                   const SizedBox(width: 8),
 

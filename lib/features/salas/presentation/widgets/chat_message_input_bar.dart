@@ -30,6 +30,7 @@ class ChatMessageInputBar extends StatefulWidget {
     required this.onSendPoll,
     this.onSendSticker,
     this.onOpenModesTap,
+    this.hideQuickImageButton = false,
     this.isRoleplay = true,
     this.userName = 'Usuario',
     this.userAvatarUrl,
@@ -63,6 +64,11 @@ class ChatMessageInputBar extends StatefulWidget {
   final Function(StickerItem sticker)? onSendSticker;
   final VoidCallback? onOpenModesTap;
   final bool isRoleplay;
+
+  /// Oculta el botón rápido de imagen (galería directa). Útil cuando el
+  /// botón "+" ya abre el sheet unificado de adjuntos (Galería/Cámara),
+  /// para no mantener dos accesos redundantes al mismo flujo.
+  final bool hideQuickImageButton;
   final String userName;
   final String? userAvatarUrl;
   final RoleCharacter? currentRole;
@@ -636,12 +642,15 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                         ),
 
                         // 2. Enviar imagen desde galería o cámara (🖼️)
-                        _toolButton(
-                          icon: Icons.photo_outlined,
-                          color: const Color(0xFF9E9EA8),
-                          tooltip: 'Enviar imagen',
-                          onTap: _pickImage,
-                        ),
+                        // Se oculta cuando el botón "+" ya abre el sheet
+                        // unificado de adjuntos (evita el acceso duplicado).
+                        if (!widget.hideQuickImageButton)
+                          _toolButton(
+                            icon: Icons.photo_outlined,
+                            color: const Color(0xFF9E9EA8),
+                            tooltip: 'Enviar imagen',
+                            onTap: _pickImage,
+                          ),
 
                         // 3. Selector de emojis y stickers (😊)
                         _toolButton(
