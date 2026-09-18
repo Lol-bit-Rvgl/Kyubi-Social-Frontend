@@ -28,7 +28,7 @@ import '../../messages/presentation/conversations_controller.dart';
 import '../../profile/presentation/user_follow_controller.dart';
 import '../../roles/presentation/role_editor_screen.dart';
 import '../../roles/presentation/widgets/role_info_modal.dart';
-import '../../roles/presentation/role_library_screen.dart';
+import '../../../../core/widgets/liquid_glass_button.dart';
 import 'edit_room_screen.dart';
 import 'sala_detail_controller.dart';
 import 'salas_controller.dart';
@@ -2541,46 +2541,6 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         .catchError((err) {
       debugPrint('[STAGE_ROLE] Error al liberar rol en backend: $err');
     });
-  }
-
-  /// Adopta una ficha de personaje elegida desde la Biblioteca de Roles (OCs).
-  void _onRoleSelectedFromLibrary(RoleCharacter chosen) {
-    final user = ref.read(authControllerProvider).user;
-    final myId = user?.id ?? '';
-    final myUsername = user?.displayName.isNotEmpty == true
-        ? user!.displayName
-        : (user?.username ?? 'Tú');
-
-    final adopted = chosen.copyWith(
-      isTaken: true,
-      takenByUserId: myId,
-      takenByUsername: myUsername,
-    );
-
-    setState(() {
-      _currentActiveRole = adopted;
-      final idx = _stageRoles.indexWhere((r) => r.id == adopted.id);
-      if (idx >= 0) {
-        _stageRoles[idx] = adopted;
-      } else {
-        _stageRoles.add(adopted);
-      }
-    });
-
-    _salas.updateRoomRole(widget.roomId, adopted);
-    ref
-        .read(roomRepositoryProvider)
-        .updateStageRole(widget.roomId, role: adopted, isTake: true)
-        .catchError((err) {
-      debugPrint('[STAGE_ROLE] Error al adoptar rol de biblioteca: $err');
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Identidad cambiada a: ${adopted.name}'),
-        backgroundColor: const Color(0xFF2A121E),
-      ),
-    );
   }
 
   void _openRoleInfo(RoleCharacter role) {
@@ -5213,66 +5173,23 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         color: Color(0xFF13101E),
         border: Border(top: BorderSide(color: Color(0xFF221D32), width: 0.8)),
       ),
-      child: Row(
-        children: [
-          // Campo simulación
-          Expanded(
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1B172B),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF2E2746), width: 0.8),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              alignment: Alignment.centerLeft,
-              child: const Text(
-                'Message...',
-                style: TextStyle(color: Color(0xFF6E6888), fontSize: 13.5),
-              ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          child: LiquidGlassButton(
+            label: 'Unirse a la sala',
+            icon: Icons.login_rounded,
+            height: 48,
+            borderColor: AppColors.accentCyan,
+            customGradient: const LinearGradient(
+              colors: [
+                Color(0xFF0E3838),
+                Color(0xFF164E4E),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ),
-          const SizedBox(width: 8),
-
-          // Botón Switch (Cambiar rol / Adoptar desde la Biblioteca de Roles)
-          GestureDetector(
-            onTap: () async {
-              final chosen = await RoleLibraryScreen.showPicker(context);
-              if (chosen != null && mounted) {
-                _onRoleSelectedFromLibrary(chosen);
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1930),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF332B4F), width: 0.8),
-              ),
-              child: const Row(
-                children: [
-                  Icon(
-                    Icons.auto_awesome_rounded,
-                    size: 14,
-                    color: AppColors.accentCyan,
-                  ),
-                  SizedBox(width: 5),
-                  Text(
-                    'Switch',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Botón Join (Conectarse formalmente)
-          GestureDetector(
             onTap: () {
               // Gamefeel: impacto medio al unirse a una sala de roleplay.
               HapticFeedback.mediumImpact();
@@ -5286,24 +5203,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                 ),
               );
             },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0E3838),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.accentCyan, width: 1),
-              ),
-              child: const Text(
-                'Join',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.accentCyan,
-                ),
-              ),
-            ),
           ),
-        ],
+        ),
       ),
     );
   }
