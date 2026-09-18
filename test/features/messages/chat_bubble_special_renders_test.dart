@@ -75,6 +75,36 @@ void main() {
       final sticker = tester.widget<AnimatedSticker>(find.byType(AnimatedSticker));
       expect(sticker.assetPath, 'assets/stickers/sparkle.json');
     });
+
+    testWidgets('Renderiza AnimatedSticker con formato :nombre: sin mostrar texto de reserva', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: ChatMessageBubble(
+              displayName: 'Usuario',
+              body: ':Destello:',
+              timestamp: '12:00',
+              mediaUrl: 'assets/stickers/sparkle.json',
+              mediaType: 'sticker',
+              extensions: {
+                'isAnimated': true,
+                'stickerId': 'sparkle',
+                'assetPath': 'assets/stickers/sparkle.json',
+                'name': 'Destello',
+              },
+            ),
+          ),
+        ),
+      );
+
+      // No debe mostrar el texto :Destello:
+      expect(find.text(':Destello:'), findsNothing);
+
+      // Debe renderizar AnimatedSticker
+      expect(find.byType(AnimatedSticker), findsOneWidget);
+      final sticker = tester.widget<AnimatedSticker>(find.byType(AnimatedSticker));
+      expect(sticker.assetPath, 'assets/stickers/sparkle.json');
+    });
   });
 
   group('3. Encuestas y Notas de voz interactivas', () {

@@ -152,8 +152,11 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
   }
 
   void _sendSticker(StickerItem sticker) {
+    final fallbackText = sticker.name.isNotEmpty
+        ? ':${sticker.name}:'
+        : (sticker.emoji.isNotEmpty ? sticker.emoji : '🎨');
     ref.read(conversationChatProvider(widget.conversationId).notifier).send(
-      '',
+      fallbackText,
       mediaUrl: sticker.assetPath,
       mediaType: 'sticker',
       extensions: {

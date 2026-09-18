@@ -135,6 +135,7 @@ class Room {
   final String? createdAt;
   final String? endedAt;
 
+  String get hostId => host.id;
   bool get hasCircle => circle != null;
   bool get isFull =>
       capacity != null && capacity! > 0 && participantCount >= capacity!;

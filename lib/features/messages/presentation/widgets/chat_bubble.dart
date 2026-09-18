@@ -1,4 +1,4 @@
-﻿import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -84,6 +84,11 @@ class DirectChatMessageBubble extends StatelessWidget {
     final t = body.trim();
     if (t.startsWith('✨') &&
         stickerCatalog.any((s) => t == '✨ ${s.name}' || t == s.emoji)) {
+      return true;
+    }
+    if (t.startsWith(':') &&
+        t.endsWith(':') &&
+        stickerCatalog.any((s) => t == ':${s.name}:')) {
       return true;
     }
     return false;
@@ -224,7 +229,10 @@ class DirectChatMessageBubble extends StatelessWidget {
 
     if (assetPath == null) {
       for (final s in stickerCatalog) {
-        if (body.contains(s.name) || body.contains(s.emoji) || (mediaUrl != null && mediaUrl!.contains(s.id))) {
+        if (body.contains(s.name) ||
+            body.contains(s.emoji) ||
+            body == ':${s.name}:' ||
+            (mediaUrl != null && mediaUrl!.contains(s.id))) {
           assetPath = s.assetPath;
           emoji ??= s.emoji;
           break;

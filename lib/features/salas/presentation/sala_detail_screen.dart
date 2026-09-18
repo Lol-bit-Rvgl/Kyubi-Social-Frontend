@@ -1865,18 +1865,34 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   /// Si no es participante ni host, muestra modal de "Solicitar invitación".
   void _verifyAccess(Room? room) {
     if (_accessChecked || room == null) return;
-    _accessChecked = true;
 
     // Salas públicas: acceso libre.
-    if (room.access == RoomAccess.public) return;
+    if (room.access == RoomAccess.public) {
+      _accessChecked = true;
+      return;
+    }
 
-    // Si es host o participante activo (no solo invitado), acceso permitido.
+    // Si la sesión aún no ha hidratado myId, diferir la comprobación (no marcar _accessChecked).
     final myId = ref.read(authControllerProvider).user?.id ?? '';
-    final isHostOrParticipant = (myId.isNotEmpty && room.host.id == myId) ||
+    if (myId.isEmpty) return;
+
+    // Prioridad absoluta al anfitrión (host):
+    final isHost = room.host.id == myId || room.hostId == myId || room.isHost;
+    if (isHost) {
+      _accessChecked = true;
+      return;
+    }
+
+    // Si es participante activo (no solo invitado), acceso permitido.
+    final isParticipant =
         room.participants.any((p) => p.user.id == myId && p.role != 'INVITED');
-    if (isHostOrParticipant) return;
+    if (isParticipant) {
+      _accessChecked = true;
+      return;
+    }
 
     // Sala privada sin permiso: mostrar modal de acceso denegado.
+    _accessChecked = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _showAccessDeniedModal(room);
@@ -3948,6 +3964,31 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     final state = ref.watch(salaDetailControllerProvider(widget.roomId));
     final room = state.room;
     final roomName = room?.name ?? 'Sala';
+    final myId = ref.watch(authControllerProvider).user?.id ?? '';
+
+    // Estado de carga defensivo: si aún no cargó la sala, o si la sala es privada
+    // pero la sesión de usuario aún no está hidratada, mostrar pantalla de carga
+    // para evitar condiciones de carrera y falsos bloqueos al host.
+    if (state.loading && room == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0A0912),
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.accentCyan),
+        ),
+      );
+    }
+    if (room != null && room.access == RoomAccess.private && myId.isEmpty) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0A0912),
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.accentCyan),
+        ),
+      );
+    }
+
+    if (!_accessChecked && room != null && myId.isNotEmpty) {
+      _verifyAccess(room);
+    }
 
     return PopScope(
       // El botón atrás (flecha superior) y el gesto del sistema nunca deben
