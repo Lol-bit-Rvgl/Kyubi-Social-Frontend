@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/role_character.dart';
 import '../../../models/room.dart';
 import '../../../repositories/room_repository.dart';
+import '../../../services/auth_controller.dart';
 import '../../../services/providers.dart';
 
 /// Estado del listado de salas (públicas o de un círculo).
@@ -23,8 +24,32 @@ class SalasState {
 
   /// Salas del usuario: donde es Host/Creador o a las que se ha unido
   /// explícitamente. Las salas públicas que solo se exploran quedan fuera.
+  /// Si el usuario solo tiene rol INVITED, la sala queda excluida.
   List<Room> get userRooms =>
-      rooms.where((r) => r.isHost || r.isParticipant).toList();
+      rooms.where((r) {
+        final isOnlyInvited = r.participants.any((p) => p.role == 'INVITED') && !r.isParticipant && !r.isHost;
+        if (isOnlyInvited) return false;
+        return r.isHost || r.isParticipant;
+      }).toList();
+
+  /// Salas activas del usuario actual identificadas estrictamente por su `userId`.
+  /// Si el usuario solo tiene rol INVITED, la sala NUNCA se incluye en "Rooms".
+  List<Room> activeRoomsForUser(String? currentUserId) {
+    if (currentUserId == null || currentUserId.isEmpty) {
+      return userRooms;
+    }
+    return rooms.where((r) {
+      final isHost = r.hostId == currentUserId || r.host.id == currentUserId;
+      final isInvited = r.participants.any(
+        (p) => p.user.id == currentUserId && p.role == 'INVITED',
+      );
+      if (isInvited) return false;
+      final isMember = r.participants.any(
+        (p) => p.user.id == currentUserId && p.role != 'INVITED',
+      ) || (r.isParticipant && !isInvited);
+      return isHost || isMember;
+    }).toList();
+  }
 
   /// Ids de salas fijadas (`Pin to My Chats`): van primero en la lista.
   final Set<String> pinnedRoomIds;
@@ -62,17 +87,36 @@ class SalasNotifier extends Notifier<SalasState> {
   RoomRepository get _repo => ref.read(roomRepositoryProvider);
 
   bool _disposed = false;
+  bool _fetching = false;
 
   @override
   SalasState build() {
     ref.onDispose(() => _disposed = true);
-    Future.microtask(_load);
+    final currentUserId = ref.watch(authControllerProvider.select((s) => s.user?.id));
+    _clearMemoryData();
+    if (currentUserId != null && currentUserId.isNotEmpty) {
+      Future.microtask(_load);
+      return const SalasState(loading: true);
+    }
     return const SalasState();
   }
 
+  /// Purga síncrona de todo el estado en memoria al cambiar de cuenta o cerrar sesión.
+  void clearAll() {
+    _clearMemoryData();
+    state = const SalasState();
+  }
+
+  void _clearMemoryData() {
+    _roomNotifications.clear();
+    _roomBubbleColors.clear();
+    _roomRoles.clear();
+    _roomMessages.clear();
+  }
+
   Future<void> _load() async {
-    if (_disposed) return;
-    if (state.loading || state.refreshing) return;
+    if (_disposed || _fetching) return;
+    _fetching = true;
     state = state.copyWith(loading: true, error: null);
     try {
       final rooms = await _fetch();
@@ -81,6 +125,8 @@ class SalasNotifier extends Notifier<SalasState> {
     } catch (e) {
       if (_disposed) return;
       state = state.copyWith(loading: false, error: e.toString());
+    } finally {
+      _fetching = false;
     }
   }
 
@@ -111,7 +157,8 @@ class SalasNotifier extends Notifier<SalasState> {
   }
 
   Future<void> refresh() async {
-    if (_disposed) return;
+    if (_disposed || _fetching) return;
+    _fetching = true;
     state = state.copyWith(refreshing: true, error: null);
     try {
       final rooms = await _fetch();
@@ -120,6 +167,8 @@ class SalasNotifier extends Notifier<SalasState> {
     } catch (e) {
       if (_disposed) return;
       state = state.copyWith(refreshing: false, error: e.toString());
+    } finally {
+      _fetching = false;
     }
   }
 

@@ -47,6 +47,8 @@ class RoomInvitesNotifier extends Notifier<RoomInvitesState> {
   StreamSubscription<RoomSocketEvent>? _socketSub;
   bool _disposed = false;
 
+  bool _fetching = false;
+
   @override
   RoomInvitesState build() {
     ref.onDispose(() {
@@ -58,6 +60,7 @@ class RoomInvitesNotifier extends Notifier<RoomInvitesState> {
     if (user != null && user.id.isNotEmpty) {
       _listenToSocket();
       Future.microtask(_load);
+      return const RoomInvitesState(loading: true);
     }
     return const RoomInvitesState();
   }
@@ -74,8 +77,8 @@ class RoomInvitesNotifier extends Notifier<RoomInvitesState> {
   }
 
   Future<void> _load() async {
-    if (_disposed) return;
-    if (state.loading || state.refreshing) return;
+    if (_disposed || _fetching) return;
+    _fetching = true;
     state = state.copyWith(loading: true, error: null);
     try {
       final list = await _repo.getRoomInvites();
@@ -87,11 +90,14 @@ class RoomInvitesNotifier extends Notifier<RoomInvitesState> {
     } catch (e) {
       if (_disposed) return;
       state = state.copyWith(loading: false, error: e.toString());
+    } finally {
+      _fetching = false;
     }
   }
 
   Future<void> refresh() async {
-    if (_disposed) return;
+    if (_disposed || _fetching) return;
+    _fetching = true;
     state = state.copyWith(refreshing: true, error: null);
     try {
       final list = await _repo.getRoomInvites();
@@ -103,6 +109,8 @@ class RoomInvitesNotifier extends Notifier<RoomInvitesState> {
     } catch (e) {
       if (_disposed) return;
       state = state.copyWith(refreshing: false, error: e.toString());
+    } finally {
+      _fetching = false;
     }
   }
 
@@ -117,7 +125,8 @@ class RoomInvitesNotifier extends Notifier<RoomInvitesState> {
         invites: state.invites.where((r) => r.id != roomId).toList(),
         busyIds: {...state.busyIds}..remove(roomId),
       );
-      // Refrescar salasController para que la sala aparezca en las listas del usuario
+      // Actualizar inmediatamente salasController para que aparezca en Rooms
+      ref.read(salasControllerProvider.notifier).upsertRoom(room);
       ref.read(salasControllerProvider.notifier).refresh();
       return room;
     } catch (e) {

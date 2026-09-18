@@ -66,6 +66,7 @@ class AuthNotifier extends Notifier<AuthState> {
   AuthRepository get _auth => ref.read(authRepositoryProvider);
 
   void _purgeUserSessionState() {
+    final currentUserId = state.user?.id;
     try {
       ref.read(chatSocketProvider).disconnect();
     } catch (_) {}
@@ -79,16 +80,20 @@ class AuthNotifier extends Notifier<AuthState> {
       ref.read(voiceRoomProvider.notifier).leaveRoom();
     } catch (_) {}
     try {
-      ref.read(salasControllerProvider.notifier).clearAllRoomMessages();
+      ref.read(salasControllerProvider.notifier).clearAll();
+    } catch (_) {}
+    try {
+      ref.read(roomInvitesControllerProvider.notifier).clear();
+    } catch (_) {}
+    try {
+      ConversationsCache.clear(userId: currentUserId);
+      RoomsCache.clear(userId: currentUserId);
     } catch (_) {}
 
     ref.invalidate(salasControllerProvider);
     ref.invalidate(conversationsControllerProvider);
     ref.invalidate(unreadCountProvider);
     ref.invalidate(followRequestsControllerProvider);
-    try {
-      ref.read(roomInvitesControllerProvider.notifier).clear();
-    } catch (_) {}
     ref.invalidate(roomInvitesControllerProvider);
   }
 
@@ -186,6 +191,7 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(busy: true, error: null);
     try {
       final result = await _auth.login(email: email, password: password);
+      _purgeUserSessionState();
       await SessionRepository(_auth).saveSession(result);
       final user = result.user ?? await _auth.me();
       state = AuthState(
@@ -219,6 +225,7 @@ class AuthNotifier extends Notifier<AuthState> {
         password: password,
         displayName: displayName,
       );
+      _purgeUserSessionState();
       await SessionRepository(_auth).saveSession(result);
       final user = result.user ?? await _auth.me();
       state = AuthState(
@@ -247,6 +254,7 @@ class AuthNotifier extends Notifier<AuthState> {
         state = state.copyWith(busy: false);
         return false;
       }
+      _purgeUserSessionState();
       await SessionRepository(_auth).saveSession(result);
       final user = result.user ?? await _auth.me();
       state = AuthState(

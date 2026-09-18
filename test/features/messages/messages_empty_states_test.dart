@@ -14,6 +14,8 @@ import 'package:kyubi/models/user.dart';
 import 'package:kyubi/services/auth_controller.dart';
 import 'package:kyubi/features/messages/presentation/messages_screen.dart';
 import 'package:kyubi/features/salas/presentation/salas_controller.dart';
+import 'package:kyubi/models/post_author.dart';
+import 'package:kyubi/models/room.dart';
 
 void main() {
   group('AppAssets - Constantes de Assets Oficiales de Estados Vacíos', () {
@@ -194,6 +196,137 @@ void main() {
       expect(find.text('My Chats'), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget);
       expect(find.byType(TabBar), findsOneWidget);
+    });
+  });
+
+  group('SalasState.activeRoomsForUser - Separación Estricta Rooms vs Invites', () {
+    const currentUserId = 'user-current';
+    const hostUser = PostAuthor(
+      id: 'user-host',
+      username: 'host_user',
+      displayName: 'Host User',
+    );
+    const currentUserAuthor = PostAuthor(
+      id: currentUserId,
+      username: 'current_user',
+      displayName: 'Current User',
+    );
+
+    test('Excluye estrictamente salas donde el usuario tiene rol INVITED', () {
+      final invitedRoom = Room(
+        id: 'room-invited-1',
+        name: 'Sala Secreta VIP',
+        host: hostUser,
+        access: RoomAccess.private,
+        participants: [
+          RoomParticipant(
+            user: currentUserAuthor,
+            role: 'INVITED',
+            joinedAt: '2026-09-18T20:00:00.000Z',
+          ),
+        ],
+      );
+
+      final state = SalasState(rooms: [invitedRoom]);
+      final activeRooms = state.activeRoomsForUser(currentUserId);
+
+      expect(activeRooms, isEmpty);
+    });
+
+    test('Incluye salas donde el usuario es el Host', () {
+      final hostRoom = Room(
+        id: 'room-host-1',
+        name: 'Mi Sala Propia',
+        host: currentUserAuthor,
+        isHost: true,
+      );
+
+      final state = SalasState(rooms: [hostRoom]);
+      final activeRooms = state.activeRoomsForUser(currentUserId);
+
+      expect(activeRooms, hasLength(1));
+      expect(activeRooms.first.id, 'room-host-1');
+    });
+
+    test('Incluye salas donde el usuario es PARTICIPANT activo', () {
+      final joinedRoom = Room(
+        id: 'room-joined-1',
+        name: 'Sala de Música',
+        host: hostUser,
+        participants: [
+          RoomParticipant(
+            user: currentUserAuthor,
+            role: 'PARTICIPANT',
+            joinedAt: '2026-09-18T19:00:00.000Z',
+          ),
+        ],
+      );
+
+      final state = SalasState(rooms: [joinedRoom]);
+      final activeRooms = state.activeRoomsForUser(currentUserId);
+
+      expect(activeRooms, hasLength(1));
+      expect(activeRooms.first.id, 'room-joined-1');
+    });
+  });
+
+  group('FollowRequestsList & RoomInvitesList - Renderizado Directo de Invitaciones', () {
+    const host = PostAuthor(
+      id: 'host-1',
+      username: 'eprin',
+      displayName: 'Eprin Host',
+    );
+
+    testWidgets('Muestra RoomInvitesList cuando hay invitaciones y 0 follow requests (sin falso empty view)', (tester) async {
+      const privateRoom = Room(
+        id: 'room-priv-1',
+        name: 'Cueva de Rol',
+        host: host,
+        access: RoomAccess.private,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _MockAuthNotifier(),
+            ),
+            followRequestsControllerProvider.overrideWith(
+              () => _MockFollowRequestsNotifier(
+                const FollowRequestsState(loading: false, items: []),
+              ),
+            ),
+            conversationsControllerProvider.overrideWith(
+              () => _MockConversationsNotifier(
+                const ConversationsState(loading: false, conversations: []),
+              ),
+            ),
+            roomInvitesControllerProvider.overrideWith(
+              () => _MockRoomInvitesNotifier(
+                const RoomInvitesState(loading: false, invites: [privateRoom]),
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: FollowRequestsList(),
+            ),
+          ),
+        ),
+      );
+
+      // No debe mostrar el empty state
+      expect(find.text('Sin invitaciones pendientes'), findsNothing);
+
+      // Debe mostrar la sección de invitaciones a salas y el badge con 🥀
+      expect(find.text('Invitaciones a Salas'), findsOneWidget);
+      expect(find.text('Cueva de Rol'), findsOneWidget);
+      expect(find.text('🥀'), findsOneWidget);
+      expect(find.text('Invitado por @eprin'), findsOneWidget);
+
+      // Debe renderizar los botones de Aceptar y Rechazar
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.close_rounded), findsOneWidget);
     });
   });
 }

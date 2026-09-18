@@ -36,17 +36,26 @@ class FollowRequestsList extends ConsumerWidget {
     final visibleItems = state.items
         .where((item) => !activeDirectUserIds.contains(item.requester.id))
         .toList();
+    final hasFollowRequests = visibleItems.isNotEmpty;
 
-    if (state.loading && !hasRoomInvites) {
+    final isEitherLoading = (state.loading || roomInvitesState.loading) &&
+        !hasRoomInvites &&
+        !hasFollowRequests;
+
+    if (isEitherLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (state.error != null && visibleItems.isEmpty && !hasRoomInvites) {
-      return ErrorView(message: state.error!, onRetry: () {
-        notifier.refresh();
-        ref.read(roomInvitesControllerProvider.notifier).refresh();
-      });
-    }
-    if (visibleItems.isEmpty && !hasRoomInvites) {
+
+    if (!hasRoomInvites && !hasFollowRequests) {
+      if (state.error != null || roomInvitesState.error != null) {
+        return ErrorView(
+          message: state.error ?? roomInvitesState.error ?? 'Error al cargar invitaciones',
+          onRetry: () {
+            notifier.refresh();
+            ref.read(roomInvitesControllerProvider.notifier).refresh();
+          },
+        );
+      }
       return EmptyView(
         imageWidget: Image.asset(
           AppAssets.iconSolicitudesChat,

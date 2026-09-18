@@ -469,7 +469,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
   // ── Tab: Rooms ─────────────────────────────────────────────────────
 
   Widget _buildRoomsTab(SalasState state) {
-    final rooms = state.userRooms;
+    final currentUserId = ref.watch(authControllerProvider).user?.id ?? '';
+    final rooms = state.activeRoomsForUser(currentUserId);
     if (state.loading && rooms.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
