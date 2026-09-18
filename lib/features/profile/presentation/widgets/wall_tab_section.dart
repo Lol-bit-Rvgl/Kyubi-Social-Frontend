@@ -156,7 +156,7 @@ class _WallTabSectionState extends ConsumerState<WallTabSection> {
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
+        parent: ClampingScrollPhysics(),
       ),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [

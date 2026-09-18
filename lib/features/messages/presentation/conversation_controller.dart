@@ -139,17 +139,16 @@ class ConversationChatNotifier
   }
 
   Future<void> loadFor(String conversationId) async {
-    await _socket.connect();
-    if (_disposed) return;
-    // Limpia el estado previo antes de cargar: evita reciclar mensajes o
-    // conversationId de un chat anterior mientras se resuelve el nuevo.
-    // Va tras el primer `await` para no mutar el provider dentro del
-    // initState del llamante.
-    state = const ConversationChatState();
-    _socket.joinConversation(conversationId);
-    final conversation = await _repo.getConversation(conversationId);
-    if (_disposed) return;
-    state = state.copyWith(conversation: conversation);
+    try {
+      try {
+        await _socket.connect();
+      } catch (_) {}
+      if (_disposed) return;
+      _socket.joinConversation(conversationId);
+      final conversation = await _repo.getConversation(conversationId);
+      if (_disposed) return;
+      state = state.copyWith(conversation: conversation);
+    } catch (_) {}
     await _load();
   }
 
@@ -158,14 +157,23 @@ class ConversationChatNotifier
     state = state.copyWith(loading: true, error: null);
     try {
       final page = await _repo.getMessages(_conversationId);
+      if (_disposed) return;
       state = state.copyWith(
         messages: page.messages.reversed.toList(),
         hasMore: page.hasMore,
         loading: false,
       );
-      await _markRead();
+      try {
+        await _markRead();
+      } catch (_) {}
     } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
+      if (!_disposed) {
+        state = state.copyWith(loading: false, error: e.toString());
+      }
+    } finally {
+      if (!_disposed && state.loading) {
+        state = state.copyWith(loading: false);
+      }
     }
   }
 
@@ -175,13 +183,20 @@ class ConversationChatNotifier
     try {
       final before = state.messages.first.id;
       final page = await _repo.getMessages(_conversationId, before: before);
+      if (_disposed) return;
       state = state.copyWith(
         messages: [...page.messages.reversed, ...state.messages],
         hasMore: page.hasMore,
         loadingOlder: false,
       );
     } catch (_) {
-      state = state.copyWith(loadingOlder: false);
+      if (!_disposed) {
+        state = state.copyWith(loadingOlder: false);
+      }
+    } finally {
+      if (!_disposed && state.loadingOlder) {
+        state = state.copyWith(loadingOlder: false);
+      }
     }
   }
 
@@ -223,6 +238,7 @@ class ConversationChatNotifier
         mediaType: mediaType ?? (mediaUrl != null ? 'image' : null),
         extensions: extensions,
       );
+      if (_disposed) return true;
       state = state.copyWith(
         messages: [
           ...state.messages.where(
@@ -232,14 +248,22 @@ class ConversationChatNotifier
         ],
         sending: false,
       );
-      await _markRead();
+      try {
+        await _markRead();
+      } catch (_) {}
       return true;
     } catch (_) {
-      state = state.copyWith(
-        messages: state.messages.where((m) => m.id != optimistic.id).toList(),
-        sending: false,
-      );
+      if (!_disposed) {
+        state = state.copyWith(
+          messages: state.messages.where((m) => m.id != optimistic.id).toList(),
+          sending: false,
+        );
+      }
       return false;
+    } finally {
+      if (!_disposed && state.sending) {
+        state = state.copyWith(sending: false);
+      }
     }
   }
 

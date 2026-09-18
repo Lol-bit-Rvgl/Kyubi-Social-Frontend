@@ -285,65 +285,63 @@ class DirectChatMessageBubble extends StatelessWidget {
     }
 
     return Container(
-      constraints: const BoxConstraints(maxWidth: 290),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF2B2206).withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: const Color(0xFFFFD700).withValues(alpha: 0.7),
-          width: 1.5,
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFFD700).withValues(alpha: 0.25),
-            blurRadius: 10,
-            spreadRadius: 1,
+            color: const Color(0xFFFFD700).withValues(alpha: 0.2),
+            blurRadius: 8,
+            spreadRadius: 0.5,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment:
-            isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
+          Text(
+            emoji,
+            style: const TextStyle(fontSize: 18),
+          ),
+          const SizedBox(width: 8),
+          Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                emoji,
-                style: const TextStyle(fontSize: 18),
-              ),
-              const SizedBox(width: 6),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
                   color: Color(0xFFFFD700),
-                  letterSpacing: 0.8,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                displayText,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            displayText,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.bottomRight,
+          const SizedBox(width: 10),
+          Padding(
+            padding: const EdgeInsets.only(top: 14),
             child: Text(
               timestamp,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 9.5,
                 color: const Color(0xFFFFD700).withValues(alpha: 0.7),
                 fontWeight: FontWeight.w500,
               ),

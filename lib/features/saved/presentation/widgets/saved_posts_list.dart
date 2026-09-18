@@ -57,7 +57,7 @@ class _SavedPostsListState extends ConsumerState<SavedPostsList> {
         color: Theme.of(context).colorScheme.primary,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
+            parent: ClampingScrollPhysics(),
           ),
           padding: const EdgeInsets.fromLTRB(16, 40, 16, 100),
           children: const [
@@ -78,7 +78,7 @@ class _SavedPostsListState extends ConsumerState<SavedPostsList> {
       child: ListView.builder(
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+          parent: ClampingScrollPhysics(),
         ),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         itemCount: posts.length + 1,

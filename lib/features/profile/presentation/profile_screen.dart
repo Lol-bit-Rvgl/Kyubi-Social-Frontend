@@ -390,13 +390,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ],
                 ),
-                SliverPersistentHeader(
-                  pinned: false,
-                  floating: false,
-                  delegate: _ProfileHeroHeaderDelegate(
-                    maxHeight: _calculateHeroHeight(user),
-                    child: _buildProfileHero(user, metrics),
-                  ),
+                SliverToBoxAdapter(
+                  child: _buildProfileHero(user, metrics),
                 ),
                 const ProfileTabsHeader(
                   tabs: ['Publicaciones', 'Muro', 'Multimedia', 'Guardados'],
@@ -431,36 +426,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildSavedTab() {
     return const SavedPostsList();
-  }
-
-  double _calculateHeroHeight(User user) {
-    // 1. Avatar con estado: padding (12) + diámetro avatar (96) + status offset (~12) = 120
-    double h = 120;
-    // 2. Identidad: padding (12) + nombre (26) + handle (16) + fecha (15) + badge (26) + espacios (14) = 109
-    h += 109;
-    // 3. Títulos de círculos (si existen): padding (12) + chip wrap (~28) = 40
-    if (user.titles.isNotEmpty) {
-      h += 40;
-    }
-    // 4. Estadísticas (visitas, seguidores, nivel): padding (16) + contenedor glass (~76) = 92
-    h += 92;
-    // 5. Botones de acción: padding (16) + botón (44) + padding inferior (16) = 76
-    h += 76;
-    // 6. Sobre mí (bio y tags de intereses)
-    final hasBio = user.bio != null && user.bio!.trim().isNotEmpty;
-    final tags = user.interests;
-    double sobreMi = 92;
-    if (hasBio) {
-      final bioLength = user.bio!.trim().length;
-      sobreMi += bioLength > 80 ? 60 : 36;
-    } else {
-      sobreMi += 24;
-    }
-    if (tags.isNotEmpty) {
-      sobreMi += tags.length > 3 ? 72 : 36;
-    }
-    h += sobreMi;
-    return h;
   }
 
   Widget _buildProfileHero(User user, ProfileMetrics metrics) {
@@ -1106,59 +1071,5 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ),
     );
-  }
-}
-
-/// Delegate para el colapso fluido del hero del perfil con desvanecimiento de opacidad suave
-/// y protección contra desbordes (`OverflowBox` + `ClipRect` + `SingleChildScrollView`).
-class _ProfileHeroHeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _ProfileHeroHeaderDelegate({
-    required this.maxHeight,
-    required this.child,
-  });
-
-  final double maxHeight;
-  final Widget child;
-
-  @override
-  double get minExtent => 0.0;
-
-  @override
-  double get maxExtent => maxHeight;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    if (shrinkOffset >= maxExtent) {
-      return const SizedBox.shrink();
-    }
-    final rawOpacity = 1.0 - (shrinkOffset / maxExtent);
-    final opacity = rawOpacity.clamp(0.0, 1.0);
-
-    return Opacity(
-      opacity: opacity,
-      child: ClipRect(
-        child: OverflowBox(
-          minHeight: 0,
-          maxHeight: maxExtent,
-          alignment: Alignment.topCenter,
-          child: SingleChildScrollView(
-            physics: const NeverScrollableScrollPhysics(),
-            child: SizedBox(
-              height: maxExtent,
-              child: child,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _ProfileHeroHeaderDelegate oldDelegate) {
-    return oldDelegate.maxHeight != maxHeight || oldDelegate.child != child;
   }
 }

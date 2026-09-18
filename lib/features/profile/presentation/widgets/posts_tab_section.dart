@@ -31,7 +31,7 @@ class PostsTabSection extends ConsumerWidget {
     if (state.loading && state.posts.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+          parent: ClampingScrollPhysics(),
         ),
         padding: const EdgeInsets.fromLTRB(16, 40, 16, 100),
         children: const [
@@ -52,7 +52,7 @@ class PostsTabSection extends ConsumerWidget {
     if (state.error != null && state.posts.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+          parent: ClampingScrollPhysics(),
         ),
         padding: const EdgeInsets.fromLTRB(16, 30, 16, 100),
         children: [
@@ -82,7 +82,7 @@ class PostsTabSection extends ConsumerWidget {
     if (state.posts.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+          parent: ClampingScrollPhysics(),
         ),
         padding: const EdgeInsets.fromLTRB(16, 30, 16, 100),
         children: [
@@ -133,7 +133,7 @@ class PostsTabSection extends ConsumerWidget {
       },
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+          parent: ClampingScrollPhysics(),
         ),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
         itemCount: state.posts.length + (state.loadingMore ? 1 : 0),

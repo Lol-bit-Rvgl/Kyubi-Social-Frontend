@@ -16,11 +16,15 @@ class ProfileSliverAppBar extends StatelessWidget {
     required this.user,
     this.leading,
     required this.actions,
+    this.pinned = false,
+    this.floating = false,
   });
 
   final User user;
   final Widget? leading;
   final List<Widget> actions;
+  final bool pinned;
+  final bool floating;
 
   static const double expandedHeight = 112;
 
@@ -28,7 +32,8 @@ class ProfileSliverAppBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverAppBar(
       expandedHeight: expandedHeight,
-      pinned: true,
+      pinned: pinned,
+      floating: floating,
       stretch: false,
       elevation: 0,
       scrolledUnderElevation: 0,

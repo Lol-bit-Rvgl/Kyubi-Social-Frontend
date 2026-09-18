@@ -106,25 +106,43 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
     if (state.loading || state.refreshing) return;
     state = state.copyWith(loading: true, error: null);
     try {
-      await _socket.connect();
-      final conversations = await _repo.getConversations();
+      try {
+        await _socket.connect().timeout(const Duration(seconds: 4));
+      } catch (_) {}
+      final conversations = await _repo
+          .getConversations()
+          .timeout(const Duration(seconds: 5));
       if (!_mounted) return;
       state = state.copyWith(conversations: conversations, loading: false);
       ConversationsCache.save(conversations);
     } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
+      if (_mounted) {
+        state = state.copyWith(loading: false, error: e.toString());
+      }
+    } finally {
+      if (_mounted && state.loading) {
+        state = state.copyWith(loading: false);
+      }
     }
   }
 
   Future<void> refresh() async {
     state = state.copyWith(refreshing: true, error: null);
     try {
-      final conversations = await _repo.getConversations();
+      final conversations = await _repo
+          .getConversations()
+          .timeout(const Duration(seconds: 5));
       if (!_mounted) return;
       state = state.copyWith(conversations: conversations, refreshing: false);
       ConversationsCache.save(conversations);
     } catch (e) {
-      state = state.copyWith(refreshing: false, error: e.toString());
+      if (_mounted) {
+        state = state.copyWith(refreshing: false, error: e.toString());
+      }
+    } finally {
+      if (_mounted && state.refreshing) {
+        state = state.copyWith(refreshing: false);
+      }
     }
   }
 
