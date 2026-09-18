@@ -922,13 +922,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        LiquidGlassButton(
-          label: 'Fichas de Rol',
-          icon: Icons.theater_comedy_rounded,
-          borderColor: const Color(0xFFFFD600),
-          onTap: () => context.push('/roles/library'),
-        ),
-        const SizedBox(width: 8),
         NebulaeToolIconButton(
           icon: Icons.settings_outlined,
           onTap: () => context.push('/settings'),
