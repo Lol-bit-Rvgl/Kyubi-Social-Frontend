@@ -665,6 +665,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   /// Cierra la actividad activa (voz / cine / roleplay) y vuelve a chat
   /// estándar. Si hay una sesión de voz activa, desconecta LiveKit de inmediato.
   Future<void> _turnOffActivity() async {
+    if (!_canManageRoles()) return;
     final voice = ref.read(voiceRoomProvider);
     if (_currentRoomMode == 'voice' || voice.isConnected || voice.isConnecting) {
       await ref.read(voiceRoomProvider.notifier).leaveVoice();
@@ -891,6 +892,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
   /// Modal de configuración del Chat de Voz (Solo Staff y Oradores Autorizados)
   void _openVoiceSettingsSheet() {
+    if (!_canManageRoles()) return;
     final room = _currentRoom;
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     final participants = room?.participants ?? const <RoomParticipant>[];
@@ -1345,6 +1347,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
   /// Modal de configuración de Sala de Cine para Staff
   void _openCinemaSettingsSheet() {
+    if (!_canManageRoles()) return;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF14121F),
@@ -1516,6 +1519,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
   /// Modal de configuración del Roleplay Stage para Staff
   void _openRoleplaySettingsSheet() {
+    if (!_canManageRoles()) return;
     final occupiedRoles = _stageRoles
         .where((r) => r.isTaken && r.takenByUserId != null)
         .toList();
@@ -1866,8 +1870,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     // Salas públicas: acceso libre.
     if (room.access == RoomAccess.public) return;
 
-    // Si es host o participante, acceso permitido.
-    if (room.isHost || room.isParticipant) return;
+    // Si es host o participante activo (no solo invitado), acceso permitido.
+    final myId = ref.read(authControllerProvider).user?.id ?? '';
+    final isHostOrParticipant = (myId.isNotEmpty && room.host.id == myId) ||
+        room.participants.any((p) => p.user.id == myId && p.role != 'INVITED');
+    if (isHostOrParticipant) return;
 
     // Sala privada sin permiso: mostrar modal de acceso denegado.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2045,18 +2052,21 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     }
     _currentActiveRole = confirmedRole;
 
-    // Auto-join: el creador o un miembro existente entra conectado directo.
-    if (room.isHost || room.isParticipant) _isConnected = true;
+    // Auto-join: el creador o un miembro activo existente entra conectado directo.
+    final isHostOrActiveParticipant = (myId.isNotEmpty && room.host.id == myId) ||
+        room.participants.any((p) => p.user.id == myId && p.role != 'INVITED');
+    if (isHostOrActiveParticipant) _isConnected = true;
   }
 
   /// Registra la unión real en el backend (best-effort). En modo offline la
   /// sala sigue siendo accesible en modo local.
   Future<void> _joinRoom() async {
     final room = _currentRoom;
-    final myId = ref.read(authControllerProvider).user?.id;
+    final myId = ref.read(authControllerProvider).user?.id ?? '';
     if (room != null) {
-      final isCreator = room.isHost || (myId != null && room.host.id == myId);
-      final isParticipant = room.isParticipant;
+      final isCreator = myId.isNotEmpty && room.host.id == myId;
+      final isParticipant =
+          room.participants.any((p) => p.user.id == myId && p.role != 'INVITED');
       if (isCreator || isParticipant) {
         // Ya es miembro o es el anfitrión: no reenviar petición de join para evitar
         // spam de mensajes 'Te has unido' en reconexiones o reingresos.
@@ -2765,10 +2775,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }
 
   void _openRoomModesSelector() {
-    final room = ref.read(salaDetailControllerProvider(widget.roomId)).room;
-    final myUserId = ref.read(authControllerProvider).user?.id;
-    final isHostOrAdmin = (room?.isHost == true) ||
-        (myUserId != null && myUserId.isNotEmpty && room?.host.id == myUserId);
+    if (!_canManageRoles()) return;
+    final isHostOrAdmin = _canManageRoles();
 
     showModalBottomSheet<void>(
       context: context,
@@ -3074,7 +3082,6 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   bool _canManageRoles() {
     final room = _currentRoom;
     if (room == null) return false;
-    if (room.isHost) return true;
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     if (myId.isEmpty) return false;
     if (room.host.id == myId) return true;
@@ -3277,7 +3284,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     final room = _currentRoom;
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     // Host/Creador: solo puede eliminar la sala (nunca abandonarla).
-    final isHost = room != null && (room.isHost || room.host.id == myId);
+    final isHost = room != null && myId.isNotEmpty && room.host.id == myId;
 
     showModalBottomSheet<void>(
       context: context,
@@ -3613,7 +3620,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     final senderId = msg['senderId']?.toString() ?? '';
     final isMine = senderId.isNotEmpty && senderId == myId;
-    final isHost = _currentRoom != null && (_currentRoom!.isHost || _currentRoom!.host.id == myId);
+    final isHost = _currentRoom != null && myId.isNotEmpty && _currentRoom!.host.id == myId;
     final canManage = isHost || _canManageRoles();
     final isEdited = msg['isEdited'] == true || (msg['editCount'] != null && (msg['editCount'] as num) > 0);
     final text = (msg['body'] ?? msg['content'] ?? msg['text'] ?? '').toString();
@@ -4123,9 +4130,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     initialVideoId: room?.cinemaVideoId,
                     initialState: room?.cinemaState ?? 'STOPPED',
                     initialPosition: room?.cinemaEstimatedPosition ?? 0,
-                    isHost: room?.isHost ??
-                        (ref.read(authControllerProvider).user?.id ==
-                            room?.host.id),
+                    isHost: _canManageRoles(),
                     isMinimized: _isStageMinimized,
                     onToggleMinimize: () {
                       if (_isSwitchingActivity) return;
@@ -4554,7 +4559,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     onSendDiceRoll: _sendDiceRoll,
                     onSendPoll: _sendPoll,
                     onSendSticker: _sendSticker,
-                    onOpenModesTap: _openRoomModesSelector,
+                    onOpenModesTap:
+                        _canManageRoles() ? _openRoomModesSelector : null,
                     isRoleplay: _currentRoomMode == 'roleplay',
                     userName:
                         ref
@@ -4573,7 +4579,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     currentRole: _currentActiveRole,
                     availableRoles: _stageRoles,
                     currentUserId: ref.watch(authControllerProvider).user?.id,
-                    isHost: room?.isHost ?? false,
+                    isHost: _canManageRoles(),
                     replyingToMessage: _replyingToMessage,
                     onCancelReply: _cancelReply,
                     editingMessage: _editingMessage,

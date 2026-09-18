@@ -199,9 +199,12 @@ class AppConfig {
   // Salas (reuniones en vivo)
   // -------------------------------------------------------------------------
   static const String salasBase = '/salas';
+  static const String salaInvites = '/salas/invites';
   static String salaDetail(String id) => '/salas/$id';
   static String salaJoin(String id) => '/salas/$id/join';
   static String salaInvite(String id) => '/salas/$id/invite';
+  static String salaInviteAccept(String id) => '/salas/$id/invite/accept';
+  static String salaInviteReject(String id) => '/salas/$id/invite/reject';
   static String salaLeave(String id) => '/salas/$id/leave';
   static String salaMessages(String id) => '/salas/$id/messages';
   static String salaVoiceToken(String id) => '/salas/$id/voice/token';

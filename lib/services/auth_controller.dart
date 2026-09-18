@@ -8,8 +8,13 @@ import '../core/services/notification_service.dart';
 import '../core/storage/session_store.dart';
 import '../models/user.dart';
 import '../repositories/auth_repository.dart';
+import '../features/messages/presentation/conversations_controller.dart';
+import '../features/messages/presentation/follow_requests_controller.dart';
+import '../features/salas/presentation/room_invites_controller.dart';
+import '../features/salas/presentation/salas_controller.dart';
 import '../routing/router_refresh.dart';
 import 'providers.dart';
+import 'voice/voice_room_controller.dart';
 
 enum AuthStatus { unknown, unauthenticated, authenticated }
 
@@ -60,6 +65,51 @@ class AuthNotifier extends Notifier<AuthState> {
 
   AuthRepository get _auth => ref.read(authRepositoryProvider);
 
+  void _purgeUserSessionState() {
+    try {
+      ref.read(chatSocketProvider).disconnect();
+    } catch (_) {}
+    try {
+      ref.read(notificationSocketProvider).disconnect();
+    } catch (_) {}
+    try {
+      ref.read(roomSocketProvider).disconnect();
+    } catch (_) {}
+    try {
+      ref.read(voiceRoomProvider.notifier).leaveRoom();
+    } catch (_) {}
+    try {
+      ref.read(salasControllerProvider.notifier).clearAllRoomMessages();
+    } catch (_) {}
+
+    ref.invalidate(salasControllerProvider);
+    ref.invalidate(conversationsControllerProvider);
+    ref.invalidate(unreadCountProvider);
+    ref.invalidate(followRequestsControllerProvider);
+    try {
+      ref.read(roomInvitesControllerProvider.notifier).clear();
+    } catch (_) {}
+    ref.invalidate(roomInvitesControllerProvider);
+  }
+
+  void _onUserSessionAuthenticated() {
+    try {
+      ref.read(notificationSocketProvider).connect();
+    } catch (_) {}
+    try {
+      ref.read(chatSocketProvider).connect();
+    } catch (_) {}
+    try {
+      ref.read(roomSocketProvider).connect();
+    } catch (_) {}
+
+    ref.invalidate(salasControllerProvider);
+    ref.invalidate(conversationsControllerProvider);
+    ref.invalidate(unreadCountProvider);
+    ref.invalidate(followRequestsControllerProvider);
+    ref.invalidate(roomInvitesControllerProvider);
+  }
+
   Future<void> restoreSession() async {
     final repo = SessionRepository(_auth);
     try {
@@ -68,7 +118,7 @@ class AuthNotifier extends Notifier<AuthState> {
           ? AuthState(status: AuthStatus.authenticated, user: user)
           : const AuthState(status: AuthStatus.unauthenticated);
       if (user != null) {
-        ref.read(notificationSocketProvider).connect();
+        _onUserSessionAuthenticated();
         // Push: registrar token FCM tras restaurar sesión.
         NotificationService.instance.syncTokenWithBackend(
           ref.read(apiClientProvider),
@@ -143,7 +193,7 @@ class AuthNotifier extends Notifier<AuthState> {
         user: user,
         busy: false,
       );
-      ref.read(notificationSocketProvider).connect();
+      _onUserSessionAuthenticated();
       // Push: registrar token FCM del dispositivo en el backend.
       await NotificationService.instance.syncTokenWithBackend(
         ref.read(apiClientProvider),
@@ -176,7 +226,7 @@ class AuthNotifier extends Notifier<AuthState> {
         user: user,
         busy: false,
       );
-      ref.read(notificationSocketProvider).connect();
+      _onUserSessionAuthenticated();
       // Push: registrar token FCM del dispositivo en el backend.
       await NotificationService.instance.syncTokenWithBackend(
         ref.read(apiClientProvider),
@@ -204,7 +254,7 @@ class AuthNotifier extends Notifier<AuthState> {
         user: user,
         busy: false,
       );
-      ref.read(notificationSocketProvider).connect();
+      _onUserSessionAuthenticated();
       // Push: registrar token FCM del dispositivo en el backend.
       await NotificationService.instance.syncTokenWithBackend(
         ref.read(apiClientProvider),
@@ -217,13 +267,8 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
-    // 1. Desconectar sockets en tiempo real de inmediato
-    try {
-      ref.read(chatSocketProvider).disconnect();
-    } catch (_) {}
-    try {
-      ref.read(notificationSocketProvider).disconnect();
-    } catch (_) {}
+    // 1. Desconectar sockets y purgar estado en memoria de inmediato
+    _purgeUserSessionState();
 
     // 2. Notificar al backend de la revocación del token de sesión (con timeout)
     try {
@@ -303,8 +348,7 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(busy: true, error: null);
     try {
       await _auth.deleteAccount(password: password);
-      ref.read(chatSocketProvider).disconnect();
-      ref.read(notificationSocketProvider).disconnect();
+      _purgeUserSessionState();
       await SessionRepository(_auth).clearSession();
       state = const AuthState(status: AuthStatus.unauthenticated);
       ref.read(routerRefreshProvider).notifySessionChanged();
@@ -316,8 +360,7 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Cierre de sesión forzado por sanción del staff (SUSPEND/BAN).
   /// No llama al backend: los tokens ya fueron invalidados desde el panel.
   Future<void> forceLogoutBySanction() async {
-    ref.read(chatSocketProvider).disconnect();
-    ref.read(notificationSocketProvider).disconnect();
+    _purgeUserSessionState();
     try {
       await TokenStorage.clear();
       await LastUserStorage.clear();

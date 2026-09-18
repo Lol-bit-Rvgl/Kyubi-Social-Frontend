@@ -317,6 +317,18 @@ class RoomSocketService extends BaseSocket<RoomSocketEvent> {
       final data = asMap(payload);
       emitEvent(RoomInvited(data));
     });
+
+    socket.on('room:invite_received', (payload) {
+      final data = asMap(payload);
+      emitEvent(RoomInvited(data));
+    });
+  }
+
+  @override
+  void onDisconnected(dynamic reason) {
+    if (reason == 'manual_disconnect') {
+      _joinedRooms.clear();
+    }
   }
 
   @override

@@ -9,10 +9,12 @@ import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/list_pagination.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../../models/user.dart';
+import '../../../salas/presentation/room_invites_controller.dart';
 import '../conversations_controller.dart';
 import '../follow_requests_controller.dart';
+import 'room_invites_list.dart';
 
-/// Tab de invitaciones: solicitudes de seguimiento pendientes de aprobación.
+/// Tab de invitaciones: solicitudes de seguimiento pendientes de aprobación y salas privadas.
 class FollowRequestsList extends ConsumerWidget {
   const FollowRequestsList({super.key});
 
@@ -20,6 +22,8 @@ class FollowRequestsList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(followRequestsControllerProvider);
     final notifier = ref.read(followRequestsControllerProvider.notifier);
+    final roomInvitesState = ref.watch(roomInvitesControllerProvider);
+    final hasRoomInvites = roomInvitesState.invites.isNotEmpty;
 
     // Excluir remitentes con los cuales ya existe una conversación directa activa
     final convState = ref.watch(conversationsControllerProvider);
@@ -33,13 +37,16 @@ class FollowRequestsList extends ConsumerWidget {
         .where((item) => !activeDirectUserIds.contains(item.requester.id))
         .toList();
 
-    if (state.loading) {
+    if (state.loading && !hasRoomInvites) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (state.error != null && visibleItems.isEmpty) {
-      return ErrorView(message: state.error!, onRetry: notifier.refresh);
+    if (state.error != null && visibleItems.isEmpty && !hasRoomInvites) {
+      return ErrorView(message: state.error!, onRetry: () {
+        notifier.refresh();
+        ref.read(roomInvitesControllerProvider.notifier).refresh();
+      });
     }
-    if (visibleItems.isEmpty) {
+    if (visibleItems.isEmpty && !hasRoomInvites) {
       return EmptyView(
         imageWidget: Image.asset(
           AppAssets.iconSolicitudesChat,
@@ -49,34 +56,94 @@ class FollowRequestsList extends ConsumerWidget {
         ),
         title: 'Sin invitaciones pendientes',
         message:
-            'Las solicitudes de seguimiento que recibas\naparecerán aquí para que las aceptes o rechaces.',
+            'Las solicitudes de seguimiento e invitaciones a salas\nque recibas aparecerán aquí para que las aceptes o rechaces.',
       );
     }
 
     return RefreshIndicator(
-      onRefresh: notifier.refresh,
+      onRefresh: () async {
+        await Future.wait([
+          notifier.refresh(),
+          ref.read(roomInvitesControllerProvider.notifier).refresh(),
+        ]);
+      },
       child: EndReachedNotifier(
         onEndReached: notifier.loadMore,
-        child: ListView.separated(
+        child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.md,
-            vertical: AppDimens.xs,
-          ),
-          itemCount: visibleItems.length + 1,
-          separatorBuilder: (_, _) => const SizedBox(height: AppDimens.xs),
-          itemBuilder: (context, index) {
-            if (index >= visibleItems.length) {
-              return ListEndIndicator(hasMore: state.hasMore);
-            }
-            final item = visibleItems[index];
-            return _FollowRequestTile(
-              item: item,
-              busy: state.busyIds.contains(item.id),
-              onAccept: () => notifier.respond(item.id, accept: true),
-              onReject: () => notifier.respond(item.id, accept: false),
-            );
-          },
+          padding: const EdgeInsets.symmetric(vertical: AppDimens.xs),
+          children: [
+            if (hasRoomInvites) const RoomInvitesList(),
+            if (hasRoomInvites && visibleItems.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppDimens.md,
+                  AppDimens.xs,
+                  AppDimens.md,
+                  AppDimens.xs,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.person_add_rounded,
+                      size: 16,
+                      color: AppColors.accentTeal,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Solicitudes de Seguimiento',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentTeal.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${visibleItems.length}',
+                        style: const TextStyle(
+                          color: AppColors.accentTeal,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (visibleItems.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: visibleItems.length + 1,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppDimens.xs),
+                  itemBuilder: (context, index) {
+                    if (index >= visibleItems.length) {
+                      return ListEndIndicator(hasMore: state.hasMore);
+                    }
+                    final item = visibleItems[index];
+                    return _FollowRequestTile(
+                      item: item,
+                      busy: state.busyIds.contains(item.id),
+                      onAccept: () => notifier.respond(item.id, accept: true),
+                      onReject: () => notifier.respond(item.id, accept: false),
+                    );
+                  },
+                ),
+              ),
+          ],
         ),
       ),
     );

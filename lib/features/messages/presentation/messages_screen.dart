@@ -11,6 +11,7 @@ import '../../../../core/widgets/liquid_glass_container.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../../models/chat_conversation.dart';
 import '../../../../services/auth_controller.dart';
+import '../../salas/presentation/room_invites_controller.dart';
 import '../../salas/presentation/salas_controller.dart';
 import '../../salas/presentation/widgets/live_room_card.dart';
 import 'conversations_controller.dart';
@@ -326,11 +327,14 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
         .whereType<String>()
         .where((id) => id.isNotEmpty)
         .toSet();
-    final inviteCount = ref
+    final roomInvitesCount =
+        ref.watch(roomInvitesControllerProvider).invites.length;
+    final followInvitesCount = ref
         .watch(followRequestsControllerProvider)
         .items
         .where((req) => !activeDirectUserIds.contains(req.requester.id))
         .length;
+    final inviteCount = roomInvitesCount + followInvitesCount;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(AppDimens.md, 8, AppDimens.md, 8),

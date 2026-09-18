@@ -314,6 +314,10 @@ class SalasNotifier extends Notifier<SalasState> {
     _roomMessages.remove(roomId);
   }
 
+  void clearAllRoomMessages() {
+    _roomMessages.clear();
+  }
+
   // ── Historial del backend + mensajes en vivo (Socket.IO) ─────────────
   // Fusiona el historial persistido con los mensajes de la sesión local.
   // Deduplicación por id y orden cronológico ascendente (el flujo muestra

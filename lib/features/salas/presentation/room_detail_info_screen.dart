@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/rules/room_permissions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/kyubi_rich_text.dart';
@@ -41,7 +42,12 @@ class RoomDetailInfoScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detailState = ref.watch(salaDetailControllerProvider(roomId));
     final r = detailState.room ?? room;
-    final isHostOrAdmin = r?.isHost == true;
+    final myId = ref.watch(authControllerProvider).user?.id ?? '';
+    final isHostOrAdmin = r != null &&
+        myId.isNotEmpty &&
+        (r.host.id == myId ||
+            r.participants.any((p) =>
+                p.user.id == myId && RoomPermissions.canManageRole(p.role)));
     final isActive = r?.status == RoomStatus.active;
     final isPrivate = r?.access == RoomAccess.private;
 

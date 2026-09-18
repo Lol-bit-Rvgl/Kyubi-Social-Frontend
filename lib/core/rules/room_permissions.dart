@@ -24,7 +24,7 @@ class RoomPermissions {
     if (room == null) return false;
     final myId = me?.id ?? '';
     if (myId.isEmpty) return false;
-    if (room.isHost || room.host.id == myId) return true;
+    if (room.host.id == myId) return true;
     for (final p in room.participants) {
       if (p.user.id == myId && canManageRole(p.role)) return true;
     }

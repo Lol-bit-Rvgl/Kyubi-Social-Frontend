@@ -78,6 +78,27 @@ class RoomRepository {
     return (json['invited'] as num?)?.toInt() ?? ids.length;
   }
 
+  /// Obtiene la lista de salas a las que el usuario actual ha sido invitado (rol INVITED).
+  Future<List<Room>> getRoomInvites() async {
+    final json = await _api.getJson(AppConfig.salaInvites);
+    final list = json['data'] as List<dynamic>? ?? const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(Room.fromJson)
+        .toList();
+  }
+
+  /// Acepta una invitación a sala privada (actualiza rol a PARTICIPANT).
+  Future<Room> acceptRoomInvite(String roomId) async {
+    final json = await _api.postJson(AppConfig.salaInviteAccept(roomId));
+    return Room.fromJson(json);
+  }
+
+  /// Rechaza una invitación a sala privada (elimina el registro de la BD).
+  Future<void> rejectRoomInvite(String roomId) async {
+    await _api.postJson(AppConfig.salaInviteReject(roomId));
+  }
+
   /// Actualiza la sala (solo el host).
   Future<Room> updateSala(
     String id, {

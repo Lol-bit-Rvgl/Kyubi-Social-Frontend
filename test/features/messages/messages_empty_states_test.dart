@@ -9,6 +9,7 @@ import 'package:kyubi/features/messages/presentation/conversation_screen.dart';
 import 'package:kyubi/features/messages/presentation/conversations_controller.dart';
 import 'package:kyubi/features/messages/presentation/follow_requests_controller.dart';
 import 'package:kyubi/features/messages/presentation/widgets/follow_requests_list.dart';
+import 'package:kyubi/features/salas/presentation/room_invites_controller.dart';
 import 'package:kyubi/models/user.dart';
 import 'package:kyubi/services/auth_controller.dart';
 import 'package:kyubi/features/messages/presentation/messages_screen.dart';
@@ -102,6 +103,9 @@ void main() {
             conversationsControllerProvider.overrideWith(
               () => _MockConversationsNotifier(const ConversationsState(conversations: [], loading: false)),
             ),
+            roomInvitesControllerProvider.overrideWith(
+              () => _MockRoomInvitesNotifier(const RoomInvitesState(invites: [], loading: false)),
+            ),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -170,6 +174,11 @@ void main() {
             salasControllerProvider.overrideWith(
               () => _MockSalasNotifier(),
             ),
+            roomInvitesControllerProvider.overrideWith(
+              () => _MockRoomInvitesNotifier(
+                const RoomInvitesState(loading: false, invites: []),
+              ),
+            ),
           ],
           child: const MaterialApp(
             home: MessagesScreen(),
@@ -230,4 +239,12 @@ class _MockAuthNotifier extends AuthNotifier {
 class _MockSalasNotifier extends SalasNotifier {
   @override
   SalasState build() => const SalasState(loading: false, rooms: []);
+}
+
+class _MockRoomInvitesNotifier extends RoomInvitesNotifier {
+  _MockRoomInvitesNotifier([this._initialState = const RoomInvitesState(loading: false, invites: [])]);
+  final RoomInvitesState _initialState;
+
+  @override
+  RoomInvitesState build() => _initialState;
 }
