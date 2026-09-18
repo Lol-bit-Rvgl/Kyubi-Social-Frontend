@@ -97,6 +97,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
   // Debounce para cambios y toggles de actividad (evita rebotes y condiciones de carrera)
   bool _isSwitchingActivity = false;
+  DateTime? _lastModeChangeAt;
   Timer? _activityDebounceTimer;
 
   void _triggerActivityDebounce() {
@@ -105,6 +106,26 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     _activityDebounceTimer = Timer(const Duration(milliseconds: 400), () {
       if (mounted) setState(() => _isSwitchingActivity = false);
     });
+  }
+
+  /// Devuelve `true` si puede cambiar de modo ahora.
+  /// Si el cooldown de 3 s no ha expirado, muestra un SnackBar y devuelve `false`.
+  bool _canChangeModeNow() {
+    if (_isSwitchingActivity) return false;
+    if (_lastModeChangeAt != null) {
+      final elapsed = DateTime.now().difference(_lastModeChangeAt!).inSeconds;
+      if (elapsed < 3) {
+        final remaining = 3 - elapsed;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Espera $remaining s para cambiar de actividad'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+        return false;
+      }
+    }
+    return true;
   }
 
   // Restricción de voz a Solo Staff y lista de oradores autorizados
@@ -2867,8 +2888,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }) {
     return GestureDetector(
       onTap: () {
-        if (_isSwitchingActivity) return;
-        _triggerActivityDebounce();
+        if (!_canChangeModeNow()) return;
         if (!isAllowed) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -2896,6 +2916,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         final nextCurrentTime =
             isScreening ? (currentRoom?.cinemaCurrentTime ?? 0.0) : 0.0;
 
+        setState(() => _isSwitchingActivity = true);
         _applyRoomMode(
           normalized,
           cinemaVideoId: nextVideoId,
@@ -2912,12 +2933,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           currentTime: nextCurrentTime,
         ).then((updated) {
           if (!mounted) return;
+          setState(() {
+            _lastModeChangeAt = DateTime.now();
+            _isSwitchingActivity = false;
+          });
           ref
               .read(salaDetailControllerProvider(widget.roomId).notifier)
               .applyRoom(updated);
           ref.read(salasControllerProvider.notifier).applyRoom(updated);
         }).catchError((err) {
           debugPrint('[MODE_DEBUG] Error en updateRoomMode HTTP: $err');
+          if (mounted) setState(() => _isSwitchingActivity = false);
         });
       },
       child: Container(
