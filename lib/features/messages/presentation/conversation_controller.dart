@@ -202,28 +202,46 @@ class ConversationChatNotifier
 
   Future<bool> send(
     String body, {
+    String? type,
     String? mediaUrl,
     String? mediaType,
+    String? stickerUrl,
+    String? stickerId,
+    Map<String, dynamic>? poll,
     Map<String, dynamic>? extensions,
   }) async {
     final text = body.trim();
-    final hasMedia = mediaUrl != null && mediaUrl.isNotEmpty;
+    final effectiveMediaUrl = mediaUrl ?? stickerUrl;
+    final hasMedia = effectiveMediaUrl != null && effectiveMediaUrl.isNotEmpty;
+    final hasPoll = poll != null && poll.isNotEmpty;
     final hasExtensions = extensions != null && extensions.isNotEmpty;
-    final hasSpecialType = mediaType != null && mediaType.isNotEmpty;
-    if ((text.isEmpty && !hasMedia && !hasExtensions && !hasSpecialType) ||
+    final hasSpecialType = (mediaType != null && mediaType.isNotEmpty) ||
+        (type != null && type.isNotEmpty);
+    if ((text.isEmpty && !hasMedia && !hasPoll && !hasExtensions && !hasSpecialType) ||
         state.sending) {
       return false;
     }
     final myId = ref.read(authControllerProvider).user?.id ?? '';
+    final combinedExt = <String, dynamic>{
+      ...?extensions,
+      'poll': ?poll,
+      'stickerId': ?stickerId,
+      'stickerUrl': ?stickerUrl,
+    };
+    final optimisticBody = text.isNotEmpty
+        ? text
+        : (poll != null
+            ? '📊 Encuesta: ${poll['question'] ?? 'Encuesta'}'
+            : (mediaType == 'sticker' || type == 'STICKER' ? '🎨 Sticker' : ''));
     final optimistic = Message(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}',
       conversationId: _conversationId,
       senderId: myId,
       sender: ChatAuthor(id: myId, username: '', displayName: 'Tú'),
-      body: text,
-      mediaUrl: mediaUrl,
-      mediaType: mediaType ?? (mediaUrl != null ? 'image' : null),
-      extensions: extensions,
+      body: optimisticBody,
+      mediaUrl: effectiveMediaUrl,
+      mediaType: mediaType ?? (effectiveMediaUrl != null ? 'image' : null),
+      extensions: combinedExt.isNotEmpty ? combinedExt : null,
       createdAt: DateTime.now(),
     );
     state = state.copyWith(
@@ -234,9 +252,13 @@ class ConversationChatNotifier
       final sent = await _repo.sendMessage(
         _conversationId,
         body: text,
+        type: type,
         mediaUrl: mediaUrl,
-        mediaType: mediaType ?? (mediaUrl != null ? 'image' : null),
-        extensions: extensions,
+        mediaType: mediaType ?? (effectiveMediaUrl != null ? 'image' : null),
+        stickerUrl: stickerUrl,
+        stickerId: stickerId,
+        poll: poll,
+        extensions: combinedExt.isNotEmpty ? combinedExt : null,
       );
       if (_disposed) return true;
       state = state.copyWith(

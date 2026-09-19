@@ -190,6 +190,8 @@ class AppConfig {
   static const String roomsBase = '/rooms';
   static String roomDetail(String id) => '/rooms/$id';
   static String roomMessages(String id) => '/rooms/$id/messages';
+  static String conversationMessages(String id) =>
+      '/conversations/$id/messages';
   static const String storiesBase = '/stories';
   static const String storiesFeed = '/stories/feed';
   static String storyDetail(String id) => '/stories/$id';
@@ -217,6 +219,7 @@ class AppConfig {
   static String salaVoiceToken(String id) => '/salas/$id/voice/token';
   static String salaStageRole(String id) => '/salas/$id/stage/role';
   static String salaRoleOccupy(String id) => '/salas/$id/roles/occupy';
+  static String salaRoleLeave(String id) => '/salas/$id/roles/leave';
   static String salaMode(String id) => '/salas/$id/mode';
   static String salaMessage(String roomId, String messageId) =>
       '/salas/$roomId/messages/$messageId';

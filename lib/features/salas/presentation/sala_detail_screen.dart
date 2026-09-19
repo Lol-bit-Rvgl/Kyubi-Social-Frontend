@@ -2514,26 +2514,39 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     }
   }
 
-  /// Acción "Dejar Rol" (`leaveRole(roleId)`): libera el slot del rol en el
-  /// stage —vuelve a quedar vacante para cualquiera—, resetea la identidad
-  /// activa a la Cuenta Personal y actualiza el stage de forma reactiva.
-  void _leaveRole(RoleCharacter role) {
+  /// Acción "Dejar Rol": libera el slot puntual del stage (por slotIndex o rol).
+  /// Si el usuario tiene otros roles asignados en el stage, preserva dichos roles
+  /// y reasigna el rol activo al primero restante.
+  void _leaveRole(RoleCharacter role, {int? slotIndex}) {
     final freed = role.toVacant();
     _salas.updateRoomRole(widget.roomId, freed);
     final myId = ref.read(authControllerProvider).user?.id ?? '';
+
+    final targetIndex = slotIndex ??
+        _stageRoles.indexWhere((r) => r.id.trim() == role.id.trim());
+
     setState(() {
-      final idx = _stageRoles.indexWhere((r) => r.id == role.id);
-      if (idx >= 0 && idx < _stageRoles.length) _stageRoles[idx] = freed;
-      if (myId.isNotEmpty) {
-        for (int i = 0; i < _stageRoles.length; i++) {
-          if (_stageRoles[i].takenByUserId == myId ||
-              _stageRoles[i].occupiedBy == myId) {
-            _stageRoles[i] = _stageRoles[i].toVacant();
-            _salas.updateRoomRole(widget.roomId, _stageRoles[i]);
+      if (targetIndex >= 0 && targetIndex < _stageRoles.length) {
+        _stageRoles[targetIndex] = freed;
+      } else {
+        final idx = _stageRoles.indexWhere((r) => r.id == role.id);
+        if (idx >= 0 && idx < _stageRoles.length) _stageRoles[idx] = freed;
+      }
+
+      // Si el rol liberado era el activo, buscar si el usuario aún posee otro rol en el stage
+      if (_currentActiveRole?.id == role.id) {
+        RoleCharacter? remainingRole;
+        for (final r in _stageRoles) {
+          if (r.isTaken &&
+              r.id != role.id &&
+              myId.isNotEmpty &&
+              (r.takenByUserId == myId || r.occupiedBy == myId)) {
+            remainingRole = r;
+            break;
           }
         }
+        _currentActiveRole = remainingRole;
       }
-      _currentActiveRole = null;
     });
 
     // Actualizar optimistamente la sala en el controlador
@@ -2541,19 +2554,12 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         ref.read(salaDetailControllerProvider(widget.roomId)).room;
     if (currentRoom != null) {
       final updatedRoles = currentRoom.stageRoles.map((r) {
-        if (r.id == role.id ||
-            (myId.isNotEmpty &&
-                (r.takenByUserId == myId || r.occupiedBy == myId))) {
+        if (r.id == role.id) {
           return r.toVacant();
         }
         return r;
       }).toList();
-      final updatedActiveChar = (currentRoom.activeCharacter?.id == role.id ||
-              (myId.isNotEmpty &&
-                  (currentRoom.activeCharacter?.takenByUserId == myId ||
-                      currentRoom.activeCharacter?.occupiedBy == myId)))
-          ? null
-          : currentRoom.activeCharacter;
+      final updatedActiveChar = _currentActiveRole;
       ref
           .read(salaDetailControllerProvider(widget.roomId).notifier)
           .applyRoom(currentRoom.copyWith(
@@ -2562,12 +2568,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           ));
     }
 
-    // Persistir liberación en el backend (best-effort)
+    // Persistir liberación en el backend con slotIndex puntual
     ref
         .read(roomRepositoryProvider)
-        .updateStageRole(widget.roomId, role: freed, isTake: false)
+        .leaveStageRole(
+          widget.roomId,
+          slotIndex: targetIndex >= 0 ? targetIndex : null,
+          roleId: role.id,
+        )
         .catchError((err) {
       debugPrint('[STAGE_ROLE] Error al liberar rol en backend: $err');
+      return <String, dynamic>{};
     });
   }
 
@@ -2604,8 +2615,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     if (isMyRole) {
                       // Cerrar el modal de inmediato para dar retroalimentación instantánea
                       Navigator.pop(modalCtx);
-                      // Dejar rol: liberar el slot y resetear la identidad.
-                      _leaveRole(liveRole);
+                      final slotIdx =
+                          _stageRoles.indexWhere((r) => r.id == liveRole.id);
+                      // Dejar rol: liberar el slot puntual y actualizar la identidad.
+                      _leaveRole(liveRole,
+                          slotIndex: slotIdx >= 0 ? slotIdx : null);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Has liberado el rol: ${liveRole.name}'),
@@ -4308,48 +4322,38 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                       );
                     },
                     onLeaveStageTap: () {
-                      final myId = ref.read(authControllerProvider).user?.id;
-                      if (myId != null && myId.isNotEmpty) {
-                        final myRoles = _stageRoles
-                            .where((r) =>
-                                (r.isTaken &&
-                                    (r.takenByUserId == myId ||
-                                        r.occupiedBy == myId)) ||
-                                r.id == _currentActiveRole?.id)
-                            .toList();
-                        if (myRoles.isNotEmpty) {
-                          for (final role in myRoles) {
-                            _leaveRole(role);
-                          }
-                        } else if (_currentActiveRole != null) {
-                          _leaveRole(_currentActiveRole!);
-                        } else {
-                          setState(() {
-                            _currentActiveRole = null;
-                            for (int i = 0; i < _stageRoles.length; i++) {
-                              if (_stageRoles[i].takenByUserId == myId ||
-                                  _stageRoles[i].occupiedBy == myId) {
-                                _stageRoles[i] = _stageRoles[i].toVacant();
-                                _salas.updateRoomRole(
-                                    widget.roomId, _stageRoles[i]);
-                              }
-                            }
-                          });
-                          ref
-                              .read(roomRepositoryProvider)
-                              .updateStageRole(widget.roomId,
-                                  role: null, isTake: false)
-                              .catchError((_) {});
+                      final myId =
+                          ref.read(authControllerProvider).user?.id ?? '';
+                      RoleCharacter? targetRole = _currentActiveRole;
+                      int? targetSlotIndex;
+
+                      if (targetRole != null) {
+                        final idx = _stageRoles
+                            .indexWhere((r) => r.id == targetRole!.id);
+                        if (idx >= 0) targetSlotIndex = idx;
+                      } else if (myId.isNotEmpty) {
+                        final idx = _stageRoles.indexWhere(
+                          (r) =>
+                              r.isTaken &&
+                              (r.takenByUserId == myId ||
+                                  r.occupiedBy == myId),
+                        );
+                        if (idx >= 0) {
+                          targetSlotIndex = idx;
+                          targetRole = _stageRoles[idx];
                         }
-                      } else if (_currentActiveRole != null) {
-                        _leaveRole(_currentActiveRole!);
                       }
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Has bajado del stage'),
-                          backgroundColor: Color(0xFF2A121E),
-                        ),
-                      );
+
+                      if (targetRole != null) {
+                        _leaveRole(targetRole, slotIndex: targetSlotIndex);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content:
+                                Text('Has bajado del stage: ${targetRole.name}'),
+                            backgroundColor: const Color(0xFF2A121E),
+                          ),
+                        );
+                      }
                     },
                   )
                 else if (_currentRoomMode == 'screening')

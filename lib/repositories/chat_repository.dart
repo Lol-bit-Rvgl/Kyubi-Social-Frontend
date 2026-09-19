@@ -44,17 +44,26 @@ class ChatRepository {
   Future<Message> sendMessage(
     String conversationId, {
     required String body,
+    String? type,
     String? mediaUrl,
     String? mediaType,
+    String? stickerUrl,
+    String? stickerId,
+    Map<String, dynamic>? poll,
     String? replyToId,
     Map<String, dynamic>? extensions,
   }) async {
     final json = await _api.postJson(
-      AppConfig.roomMessages(conversationId),
+      AppConfig.conversationMessages(conversationId),
       data: {
         'body': body,
+        'content': body,
+        'type': ?type,
         'mediaUrl': ?mediaUrl,
         'mediaType': ?mediaType,
+        'stickerUrl': ?stickerUrl,
+        'stickerId': ?stickerId,
+        'poll': ?poll,
         'replyToId': ?replyToId,
         'extensions': ?extensions,
       },

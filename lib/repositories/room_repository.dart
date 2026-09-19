@@ -178,6 +178,22 @@ class RoomRepository {
     return json;
   }
 
+  /// Libera un rol puntual del stage por su slotIndex o roleId.
+  Future<Map<String, dynamic>> leaveStageRole(
+    String roomId, {
+    int? slotIndex,
+    String? roleId,
+  }) async {
+    final json = await _api.postJson(
+      AppConfig.salaRoleLeave(roomId),
+      data: {
+        'slotIndex': ?slotIndex,
+        'roleId': ?roleId,
+      },
+    );
+    return json;
+  }
+
   /// Guarda (crea o actualiza) un rol en la sala de forma persistente en PostgreSQL.
   Future<void> saveStageRole(String roomId, RoleCharacter role) async {
     await _api.postJson(

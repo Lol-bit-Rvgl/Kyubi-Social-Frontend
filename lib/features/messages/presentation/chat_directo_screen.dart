@@ -134,8 +134,13 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
 
   void _sendPoll(String question, List<String> options) {
     ref.read(conversationChatProvider(widget.conversationId).notifier).send(
-      '📊 Encuesta: $question\n${options.map((o) => '• $o').join('\n')}',
+      '',
+      type: 'POLL',
       mediaType: 'poll',
+      poll: {
+        'question': question,
+        'options': options,
+      },
       extensions: {
         'poll': {
           'question': question,
@@ -152,12 +157,12 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
   }
 
   void _sendSticker(StickerItem sticker) {
-    final fallbackText = sticker.name.isNotEmpty
-        ? ':${sticker.name}:'
-        : (sticker.emoji.isNotEmpty ? sticker.emoji : '🎨');
     ref.read(conversationChatProvider(widget.conversationId).notifier).send(
-      fallbackText,
+      '',
+      type: 'STICKER',
       mediaUrl: sticker.assetPath,
+      stickerUrl: sticker.assetPath,
+      stickerId: sticker.id,
       mediaType: 'sticker',
       extensions: {
         'isAnimated': true,
@@ -217,7 +222,7 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
 
       final ok = await ref
           .read(conversationChatProvider(widget.conversationId).notifier)
-          .send('', mediaUrl: url, mediaType: 'image');
+          .send('', mediaUrl: url, mediaType: 'image', type: 'IMAGE');
 
       if (!mounted) return;
       if (ok) {

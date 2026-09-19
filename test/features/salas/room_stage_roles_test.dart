@@ -567,6 +567,24 @@ void main() {
 
       expect(tappedSlot, 0);
     });
+
+    test('RoomRepository.leaveStageRole envía POST con slotIndex y roleId a /salas/:id/roles/leave', () async {
+      final fakeApi = FakeApiClient();
+      final repository = RoomRepository(fakeApi);
+
+      final result = await repository.leaveStageRole(
+        'sala-123',
+        slotIndex: 3,
+        roleId: 'role-999',
+      );
+
+      expect(fakeApi.lastPath, '/salas/sala-123/roles/leave');
+      expect(fakeApi.lastData, {
+        'slotIndex': 3,
+        'roleId': 'role-999',
+      });
+      expect(result['success'], true);
+    });
   });
 }
 
