@@ -13,7 +13,7 @@ class _FakeRoomRepository implements RoomRepository {
   final Room? room;
 
   @override
-  Future<Room> getRoom(String id) async {
+  Future<Room> getSala(String id) async {
     return room ??
         Room(
           id: id,

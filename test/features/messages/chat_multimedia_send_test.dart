@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kyubi/core/network/api_client.dart';
-import 'package:kyubi/models/chat_message.dart';
 import 'package:kyubi/repositories/chat_repository.dart';
 
 class FakeChatApiClient extends Fake implements ApiClient {
@@ -11,16 +10,17 @@ class FakeChatApiClient extends Fake implements ApiClient {
   Future<Map<String, dynamic>> postJson(String path, {Object? data, Map<String, dynamic>? query}) async {
     lastPath = path;
     lastData = data;
+    final map = data as Map?;
     return {
       'id': 'msg-123',
       'conversationId': 'conv-123',
       'senderId': 'user-1',
       'sender': {'id': 'user-1', 'username': 'tester', 'displayName': 'Tester'},
-      'body': (data as Map?)?['body'] ?? '',
+      'body': map?['body'] ?? '',
       'createdAt': DateTime.now().toIso8601String(),
-      'mediaUrl': (data as Map?)?['mediaUrl'],
-      'mediaType': (data as Map?)?['mediaType'],
-      'extensions': (data as Map?)?['extensions'],
+      'mediaUrl': map?['mediaUrl'],
+      'mediaType': map?['mediaType'],
+      'extensions': map?['extensions'],
     };
   }
 }

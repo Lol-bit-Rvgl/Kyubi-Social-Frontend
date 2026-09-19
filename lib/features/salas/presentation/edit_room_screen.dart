@@ -96,7 +96,10 @@ class _EditRoomScreenState extends ConsumerState<EditRoomScreen> {
     final liveRoom = (roomId != null
         ? ref.read(salaDetailControllerProvider(roomId)).room
         : null) ?? widget.room;
-    final liveDesc = liveRoom?.description ?? liveRoom?.lore;
+    final liveDesc = widget.room?.description ??
+        widget.room?.lore ??
+        liveRoom?.description ??
+        liveRoom?.lore;
     if (_descController.text.trim().isEmpty && liveDesc != null && liveDesc.trim().isNotEmpty) {
       _descController.value = TextEditingValue(
         text: liveDesc,

@@ -42,7 +42,7 @@ Map<String, dynamic> postJson({String? visibility}) => {
   'type': 'TEXT',
   'title': '',
   'body': 'Contenido de prueba',
-  if (visibility != null) 'visibility': visibility,
+  'visibility': ?visibility,
   'author': {'id': 'u1', 'username': 'tester', 'displayName': 'Tester'},
   'reactions': {
     'like': 0,
