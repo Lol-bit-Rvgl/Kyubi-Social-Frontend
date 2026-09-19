@@ -129,6 +129,10 @@ class AppConfig {
   // -------------------------------------------------------------------------
   static const String postsBase = '/posts';
   static const String postsFeed = '/posts/feed';
+
+  /// Publicaciones del muro de un perfil (acepta id o username).
+  /// El backend devuelve todas (incluidas privadas) cuando es el propio autor.
+  static String userPosts(String usernameOrId) => '/posts/user/$usernameOrId';
   static const String postsAiImprove = '/posts/ai-improve';
   static const String postsDraftsAutosave = '/posts/drafts/autosave';
   static const String postsDraftsMy = '/posts/drafts/my';

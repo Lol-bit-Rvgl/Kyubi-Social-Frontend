@@ -31,6 +31,24 @@ class PostRepository {
     return FeedPage.fromJson(body);
   }
 
+  /// Publicaciones del muro de un perfil.
+  ///
+  /// El backend devuelve las públicas de terceros y **todas** (incluidas
+  /// privadas y de círculo) cuando el solicitante es el propio autor, por eso
+  /// el perfil propio usa este endpoint en lugar del feed global.
+  Future<FeedPage> getUserPosts({
+    required String usernameOrId,
+    int limit = 30,
+    String? cursor,
+  }) async {
+    final body = await _api.getJson(
+      AppConfig.userPosts(usernameOrId),
+      query: {'limit': limit, 'cursor': ?cursor},
+    );
+    return FeedPage.fromJson(body);
+  }
+
+
   Future<Post> getPost(String id) async {
     final body = await _api.getJson(AppConfig.postDetail(id));
     return Post.fromJson(body);

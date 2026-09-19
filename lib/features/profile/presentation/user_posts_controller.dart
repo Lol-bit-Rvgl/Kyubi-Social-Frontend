@@ -45,8 +45,12 @@ class UserPostsState {
   }
 }
 
-/// Publicaciones de un usuario. Como no existe endpoint dedicado, filtramos
-/// el feed paginado y conservamos las del autor indicado por `userId`.
+/// Publicaciones de un usuario (pestaña "Publicaciones").
+///
+/// Consume `/posts/user/:id`, que devuelve todas las publicaciones del autor
+/// (incluidas las PRIVATE) cuando el perfil es el propio, y solo las públicas
+/// cuando es el perfil de un tercero. Antes derivaba del feed global —que
+/// excluye PRIVATE— por lo que el post privado recién creado nunca aparecía.
 class UserPostsNotifier extends FamilyNotifier<UserPostsState, String> {
   PostRepository get _repo => ref.read(postRepositoryProvider);
 
@@ -66,11 +70,10 @@ class UserPostsNotifier extends FamilyNotifier<UserPostsState, String> {
     if (state.loading || state.refreshing) return;
     state = state.copyWith(loading: true, error: null);
     try {
-      final page = await _repo.getFeed(category: 'para_ti', page: 1, limit: 30);
+      final page = await _repo.getUserPosts(usernameOrId: _userId, limit: 30);
       if (_disposed) return;
-      final mine = page.posts.where((p) => p.author.id == _userId).toList();
       state = state.copyWith(
-        posts: mine,
+        posts: page.posts,
         nextCursor: page.nextCursor,
         hasMore: page.nextCursor != null,
         loading: false,
@@ -85,11 +88,10 @@ class UserPostsNotifier extends FamilyNotifier<UserPostsState, String> {
     if (_disposed) return;
     state = state.copyWith(refreshing: true, error: null);
     try {
-      final page = await _repo.getFeed(category: 'para_ti', page: 1, limit: 30);
+      final page = await _repo.getUserPosts(usernameOrId: _userId, limit: 30);
       if (_disposed) return;
-      final mine = page.posts.where((p) => p.author.id == _userId).toList();
       state = state.copyWith(
-        posts: mine,
+        posts: page.posts,
         nextCursor: page.nextCursor,
         hasMore: page.nextCursor != null,
         refreshing: false,
@@ -105,15 +107,14 @@ class UserPostsNotifier extends FamilyNotifier<UserPostsState, String> {
     if (state.loadingMore || !state.hasMore || state.nextCursor == null) return;
     state = state.copyWith(loadingMore: true);
     try {
-      final page = await _repo.getFeed(
-        category: 'para_ti',
+      final page = await _repo.getUserPosts(
+        usernameOrId: _userId,
         limit: 30,
         cursor: state.nextCursor,
       );
       if (_disposed) return;
-      final mine = page.posts.where((p) => p.author.id == _userId).toList();
       state = state.copyWith(
-        posts: [...state.posts, ...mine],
+        posts: [...state.posts, ...page.posts],
         nextCursor: page.nextCursor,
         hasMore: page.nextCursor != null,
         loadingMore: false,

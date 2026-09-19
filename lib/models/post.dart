@@ -23,6 +23,8 @@ abstract class Post with _$Post {
     required ReactionCounts reactions,
     required PostStats stats,
     required bool isLiked,
+    /// Visibilidad del post (`PUBLIC`, `FOLLOWERS`, `PRIVATE`, `CIRCLE`).
+    @Default('PUBLIC') String visibility,
     String? myReaction,
     String? coverImageUrl,
     String? bgImageUrl,
@@ -54,6 +56,9 @@ abstract class Post with _$Post {
   bool get hasCover =>
       coverImageUrl != null && coverImageUrl!.isNotEmpty || cover != null;
 
+  /// `true` cuando el post solo es visible para su autor.
+  bool get isPrivate => visibility == 'PRIVATE';
+
   factory Post.fromJson(Map<String, dynamic> json) =>
       _$PostFromJson(<String, dynamic>{
         ...json,
@@ -64,6 +69,7 @@ abstract class Post with _$Post {
         'author': json['author'] ?? <String, dynamic>{},
         'reactions': json['reactions'] ?? <String, dynamic>{},
         'stats': json['stats'] ?? <String, dynamic>{},
+        'isLiked': json['isLiked'] ?? false,
         'timeAgo': json['timeAgo'] ?? '',
       });
 }

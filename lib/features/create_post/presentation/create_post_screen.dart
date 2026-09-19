@@ -6,8 +6,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../models/circle.dart';
+import '../../../../services/auth_controller.dart';
 import '../../../../services/providers.dart';
 import '../../feed/presentation/feed_controller.dart';
+import '../../profile/presentation/user_posts_controller.dart';
 
 /// Creador de publicaciones de texto con estética Project Z y soporte estricto de SafeArea.
 class CreatePostScreen extends ConsumerStatefulWidget {
@@ -179,7 +181,15 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
             warnSpoiler: _warnSpoiler,
           );
       if (!mounted) return;
-      ref.read(feedControllerProvider.notifier).insertPostAtTop(post);
+      // Inserción optimista selectiva: un post PRIVATE nunca se inyecta en el
+      // feed público (el backend lo excluye vía `visibility: PUBLIC`, así que
+      // aparecería y desaparecería al recargar). En su lugar se invalida el
+      // muro del perfil propio, que sí lo devuelve para su autor.
+      final myId = ref.read(authControllerProvider).user?.id;
+      if (!post.isPrivate) {
+        ref.read(feedControllerProvider.notifier).insertPostAtTop(post);
+      }
+      if (myId != null) ref.invalidate(userPostsProvider(myId));
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Publicación creada')));

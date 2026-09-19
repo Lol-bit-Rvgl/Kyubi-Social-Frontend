@@ -245,12 +245,33 @@ class PostCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 2),
-              Text(
-                '${post.author.handle} · ${post.timeAgo}',
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: Color(0xFF7A7A8A),
-                ),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      '${post.author.handle} · ${post.timeAgo}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF7A7A8A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // Insignia de privacidad: distingue los posts que solo ve
+                  // su autor del resto del muro.
+                  if (post.isPrivate) ...[
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: 'Visible solo para ti',
+                      child: Icon(
+                        Icons.lock_rounded,
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
