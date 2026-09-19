@@ -36,7 +36,7 @@ class DirectChatMessageBubble extends StatelessWidget {
     required this.body,
     required this.timestamp,
     required this.isMine,
-    required this.senderName,
+    this.senderName = '',
     this.avatarUrl,
     this.avatarName = '',
     this.media,
@@ -57,7 +57,7 @@ class DirectChatMessageBubble extends StatelessWidget {
   final String body;
   final String timestamp;
   final bool isMine;
-  final String senderName;
+  final String senderName; // Opcional: vacio en chats 1:1, se muestra solo si no es vacio.
   final String? avatarUrl;
   final String avatarName;
   final Media? media;
@@ -449,7 +449,7 @@ class DirectChatMessageBubble extends StatelessWidget {
 
     return Container(
       constraints: BoxConstraints(maxWidth: screenWidth * 0.78),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
         color: bubbleColor,
         borderRadius: bubbleRadius,
@@ -469,7 +469,9 @@ class DirectChatMessageBubble extends StatelessWidget {
         crossAxisAlignment:
             isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          if (!isMine) ...[
+          // Nombre + rol SOLO si hay nombre (en chats 1:1 no hay nombre y la
+          // burbuja queda compacta sin filas ni espaciados fantasma).
+          if (!isMine && senderName.isNotEmpty) ...[
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -513,7 +515,7 @@ class DirectChatMessageBubble extends StatelessWidget {
               _buildFormattedText(body, isMine: isMine),
           ],
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../models/media.dart';
 import '../../features/messages/presentation/widgets/chat_bubble.dart';
@@ -10,7 +10,7 @@ export '../../features/messages/presentation/widgets/chat_bubble.dart';
 class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({
     super.key,
-    required this.displayName,
+    this.displayName = '',
     required this.body,
     required this.timestamp,
     this.avatarUrl,
@@ -31,7 +31,7 @@ class ChatMessageBubble extends StatelessWidget {
     this.onAvatarTap,
   });
 
-  final String displayName;
+  final String displayName; // Opcional: en DMs 1:1 va vacio para burbuja compacta.
   final String body;
   final String timestamp;
   final String? avatarUrl;

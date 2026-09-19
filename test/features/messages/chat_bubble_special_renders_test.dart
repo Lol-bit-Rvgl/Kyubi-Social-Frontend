@@ -166,6 +166,86 @@ void main() {
     });
   });
 
+  group('5. Burbuja compacta para textos muy cortos (1-4 caracteres)', () {
+    // La burbuja estándar es el Container con borde de 0.9 (dice/morra usan 1.2).
+    RenderBox bubbleBox(WidgetTester tester) {
+      final finder = find.byWidgetPredicate(
+        (w) =>
+            w is Container &&
+            w.decoration is BoxDecoration &&
+            (w.decoration as BoxDecoration).border is Border &&
+            ((w.decoration as BoxDecoration).border as Border).top.width == 0.9,
+      );
+      return tester.renderObject<RenderBox>(finder);
+    }
+
+    Future<Size> pumpBubble(
+      WidgetTester tester,
+      String body, {
+      required bool isMine,
+      String name = '',
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment:
+                  isMine ? Alignment.centerRight : Alignment.centerLeft,
+              child: ChatMessageBubble(
+                displayName: name,
+                body: body,
+                timestamp: '12:00',
+                isMine: isMine,
+              ),
+            ),
+          ),
+        ),
+      );
+      return bubbleBox(tester).size;
+    }
+
+    testWidgets(
+        'Burbuja propia y ajena (sin nombre, DM 1:1) miden lo mismo y la altura no crece con textos de 1 a 4 caracteres',
+        (tester) async {
+      const sizes = ['E', '12', '1234'];
+      double? reference;
+      for (final body in sizes) {
+        final own = await pumpBubble(tester, body, isMine: true);
+        final other = await pumpBubble(tester, body, isMine: false);
+        expect(own.height, other.height,
+            reason: 'La burbuja propia y la ajena deben medir lo mismo');
+        reference ??= own.height;
+        expect(own.height, reference,
+            reason: 'La altura no debe cambiar entre textos de 1 a 4 caracteres');
+      }
+    });
+
+    testWidgets(
+        'Un texto de 1 caracter mide la altura de una linea y el timestamp queda dentro con doble check',
+        (tester) async {
+      final size = await pumpBubble(tester, 'E', isMine: true);
+      // Una línea de texto + timestamp inline + padding vertical 12: la burbuja
+      // debe seguir siendo baja (sin filas fantasma ni padding sobredimensionado).
+      expect(size.height, lessThan(50));
+      expect(find.text('12:00'), findsOneWidget);
+      expect(find.byIcon(Icons.done_all_rounded), findsOneWidget);
+    });
+
+    testWidgets(
+        'Con nombre explicito (salas) el nombre sigue renderizandose encima del texto',
+        (tester) async {
+      await pumpBubble(tester, 'E', isMine: false, name: 'Usuario');
+      expect(find.text('Usuario'), findsOneWidget);
+    });
+
+    testWidgets(
+        'El nombre se oculta en la burbuja ajena cuando no se pasa displayName (DM 1:1)',
+        (tester) async {
+      await pumpBubble(tester, 'E', isMine: false, name: '');
+      expect(find.text('Usuario'), findsNothing);
+    });
+  });
+
   group('4. Tiradas de Dados y Morra con Contenedor y Borde Dorado', () {
     testWidgets('Aplica borde dorado brillante 0xFFFFD700 y fondo ámbar 0xFF2B2206 a tirada de dados', (tester) async {
       await tester.pumpWidget(

@@ -260,8 +260,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         }
 
         final message = item.message!;
+        // DM 1:1: sin nombre dentro de la burbuja para mantener burbujas
+        // compactas y proporcionales (especialmente con textos muy cortos).
         return ChatMessageBubble(
-          displayName: message.sender.displayName,
+          displayName: '',
           body: message.body,
           timestamp: _timeLabel(message.createdAt),
           avatarUrl: message.sender.avatarUrl,

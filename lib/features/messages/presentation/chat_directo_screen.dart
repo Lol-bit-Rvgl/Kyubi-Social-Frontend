@@ -955,7 +955,10 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
           body: message.body,
           timestamp: _timeLabel(message.createdAt),
           isMine: isMine,
-          senderName: message.sender.displayName,
+          // DM 1:1: sin nombre dentro de la burbuja (la burbuja propia nunca
+          // lo muestra y la ajena ya se identifica por avatar); evita filas
+          // fantasma y burbujas infladas con textos muy cortos.
+          senderName: '',
           avatarUrl: message.sender.avatarUrl,
           media: message.media,
           mediaUrl: message.mediaUrl,

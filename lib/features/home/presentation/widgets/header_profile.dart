@@ -5,12 +5,14 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/widgets/app_avatar.dart';
+import '../../../../features/friends/presentation/friends_list_sheet.dart';
 import '../../../../services/auth_controller.dart';
 import '../../../../services/providers.dart';
 
 /// Encabezado superior fiel a la maqueta original de Kyubi / Project Z:
 /// - Avatar + Nombre de usuario a la izquierda.
-/// - Botón de Amigos/Comunidad y Botón de Notificaciones a la derecha en squircles oscuros.
+/// - Botón de Amigos (seguimiento mutuo) y Botón de Notificaciones a la derecha
+///   en squircles oscuros.
 class HeaderProfile extends ConsumerWidget {
   const HeaderProfile({super.key});
 
@@ -83,9 +85,9 @@ class HeaderProfile extends ConsumerWidget {
               ),
             ),
 
-            // ── Botón 1: Amigos / Comunidad ──
+            // ── Botón 1: Amigos (seguimiento mutuo bilateral) ──
             GestureDetector(
-              onTap: () => context.push('/circles'),
+              onTap: () => FriendsListSheet.show(context),
               child: Container(
                 width: 38,
                 height: 38,

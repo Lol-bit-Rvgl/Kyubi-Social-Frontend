@@ -104,6 +104,9 @@ class AppConfig {
   /// Registro de token FCM para notificaciones push.
   static const String usersDeviceToken = '/users/device-token';
 
+  /// Amigos del usuario autenticado (seguimiento bilateral mutuo).
+  static const String usersFriends = '/users/friends';
+
   static String userProfile(String usernameOrId) =>
       '/users/$usernameOrId/profile';
   static String userFollowers(String usernameOrId) =>

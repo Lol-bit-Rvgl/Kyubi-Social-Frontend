@@ -11,6 +11,7 @@ import '../features/auth/presentation/reset_password/reset_password_screen.dart'
 import '../features/auth/presentation/splash/splash_screen.dart';
 import '../features/auth/presentation/verify_email/verify_email_screen.dart';
 import '../features/feed/presentation/feed_screen.dart';
+import '../features/friends/presentation/friends_list_screen.dart';
 import '../features/home/presentation/home_shell.dart';
 import '../features/messages/presentation/chat_directo_screen.dart';
 import '../features/messages/presentation/conversation_screen.dart';
@@ -166,6 +167,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/app/notifications',
         builder: (_, _) => const NotificationsScreen(),
       ),
+      GoRoute(path: '/friends', builder: (_, _) => const FriendsListScreen()),
+      GoRoute(path: '/app/friends', redirect: (_, _) => '/friends'),
       GoRoute(
         path: '/create-post',
         builder: (_, _) => const CreatePostScreen(),

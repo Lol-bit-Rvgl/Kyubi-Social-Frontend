@@ -148,6 +148,22 @@ class UserRepository {
     return _parseFollowList(body);
   }
 
+  /// Amigos del usuario autenticado (seguimiento bilateral mutuo).
+  ///
+  /// `GET /users/friends` solo devuelve usuarios con relación recíproca
+  /// (yo lo sigo y él me sigue), ya filtrada por el backend.
+  Future<List<User>> getFriends() async {
+    final body = await _api.getJson(AppConfig.usersFriends);
+    final raw = body['items'] ?? body['data'] ?? body['results'] ?? body['users'];
+    if (raw is List) {
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(User.fromJson)
+          .toList();
+    }
+    return const [];
+  }
+
   FollowListResult _parseFollowList(Map<String, dynamic> body) {
     final raw =
         body['items'] ?? body['data'] ?? body['results'] ?? body['users'];
