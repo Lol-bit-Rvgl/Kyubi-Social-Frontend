@@ -43,6 +43,7 @@ class RoleChatBubble extends StatelessWidget {
     this.contentUrl,
     this.metadata,
     this.onPollVote,
+    this.isHighlighted = false,
   });
 
   final String body;
@@ -71,6 +72,9 @@ class RoleChatBubble extends StatelessWidget {
   /// Callback de voto de encuesta: el consumidor (sala) actualiza la
   /// metadata persistida para que la tarjeta re-renderice userVotedOptionId.
   final void Function(String optionId)? onPollVote;
+
+  /// Resaltado temporal (1s) de la burbuja destino al saltar al mensaje citado.
+  final bool isHighlighted;
 
   /// Respuesta / Mensaje citado opcional (Ref: Imagen 1)
   final String? replyToId;
@@ -391,10 +395,19 @@ class RoleChatBubble extends StatelessWidget {
           bottomRight: Radius.circular(16),
         ),
         border: Border.all(
-          color: accentColor ?? const Color(0xFF2C2642),
-          width: 0.9,
+          color: isHighlighted
+              ? AppColors.accentCyan.withValues(alpha: 0.9)
+              : (accentColor ?? const Color(0xFF2C2642)),
+          width: isHighlighted ? 1.6 : 0.9,
         ),
         boxShadow: [
+          // Destello temporal cuando la burbuja es el destino del scroll.
+          if (isHighlighted)
+            BoxShadow(
+              color: AppColors.accentCyan.withValues(alpha: 0.45),
+              blurRadius: 18,
+              spreadRadius: 1.5,
+            ),
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
             blurRadius: 8,

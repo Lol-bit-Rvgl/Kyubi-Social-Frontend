@@ -146,6 +146,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   Map<String, dynamic>? _replyingToMessage;
   Map<String, dynamic>? _editingMessage;
 
+  // Swipe-to-reply: umbral mínimo horizontal (px) para activar la respuesta.
+  // Evita disparos accidentales con micro-deslizamientos y no interfiere con
+  // el scroll vertical (el drag vertical nunca completa la confirmación).
+  static const double _swipeReplyThreshold = 64.0;
+
   final ScrollController _scrollController = ScrollController();
 
   // Guard anti doble-solicitud y para no navegar dos veces al salir.
@@ -202,6 +207,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   void dispose() {
     _chatSub?.cancel();
     _activityDebounceTimer?.cancel();
+    _highlightTimer?.cancel();
     RoomSocketService.instance.leaveRoom(widget.roomId);
     final voiceState = ref.read(voiceRoomProvider);
     if (voiceState.activeRoomId == widget.roomId) {
@@ -3590,13 +3596,73 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     );
   }
 
-  void _scrollToMessage(String targetMessageId) {
+  /// Resaltado temporal de la burbuja destino (1s) tras el scroll.
+  String? _highlightedMessageId;
+  Timer? _highlightTimer;
+
+  void _flashHighlight(String messageId) {
+    _highlightTimer?.cancel();
+    setState(() => _highlightedMessageId = messageId);
+    _highlightTimer = Timer(const Duration(milliseconds: 1000), () {
+      if (mounted) setState(() => _highlightedMessageId = null);
+    });
+  }
+
+  /// Normaliza un id de mensaje para comparaciones tolerantes: recorta
+  /// espacios, minúsculas y envuelve con comillas simples cuando el backend
+  /// serializa el id entre comillas (p.ej. "'abc123'").
+  String _normalizeMessageId(Object? raw) {
+    var id = raw?.toString().trim() ?? '';
+    if (id.length >= 2 && id.startsWith("'") && id.endsWith("'")) {
+      id = id.substring(1, id.length - 1).trim();
+    }
+    return id.toLowerCase();
+  }
+
+  /// Extrae ids candidatos de un mensaje: id principal, clientMessageId y
+  /// ids anidados en metadata/extensions (tolera ids serializados).
+  List<String> _messageIdCandidates(Map<String, dynamic> m) {
+    final ids = <String>[
+      _normalizeMessageId(m['id']),
+      _normalizeMessageId(m['clientMessageId']),
+      _normalizeMessageId(m['messageId']),
+    ];
+    for (final containerKey in const ['metadata', 'extensions']) {
+      final raw = m[containerKey];
+      if (raw is Map) {
+        for (final key in const ['id', 'messageId', 'clientMessageId', 'message_id']) {
+          ids.add(_normalizeMessageId(raw[key]));
+        }
+      }
+    }
+    ids.removeWhere((s) => s.isEmpty);
+    return ids;
+  }
+
+  /// Busca el índice del mensaje citado tolerando formatos/tipos distintos
+  /// (trim, comillas envueltas, case) y campos alternativos.
+  int _indexOfMessageById(String targetId) {
+    final target = _normalizeMessageId(targetId);
+    if (target.isEmpty) return -1;
+    return _messages.indexWhere((m) => _messageIdCandidates(m).contains(target));
+  }
+
+  /// Claves de montaje por id de mensaje (candidatos normalizados) para
+  /// localizar el elemento construido del mensaje citado y hacer
+  /// Scrollable.ensureVisible sobre su context real.
+  final Map<String, GlobalKey> _messageKeys = {};
+
+  List<String> _keysForMessage(Map<String, dynamic> m) =>
+      _messageIdCandidates(m).map((id) => 'msg_$id').toList();
+
+    void _scrollToMessage(String targetMessageId) {
     if (targetMessageId.isEmpty) return;
-    final index = _messages.indexWhere((m) => '${m['id'] ?? ''}' == targetMessageId);
+    final index = _indexOfMessageById(targetMessageId);
     if (index < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('El mensaje citado no se encuentra en el historial actual.'),
+          content:
+              Text('El mensaje citado no se encuentra en el historial actual.'),
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 2),
         ),
@@ -3604,20 +3670,61 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return;
     }
 
-    if (_scrollController.hasClients) {
-      final max = _scrollController.position.maxScrollExtent;
-      final targetOffset = (_messages.length > 1)
-          ? (index / (_messages.length - 1)) * max
-          : 0.0;
-      _scrollController.animateTo(
-        targetOffset.clamp(0.0, max),
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOutCubic,
-      );
-    }
-  }
+    final msg = _messages[index];
+    void flash() => _flashHighlight(_normalizeMessageId(msg['id']));
 
-  void _showMessageContextMenu(Map<String, dynamic> msg) {
+    Future<void> reveal() async {
+      // 1) Si el elemento ya está montado (ventana cacheada del ListView), lo
+      //    centramos con Scrollable.ensureVisible sobre su context real:
+      //    posiciona la burbuja citada sin cálculos manuales de offset.
+      for (final key in _keysForMessage(msg)) {
+        final ctx = _messageKeys[key]?.currentContext;
+        if (ctx != null && ctx.mounted) {
+          await Scrollable.ensureVisible(
+            ctx,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+          );
+          flash();
+          return;
+       }
+      }
+
+      // 2) Fuera de la ventana montada: salto proporcional al índice en la
+      //    lista invertida (el offset crece hacia mensajes antiguos) y luego
+      //    refinamos con ensureVisible cuando el elemento ya esté construido.
+      if (_scrollController.hasClients) {
+        final position = _scrollController.position;
+        final max = position.maxScrollExtent;
+        final listIndex = _messages.length - 1 - index;
+        final proportional = (_messages.length <= 1)
+            ? 0.0
+            : (listIndex / (_messages.length - 1)) * max;
+        await _scrollController.animateTo(
+          proportional.clamp(0.0, max),
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+        );
+        for (final key in _keysForMessage(msg)) {
+          final ctx = _messageKeys[key]?.currentContext;
+          if (ctx != null && ctx.mounted) {
+            await Scrollable.ensureVisible(
+              ctx,
+              alignment: 0.5,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOutCubic,
+            );
+            break;
+          }
+        }
+      }
+      flash();
+    }
+
+    reveal();
+  }
+void _showMessageContextMenu(Map<String, dynamic> msg) {
     HapticFeedback.mediumImpact();
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     final senderId = msg['senderId']?.toString() ?? '';
@@ -4389,8 +4496,21 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                                         : (metaMap?['mediaUrl'] as String?));
 
                             final isMsgMine = senderId.isNotEmpty && senderId == myId;
+                            // ── Registro de GlobalKeys + resaltado ──
+                            // Asocia una GlobalKey por id (candidatos
+                            // normalizados) para el scroll al mensaje citado
+                            // y calcula si esta burbuja está resaltada.
+                            final keyNames = _keysForMessage(msg);
+                            for (final kn in keyNames) {
+                              _messageKeys.putIfAbsent(kn, GlobalKey.new);
+                            }
+                            final isHighlighted =
+                                _highlightedMessageId != null &&
+                                    _highlightedMessageId ==
+                                        _normalizeMessageId(msg['id']);
                             final bubble = RoleChatBubble(
                               isMine: isMsgMine,
+                              isHighlighted: isHighlighted,
                               body: msg['body'] as String? ?? '',
                               senderName: senderName,
                               userName: msg['username'] as String?,
@@ -4498,33 +4618,27 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                               },
                             );
 
+                            // ── Swipe-to-reply calibrado ──
+                            // Reemplaza al Dismissible (que se disparaba con
+                            // micro-deslizamientos e interfería con el scroll
+                            // vertical): exige ~64px horizontales netos con
+                            // dominancia horizontal y cancela el gesto si el
+                            // usuario termina haciendo scroll vertical.
                             final msgKey = 'msg_${msg['id'] ?? index}';
-                            return Dismissible(
+                            return _SwipeToReply(
                               key: ValueKey(msgKey),
-                              direction: DismissDirection.startToEnd,
-                              confirmDismiss: (dir) async {
-                                _startReply(msg);
-                                return false;
-                              },
-                              background: Container(
-                                alignment: Alignment.centerLeft,
-                                padding: const EdgeInsets.only(left: 16),
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.accentCyan.withValues(alpha: 0.18),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.reply_rounded,
-                                    color: AppColors.accentCyan,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
+                              onReply: () => _startReply(msg),
+                              threshold: _swipeReplyThreshold,
+                              onThresholdCrossed: () =>
+                                  HapticFeedback.lightImpact(),
                               child: GestureDetector(
                                 onLongPress: () => _showMessageContextMenu(msg),
-                                child: bubble,
+                                child: KeyedSubtree(
+                                  key: _keysForMessage(msg).isNotEmpty
+                                      ? _messageKeys[_keysForMessage(msg).first]
+                                      : null,
+                                  child: bubble,
+                                ),
                               ),
                             );
                           },
@@ -5232,6 +5346,111 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Envoltorio de gesto para swipe-to-reply con umbral calibrado.
+///
+/// Sustituye al `Dismissible` anterior que se activaba con micro-deslizamientos
+/// horizontales e interfería con el scroll vertical del chat:
+/// - Exige un desplazamiento horizontal neto ≥ [threshold] (~64px) para
+///   activar la respuesta (al soltar el dedo).
+/// - Cancela el gesto si la componente vertical domina el deslizamiento
+///   (|dy| > |dx|): el scroll vertical queda totalmente intacto.
+/// - Emite [onThresholdCrossed] una única vez por gesto (feedback háptico).
+/// - Muestra una insignia de respuesta mientras se supera el umbral.
+class _SwipeToReply extends StatefulWidget {
+  const _SwipeToReply({
+    super.key,
+    required this.child,
+    required this.onReply,
+    required this.threshold,
+    this.onThresholdCrossed,
+  });
+
+  final Widget child;
+  final VoidCallback onReply;
+  final double threshold;
+  final VoidCallback? onThresholdCrossed;
+
+  @override
+  State<_SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<_SwipeToReply> {
+  double _dx = 0;
+  double _dy = 0;
+  bool _crossed = false;
+
+  void _reset({required bool fire}) {
+    final dx = _dx;
+    final dy = _dy;
+    final horizontalDominant = dy.abs() <= dx.abs();
+    _dx = 0;
+    _dy = 0;
+    _crossed = false;
+    // Solo activa la respuesta si el gesto terminó siendo horizontal
+    // dominante; si el usuario acabó haciendo scroll vertical, se cancela.
+    if (fire && horizontalDominant && dx >= widget.threshold) {
+      widget.onReply();
+    }
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Si el gesto terminó siendo vertical, no se traslada la burbuja.
+    final horizontal = _dy.abs() <= _dx.abs();
+    final dx = horizontal ? _dx : 0.0;
+    return Stack(
+      clipBehavior: Clip.hardEdge,
+      children: [
+        Positioned(
+          left: 8,
+          top: 0,
+          bottom: 0,
+          child: IgnorePointer(
+            child: Opacity(
+              opacity: (dx / widget.threshold).clamp(0.0, 1.0),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentCyan.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.reply_rounded,
+                    color: AppColors.accentCyan,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Transform.translate(
+          offset: Offset(dx * 0.35, 0),
+          child: GestureDetector(
+            behavior: HitTestBehavior.deferToChild,
+            onHorizontalDragStart: (_) => _reset(fire: false),
+            onHorizontalDragUpdate: (d) {
+              setState(() {
+                _dx = (_dx + d.delta.dx).clamp(0.0, widget.threshold * 2);
+                _dy += d.delta.dy;
+                if (!_crossed && _dx >= widget.threshold && _dy.abs() <= _dx.abs()) {
+                  _crossed = true;
+                  widget.onThresholdCrossed?.call();
+                }
+              });
+            },
+            onHorizontalDragEnd: (_) => _reset(fire: true),
+            onHorizontalDragCancel: () => _reset(fire: false),
+            child: widget.child,
+          ),
+        ),
+      ],
     );
   }
 }
