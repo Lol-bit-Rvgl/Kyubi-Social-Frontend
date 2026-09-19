@@ -8,16 +8,9 @@ import '../../../../core/constants/room_backgrounds.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../models/room.dart';
 import '../../../../services/providers.dart';
+import 'sala_detail_controller.dart';
 
-const _appearanceColors = [
-  Color(0xFF00E5FF), // Cian neón
-  AppColors.primary, // Carmesí Kyubi
-  AppColors.accentTeal, // Verde neón
-  Color(0xFFD500F9), // Púrpura
-  Color(0xFFFF9100), // Naranja
-  Color(0xFFFFD600), // Amarillo
-  Color(0xFF2979FF), // Azul eléctrico
-];
+
 
 /// Pantalla Completa de Edición de Sala (Ref: Admin / Co-Admin Settings).
 class EditRoomScreen extends ConsumerStatefulWidget {
@@ -61,21 +54,29 @@ class _EditRoomScreenState extends ConsumerState<EditRoomScreen> {
   void initState() {
     super.initState();
     final r = widget.room;
-    _nameController = TextEditingController(text: r?.name ?? 'Sala de Kyubi');
-    _descController = TextEditingController(text: r?.description ?? '');
+    final roomId = r?.id;
+    final liveRoom = (roomId != null
+        ? ref.read(salaDetailControllerProvider(roomId)).room
+        : null) ?? r;
+    _nameController = TextEditingController(text: liveRoom?.name ?? 'Sala de Kyubi');
+    _descController = TextEditingController(
+      text: liveRoom?.description ?? liveRoom?.lore ?? '',
+    );
     _tagInputController = TextEditingController();
 
     _coverUrl =
         widget.initialCoverUrl ??
+        liveRoom?.host.avatarUrl ??
         r?.host.avatarUrl ??
         'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&auto=format&fit=crop&q=60';
     _bgUrl =
         widget.initialBgUrl ??
+        liveRoom?.chatBackgroundUrl ??
         'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=500&auto=format&fit=crop&q=60';
     _themeColor = widget.initialThemeColor ?? const Color(0xFF00E5FF);
-    if (r != null) {
-      _tags = List<String>.from(r.tags);
-      _rules = List<String>.from(r.rules);
+    if (liveRoom != null) {
+      _tags = List<String>.from(liveRoom.tags);
+      _rules = List<String>.from(liveRoom.rules);
     } else {
       _tags = ['Roleplay', 'Anime', 'Social'];
       _rules = [
@@ -85,7 +86,23 @@ class _EditRoomScreenState extends ConsumerState<EditRoomScreen> {
         'El host puede moderar la sala en cualquier momento.',
       ];
     }
-    _isPrivate = r?.access == RoomAccess.private;
+    _isPrivate = (liveRoom ?? r)?.access == RoomAccess.private;
+  }
+
+  @override
+  void didUpdateWidget(covariant EditRoomScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final roomId = widget.room?.id;
+    final liveRoom = (roomId != null
+        ? ref.read(salaDetailControllerProvider(roomId)).room
+        : null) ?? widget.room;
+    final liveDesc = liveRoom?.description ?? liveRoom?.lore;
+    if (_descController.text.trim().isEmpty && liveDesc != null && liveDesc.trim().isNotEmpty) {
+      _descController.value = TextEditingValue(
+        text: liveDesc,
+        selection: TextSelection.collapsed(offset: liveDesc.length),
+      );
+    }
   }
 
   @override
@@ -315,6 +332,21 @@ class _EditRoomScreenState extends ConsumerState<EditRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final roomId = widget.room?.id;
+    if (roomId != null) {
+      ref.listen(salaDetailControllerProvider(roomId), (prev, next) {
+        final liveDesc = next.room?.description ?? next.room?.lore;
+        if (_descController.text.trim().isEmpty &&
+            liveDesc != null &&
+            liveDesc.trim().isNotEmpty) {
+          _descController.value = TextEditingValue(
+            text: liveDesc,
+            selection: TextSelection.collapsed(offset: liveDesc.length),
+          );
+        }
+      });
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0D0C15),
       appBar: AppBar(
@@ -491,53 +523,7 @@ class _EditRoomScreenState extends ConsumerState<EditRoomScreen> {
             ],
           ),
 
-          const SizedBox(height: 16),
-
-          // ── Color de Acento Neón ──
-          const Text(
-            'Color Temático de la Sala',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: _appearanceColors.map((color) {
-              final isSelected = _themeColor == color;
-              return GestureDetector(
-                onTap: () => setState(() => _themeColor = color),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? Colors.white : Colors.transparent,
-                      width: 2.5,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: color.withValues(alpha: 0.6),
-                              blurRadius: 10,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: isSelected
-                      ? const Icon(
-                          Icons.check_rounded,
-                          color: Colors.black,
-                          size: 20,
-                        )
-                      : null,
-                ),
-              );
-            }).toList(),
-          ),
-
-          const SizedBox(height: 22),
+          const SizedBox(height: 18),
           const Divider(color: Color(0xFF221E32)),
           const SizedBox(height: 10),
 

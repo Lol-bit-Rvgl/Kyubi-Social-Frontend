@@ -137,6 +137,7 @@ class Room {
 
   String get hostId => host.id;
   bool get hasCircle => circle != null;
+  String? get lore => description;
   bool get isFull =>
       capacity != null && capacity! > 0 && participantCount >= capacity!;
 

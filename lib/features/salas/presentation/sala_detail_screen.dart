@@ -3187,19 +3187,23 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       MaterialPageRoute(
         builder: (_) => RoomDetailInfoScreen(
           roomId: widget.roomId,
-          room: room,
-          onEditRoom: () => _openEditRoom(room),
+          room: room ?? _currentRoom,
+          onEditRoom: () => _openEditRoom(_currentRoom ?? room),
         ),
       ),
     );
   }
 
   void _openEditRoom(Room? room) async {
+    final liveRoom =
+        ref.read(salaDetailControllerProvider(widget.roomId)).room ??
+        _currentRoom ??
+        room;
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (_) => EditRoomScreen(
-          room: room,
+          room: liveRoom,
           initialCoverUrl: _effectiveCoverUrl,
           initialBgUrl: _effectiveBgUrl,
           initialThemeColor: _themeColor,

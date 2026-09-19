@@ -13,6 +13,7 @@ import '../../../../services/auth_controller.dart';
 import '../../../../services/providers.dart';
 import 'edit_room_screen.dart';
 import 'sala_detail_controller.dart';
+import 'salas_controller.dart';
 import 'widgets/room_invite_friends_sheet.dart';
 
 /// Handle mostrable del host de una sala, evitando el fallback vacío '@usuario'
@@ -699,9 +700,10 @@ class RoomDetailInfoScreen extends ConsumerWidget {
     WidgetRef ref,
     Room? r,
   ) async {
+    final liveRoom = ref.read(salaDetailControllerProvider(roomId)).room ?? r;
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(builder: (_) => EditRoomScreen(room: r)),
+      MaterialPageRoute(builder: (_) => EditRoomScreen(room: liveRoom)),
     );
     if (result == null || !context.mounted) return;
     try {
@@ -715,6 +717,8 @@ class RoomDetailInfoScreen extends ConsumerWidget {
             tags: (result['tags'] as List?)?.cast<String>(),
           );
       ref.read(salaDetailControllerProvider(roomId).notifier).applyRoom(updated);
+      ref.read(salasControllerProvider.notifier).applyRoom(updated);
+      await ref.read(salaDetailControllerProvider(roomId).notifier).refresh();
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
