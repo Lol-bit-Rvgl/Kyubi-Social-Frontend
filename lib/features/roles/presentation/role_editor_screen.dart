@@ -76,11 +76,21 @@ class _RoleEditorScreenState extends State<RoleEditorScreen> {
       final picker = ImagePicker();
       final image = await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
+        maxWidth: 512,
+        maxHeight: 512,
         imageQuality: 85,
       );
       if (image != null && mounted) {
+        final ext = image.path.toLowerCase().split('.').last;
+        if (!['jpg', 'jpeg', 'png', 'webp'].contains(ext)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Formato no permitido. Usa JPG, PNG o WebP.'),
+              backgroundColor: AppColors.accentCrimson,
+            ),
+          );
+          return;
+        }
         setState(() => _avatarPath = image.path);
       }
     } catch (e) {

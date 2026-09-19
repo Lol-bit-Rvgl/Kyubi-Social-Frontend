@@ -16,6 +16,7 @@ class RoleplayStageView extends StatefulWidget {
     required this.onRoleTap,
     required this.onPlayTap,
     this.onAddRoleTap,
+    this.onVacantSlotTap,
     this.onLeaveStageTap,
     this.isExpanded = false,
     this.onToggleExpanded,
@@ -30,6 +31,9 @@ class RoleplayStageView extends StatefulWidget {
   final Function(RoleCharacter role) onRoleTap;
   final VoidCallback onPlayTap;
   final VoidCallback? onAddRoleTap;
+
+  /// Callback para seleccionar y ocupar un slot vacante pasando su índice.
+  final void Function(int? slotIndex)? onVacantSlotTap;
   final VoidCallback? onLeaveStageTap;
 
   /// Si el stage de roleplay se muestra expandido o minimizado.
@@ -86,7 +90,11 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
     final validRoles = widget.roles
         .where((r) => r.isValid)
         .toList();
-    final allSlots = [...validRoles.map(_buildRoleItem), _buildEmptySlot()];
+    final allSlots = [
+      for (int i = 0; i < validRoles.length; i++)
+        _buildRoleItem(validRoles[i], slotIndex: i),
+      _buildEmptySlot(slotIndex: validRoles.length),
+    ];
     const int pageSize = 6;
     final totalPages = (allSlots.length / pageSize).ceil();
 
@@ -225,7 +233,7 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
             if (validRoles.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: _buildEmptySlot(),
+                child: _buildEmptySlot(slotIndex: 0),
               )
             else if (totalPages > 1)
               Column(
@@ -381,7 +389,11 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
             onTap: () {
               // Gamefeel: impacto medio al unirse al stage (acción principal).
               HapticFeedback.mediumImpact();
-              widget.onAddRoleTap?.call();
+              if (widget.onVacantSlotTap != null) {
+                widget.onVacantSlotTap!(null);
+              } else {
+                widget.onAddRoleTap?.call();
+              }
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -497,13 +509,17 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
     );
   }
 
-  Widget _buildRoleItem(RoleCharacter role) {
+  Widget _buildRoleItem(RoleCharacter role, {required int slotIndex}) {
     final isVacant = !role.isTaken;
     final occupantName = role.takenByUsername ?? role.occupiedByName;
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
-        widget.onRoleTap(role);
+        if (isVacant && widget.onVacantSlotTap != null && !_userHasRole) {
+          widget.onVacantSlotTap!(slotIndex);
+        } else {
+          widget.onRoleTap(role);
+        }
       },
       child: SizedBox(
         width: 68,
@@ -517,6 +533,7 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
                 HexagonAvatar(
                   size: 54,
                   imageUrl: role.avatarUrl,
+                  name: role.name,
                   borderColor: isVacant
                       ? role.color.withValues(alpha: 0.5)
                       : role.color,
@@ -602,7 +619,7 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
         );
   }
 
-  Widget _buildEmptySlot() {
+  Widget _buildEmptySlot({int? slotIndex}) {
     final alreadyHasRole = _userHasRole;
     return GestureDetector(
       onTap: alreadyHasRole
@@ -611,7 +628,11 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
               // Gamefeel: impacto medio al ocupar un slot "+ Unirse";
               // solo disponible si el usuario no posee ya un rol asignado.
               HapticFeedback.mediumImpact();
-              widget.onAddRoleTap?.call();
+              if (widget.onVacantSlotTap != null) {
+                widget.onVacantSlotTap!(slotIndex);
+              } else {
+                widget.onAddRoleTap?.call();
+              }
             },
       child: SizedBox(
         width: 68,

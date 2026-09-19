@@ -162,6 +162,22 @@ class RoomRepository {
     );
   }
 
+  /// Ocupa un espacio en el stage con la ficha de rol seleccionada.
+  Future<Map<String, dynamic>> occupyStageRole(
+    String roomId, {
+    required String roleSheetId,
+    int? slotIndex,
+  }) async {
+    final json = await _api.postJson(
+      AppConfig.salaRoleOccupy(roomId),
+      data: {
+        'roleSheetId': roleSheetId,
+        'slotIndex': ?slotIndex,
+      },
+    );
+    return json;
+  }
+
   /// Guarda (crea o actualiza) un rol en la sala de forma persistente en PostgreSQL.
   Future<void> saveStageRole(String roomId, RoleCharacter role) async {
     await _api.postJson(

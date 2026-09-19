@@ -216,6 +216,7 @@ class AppConfig {
   static String salaMessages(String id) => '/salas/$id/messages';
   static String salaVoiceToken(String id) => '/salas/$id/voice/token';
   static String salaStageRole(String id) => '/salas/$id/stage/role';
+  static String salaRoleOccupy(String id) => '/salas/$id/roles/occupy';
   static String salaMode(String id) => '/salas/$id/mode';
   static String salaMessage(String roomId, String messageId) =>
       '/salas/$roomId/messages/$messageId';

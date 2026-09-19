@@ -269,6 +269,14 @@ class RoomSocketService extends BaseSocket<RoomSocketEvent> {
       }
     });
 
+    socket.on('roleplay:slot_updated', (payload) {
+      final data = asMap(payload);
+      final roomId = data['roomId'] as String? ?? '';
+      if (roomId.isNotEmpty) {
+        emitEvent(RoomStageRoleChanged(roomId, data));
+      }
+    });
+
     socket.on('room:poll_voted', (payload) {
       final data = asMap(payload);
       final roomId = data['roomId'] as String? ?? '';

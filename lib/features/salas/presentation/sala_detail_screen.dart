@@ -27,6 +27,7 @@ import '../../../../services/voice/voice_room_controller.dart';
 import '../../messages/presentation/conversations_controller.dart';
 import '../../profile/presentation/user_follow_controller.dart';
 import '../../roles/presentation/role_editor_screen.dart';
+import '../../roles/presentation/role_library_screen.dart';
 import '../../roles/presentation/widgets/role_info_modal.dart';
 import '../../../../core/widgets/liquid_glass_button.dart';
 import 'edit_room_screen.dart';
@@ -2737,6 +2738,96 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     );
   }
 
+  /// Abre el selector de fichas de rol (OC) y ocupa el slot correspondiente en el stage.
+  Future<void> _handleSelectRoleForStage({int? targetSlotIndex}) async {
+    final myId = ref.read(authControllerProvider).user?.id ?? '';
+    if (myId.isEmpty) return;
+
+    final picked = await RoleLibraryScreen.showPicker(context);
+    if (picked == null || !mounted) return;
+
+    await _occupyStageWithRole(picked, targetSlotIndex: targetSlotIndex);
+  }
+
+  /// Ocupa un slot del stage con la ficha dada y sincroniza con el backend y socket.
+  Future<void> _occupyStageWithRole(
+    RoleCharacter role, {
+    int? targetSlotIndex,
+  }) async {
+    final myId = ref.read(authControllerProvider).user?.id ?? '';
+    if (myId.isEmpty) return;
+
+    final user = ref.read(authControllerProvider).user;
+    final displayName = user?.displayName.isNotEmpty == true
+        ? user!.displayName
+        : (user?.username ?? 'Tú');
+
+    final updatedRole = role.copyWith(
+      isTaken: true,
+      takenByUserId: myId,
+      takenByUsername: displayName,
+    );
+
+    setState(() {
+      _currentActiveRole = updatedRole;
+
+      // Liberar cualquier slot anterior que tuviera este usuario
+      for (int i = 0; i < _stageRoles.length; i++) {
+        if (_stageRoles[i].takenByUserId == myId ||
+            _stageRoles[i].occupiedBy == myId) {
+          _stageRoles[i] = _stageRoles[i].toVacant();
+        }
+      }
+
+      int destIndex = targetSlotIndex ?? -1;
+      if (destIndex >= 0 && destIndex < _stageRoles.length) {
+        _stageRoles[destIndex] = updatedRole;
+      } else {
+        final vacantIndex =
+            _stageRoles.indexWhere((r) => !r.isTaken && !r.isOccupied);
+        if (vacantIndex >= 0) {
+          destIndex = vacantIndex;
+          _stageRoles[vacantIndex] = updatedRole;
+        } else {
+          destIndex = _stageRoles.length;
+          _stageRoles.add(updatedRole);
+        }
+      }
+    });
+
+    _salas.updateRoomRole(widget.roomId, updatedRole);
+
+    final currentRoom =
+        ref.read(salaDetailControllerProvider(widget.roomId)).room;
+    if (currentRoom != null) {
+      ref.read(salaDetailControllerProvider(widget.roomId).notifier).applyRoom(
+            currentRoom.copyWith(
+              stageRoles: _stageRoles,
+              activeCharacter: updatedRole,
+            ),
+          );
+    }
+
+    try {
+      await ref.read(roomRepositoryProvider).occupyStageRole(
+            widget.roomId,
+            roleSheetId: role.id,
+            slotIndex: targetSlotIndex,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('¡Personaje ${role.name} subido al stage!'),
+            backgroundColor: const Color(0xFF1E1A2E),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[STAGE_OCCUPY] Error al ocupar slot: $e');
+    }
+  }
+
   void _openRoleCreatorOrSelector() async {
     if (!_canManageRoles()) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -4058,6 +4149,7 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
     final room = state.room;
     final roomName = room?.name ?? 'Sala';
     final myId = ref.watch(authControllerProvider).user?.id ?? '';
+    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
 
     // Estado de carga defensivo: si aún no cargó la sala, o si la sala es privada
     // pero la sesión de usuario aún no está hidratada, mostrar pantalla de carga
@@ -4188,7 +4280,7 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                 if (_currentRoomMode == 'roleplay')
                   RoleplayStageView(
                     roles: _stageRoles,
-                    isExpanded: !_isRoleplayMinimized,
+                    isExpanded: !_isRoleplayMinimized && !isKeyboardOpen,
                     onToggleExpanded: (expanded) {
                       if (_isSwitchingActivity) return;
                       _triggerActivityDebounce();
@@ -4200,7 +4292,9 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                       });
                     },
                     onRoleTap: _openRoleInfo,
-                    onAddRoleTap: _openRoleCreatorOrSelector,
+                    onVacantSlotTap: (slotIndex) =>
+                        _handleSelectRoleForStage(targetSlotIndex: slotIndex),
+                    onAddRoleTap: () => _handleSelectRoleForStage(),
                     currentUserId: ref.read(authControllerProvider).user?.id,
                     canPowerOff: _canManageRoles(),
                     onPowerOff: _turnOffActivity,
@@ -4283,10 +4377,12 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                   ),
 
                 // ── Botón de redimensión / colapso de la actividad activa ──
-                if (_currentRoomMode == 'voice' ||
-                    ref.watch(voiceRoomProvider.select((s) => s.isConnected)) ||
-                    _currentRoomMode == 'roleplay' ||
-                    _currentRoomMode == 'screening')
+                if (!isKeyboardOpen &&
+                    (_currentRoomMode == 'voice' ||
+                        ref.watch(
+                            voiceRoomProvider.select((s) => s.isConnected)) ||
+                        _currentRoomMode == 'roleplay' ||
+                        _currentRoomMode == 'screening'))
                   _buildStageResizeButton(),
 
                 // ── Feed de Mensajes / Chat Flow (Ref: Imagen 1, 2, 3, 5) ──
@@ -4728,9 +4824,15 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                     onSendEdit: _submitEdit,
                     onIdentityChanged: (selected) {
                       setState(() => _currentActiveRole = selected);
+                      if (selected != null && _currentRoomMode == 'roleplay') {
+                        _occupyStageWithRole(selected);
+                      }
                     },
                     onRoleChanged: (selected) {
                       setState(() => _currentActiveRole = selected);
+                      if (selected != null && _currentRoomMode == 'roleplay') {
+                        _occupyStageWithRole(selected);
+                      }
                     },
                     onTypingChanged: (typing) {
                       // Mientras se escribe se pausan los emojis animados.

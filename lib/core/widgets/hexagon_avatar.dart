@@ -110,6 +110,7 @@ class HexagonAvatar extends StatelessWidget {
   const HexagonAvatar({
     super.key,
     this.imageUrl,
+    this.name,
     this.size = 54,
     this.borderColor = AppColors.accentCyan,
     this.borderWidth = 2.0,
@@ -122,6 +123,7 @@ class HexagonAvatar extends StatelessWidget {
   });
 
   final String? imageUrl;
+  final String? name;
   final double size;
   final Color borderColor;
   final double borderWidth;
@@ -215,6 +217,35 @@ class HexagonAvatar extends StatelessWidget {
   }
 
   Widget _buildFallback() {
+    final rawName = name?.trim() ?? '';
+    if (rawName.isNotEmpty) {
+      final parts = rawName.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+      final initials = parts.length > 1
+          ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
+          : (rawName.length > 1 ? rawName.substring(0, 2).toUpperCase() : rawName.toUpperCase());
+
+      return Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF2E1220), Color(0xFF121A2E)],
+          ),
+        ),
+        child: Center(
+          child: Text(
+            initials,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: size * 0.32,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -223,8 +254,8 @@ class HexagonAvatar extends StatelessWidget {
           colors: [Color(0xFF2E1220), Color(0xFF121A2E)],
         ),
       ),
-      child: const Center(
-        child: Icon(Icons.person_rounded, color: Colors.white38, size: 24),
+      child: Center(
+        child: Icon(Icons.person_rounded, color: Colors.white38, size: size * 0.44),
       ),
     );
   }

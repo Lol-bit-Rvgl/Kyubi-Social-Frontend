@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kyubi/core/network/api_client.dart';
 import 'package:kyubi/core/widgets/chat_bubble.dart';
+import 'package:kyubi/core/widgets/hexagon_avatar.dart';
 import 'package:kyubi/features/salas/presentation/edit_room_screen.dart';
 import 'package:kyubi/features/salas/presentation/salas_controller.dart';
 import 'package:kyubi/features/salas/presentation/widgets/chat_message_input_bar.dart';
@@ -502,4 +503,70 @@ void main() {
       expect(event.retryAfterMs, 1500);
     });
   });
+
+  group('Roleplay Stage - Ocupación de Slots e Iniciales Cósmicas', () {
+    test('RoomRepository.occupyStageRole envía POST con roleSheetId y slotIndex', () async {
+      final fakeApi = FakeApiClient();
+      final repository = RoomRepository(fakeApi);
+
+      final result = await repository.occupyStageRole(
+        'sala-123',
+        roleSheetId: 'char-456',
+        slotIndex: 2,
+      );
+
+      expect(fakeApi.lastPath, '/salas/sala-123/roles/occupy');
+      expect(fakeApi.lastData, {
+        'roleSheetId': 'char-456',
+        'slotIndex': 2,
+      });
+      expect(result['success'], true);
+    });
+
+    testWidgets('HexagonAvatar muestra iniciales cósmicas cuando imageUrl es null o vacía', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: HexagonAvatar(
+                size: 56,
+                name: 'Kitsune Ninja',
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('KN'), findsOneWidget);
+    });
+
+    testWidgets('RoleplayStageView invoca onVacantSlotTap con el slotIndex correspondiente', (tester) async {
+      int? tappedSlot;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RoleplayStageView(
+              roles: const [],
+              onRoleTap: (_) {},
+              onPlayTap: () {},
+              isExpanded: true,
+              canManage: false,
+              onVacantSlotTap: (slot) => tappedSlot = slot,
+            ),
+          ),
+        ),
+      );
+
+      // Los slots vacíos muestran el icono add_rounded
+      final addIcons = find.byIcon(Icons.add_rounded);
+      expect(addIcons, findsWidgets);
+
+      await tester.tap(addIcons.first, warnIfMissed: false);
+      await tester.pump();
+
+      expect(tappedSlot, 0);
+    });
+  });
 }
+
