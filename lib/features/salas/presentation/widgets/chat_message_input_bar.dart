@@ -1297,18 +1297,23 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
     HapticFeedback.lightImpact();
     final myId = widget.currentUserId ?? '';
 
-    // Filtrar los roles asignados al usuario actual o disponibles si es host
+    // Filtrar los roles asignados al usuario actual o disponibles si es host,
+    // descartando rigurosamente fichas vacías, nulas o con datos corruptos.
     final userRoles = widget.availableRoles.where((r) {
+      if (!r.isValid) return false;
       if (r.takenByUserId != null && r.takenByUserId == myId) return true;
       if (r.occupiedBy != null && r.occupiedBy == myId) return true;
       if (widget.isHost && !r.isTaken) return true;
       return false;
     }).toList();
 
-    // Asegurar que si hay un rol seleccionado actualmente, figure en la lista
-    if (_selectedRole != null &&
-        !userRoles.any((r) => r.id == _selectedRole!.id)) {
-      userRoles.insert(0, _selectedRole!);
+    // Asegurar que si hay un rol seleccionado actualmente, figure en la lista sólo si es válido
+    if (_selectedRole != null) {
+      if (!_selectedRole!.isValid) {
+        _selectedRole = null;
+      } else if (!userRoles.any((r) => r.id == _selectedRole!.id)) {
+        userRoles.insert(0, _selectedRole!);
+      }
     }
 
     showModalBottomSheet<void>(

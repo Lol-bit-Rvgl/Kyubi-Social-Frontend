@@ -31,7 +31,11 @@ class RoleCharacter {
   bool get isOccupied => isTaken;
   String? get occupiedBy => takenByUserId;
   String? get occupiedByName => takenByUsername;
-  bool get isValid => id.trim().isNotEmpty && name.trim().isNotEmpty;
+  bool get isValid {
+    final cleanId = id.trim();
+    final cleanName = name.trim().replaceAll(RegExp(r'^[.\s]+$'), '');
+    return cleanId.isNotEmpty && cleanName.isNotEmpty;
+  }
 
   Color get color {
     final hex = colorHex.replaceAll('#', '');

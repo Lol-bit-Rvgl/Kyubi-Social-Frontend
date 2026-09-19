@@ -360,6 +360,25 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return;
     }
     if (event is RoomStageRoleChanged && event.roomId == widget.roomId) {
+      if (event.action == 'leave_all' || event.payload['isActive'] == false) {
+        setState(() {
+          _stageRoles = [];
+          _currentActiveRole = null;
+        });
+        _salas.setRoomRoles(widget.roomId, []);
+        return;
+      }
+
+      // Si el cliente no está en modo roleplay o está en plena transición entre actividades,
+      // descartamos eventos de socket tardíos/desfasados para prevenir race conditions.
+      if (_currentRoomMode != 'roleplay' || _isSwitchingActivity) {
+        debugPrint(
+          '[MODE_DEBUG] Descartando RoomStageRoleChanged (${event.action}) '
+          'porque el modo actual es $_currentRoomMode (switching=$_isSwitchingActivity)',
+        );
+        return;
+      }
+
       final myId = ref.read(authControllerProvider).user?.id;
       if (event.stageRoles != null) {
         final roles = event.stageRoles!
@@ -605,6 +624,16 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         event.actorId == myId;
     final normalized = RoomSocketService.normalizeMode(event.mode);
     final previous = _currentRoomMode;
+
+    // Si el cliente local está cambiando de modo activamente, ignoramos
+    // broadcasts remotos concurrentes para prevenir condiciones de carrera.
+    if (_isSwitchingActivity && !isMyChange) {
+      debugPrint(
+        '[MODE_DEBUG] Ignorando room:mode_changed remoto mientras _isSwitchingActivity=true',
+      );
+      return;
+    }
+
     if (normalized == previous && !isMyChange) return;
     _applyRoomMode(
       normalized,
@@ -690,28 +719,111 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     }
   }
 
-  /// Cierra la actividad activa (voz / cine / roleplay) y vuelve a chat
-  /// estándar. Si hay una sesión de voz activa, desconecta LiveKit de inmediato.
-  Future<void> _turnOffActivity() async {
-    if (!_canManageRoles()) return;
-    final voice = ref.read(voiceRoomProvider);
-    if (_currentRoomMode == 'voice' || voice.isConnected || voice.isConnecting) {
-      await ref.read(voiceRoomProvider.notifier).leaveVoice();
+  /// Función centralizada y protegida por mutex y cooldown para cambiar el modo de sala.
+  /// Unifica el comportamiento del modal inferior y del botón de apagado del Stage (⏻).
+  Future<void> _requestModeChange(
+    String mode, {
+    String? cinemaVideoId,
+    String? cinemaState,
+    double? cinemaCurrentTime,
+    bool popContext = false,
+  }) async {
+    if (!_canChangeModeNow()) return;
+    if (!_canManageRoles()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Solo el Host o Administradores pueden cambiar el modo',
+            ),
+          ),
+        );
+      }
+      return;
     }
+
+    if (popContext && mounted) {
+      Navigator.of(context).maybePop();
+    }
+
+    HapticFeedback.mediumImpact();
+
+    // Activar inmediatamente el cooldown y el mutex de switching
+    _lastModeChangeAt = DateTime.now();
+    if (mounted) {
+      setState(() => _isSwitchingActivity = true);
+    }
+
+    final normalized = RoomSocketService.normalizeMode(mode);
+
+    // Desconectar voz si se sale de voice
+    if (normalized != 'voice') {
+      final voice = ref.read(voiceRoomProvider);
+      if (voice.isConnected || voice.isConnecting) {
+        await ref.read(voiceRoomProvider.notifier).leaveVoice();
+      }
+    }
+
     if (!mounted) return;
-    _applyRoomMode('standard');
-    ref.read(roomRepositoryProvider).updateRoomMode(
-      widget.roomId,
-      'standard',
-    ).then((updated) {
+
+    // Al salir de roleplay o volver a standard, limpiar la identidad activa de rol
+    if (normalized != 'roleplay') {
+      _currentActiveRole = null;
+    }
+
+    final isScreening = normalized == 'screening';
+    final currentRoom = _currentRoom;
+    final nextVideoId =
+        isScreening ? (cinemaVideoId ?? currentRoom?.cinemaVideoId) : null;
+    final nextCinemaState = isScreening
+        ? (cinemaState ?? currentRoom?.cinemaState ?? 'STOPPED')
+        : 'STOPPED';
+    final nextCurrentTime = isScreening
+        ? (cinemaCurrentTime ?? currentRoom?.cinemaCurrentTime ?? 0.0)
+        : 0.0;
+
+    // Actualizar optimistamente la UI de forma inmediata
+    _applyRoomMode(
+      normalized,
+      cinemaVideoId: nextVideoId,
+      cinemaState: nextCinemaState,
+      cinemaCurrentTime: nextCurrentTime,
+    );
+
+    debugPrint(
+      '[MODE_DEBUG] Emitiendo cambio de modo a HTTP: '
+      'sala=${widget.roomId}, modo=$normalized',
+    );
+
+    try {
+      final updated = await ref.read(roomRepositoryProvider).updateRoomMode(
+            widget.roomId,
+            normalized,
+            videoId: nextVideoId,
+            cinemaState: nextCinemaState,
+            currentTime: nextCurrentTime,
+          );
       if (!mounted) return;
       ref
           .read(salaDetailControllerProvider(widget.roomId).notifier)
           .applyRoom(updated);
       ref.read(salasControllerProvider.notifier).applyRoom(updated);
-    }).catchError((err) {
-      debugPrint('[MODE_DEBUG] Error en _turnOffActivity updateRoomMode HTTP: $err');
-    });
+    } catch (err) {
+      debugPrint('[MODE_DEBUG] Error en updateRoomMode HTTP: $err');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _lastModeChangeAt = DateTime.now();
+          _isSwitchingActivity = false;
+        });
+      }
+    }
+  }
+
+  /// Cierra la actividad activa (voz / cine / roleplay) y vuelve a chat
+  /// estándar pasando por el mutex y cooldown unificado.
+  Future<void> _turnOffActivity() async {
+    await _requestModeChange('standard');
   }
 
   /// Emoji de cabecera para el toast según el modo.
@@ -2999,7 +3111,6 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }) {
     return GestureDetector(
       onTap: () {
-        if (!_canChangeModeNow()) return;
         if (!isAllowed) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -3010,52 +3121,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           );
           return;
         }
-        HapticFeedback.mediumImpact();
-        Navigator.pop(context);
-        final normalized = RoomSocketService.normalizeMode(mode);
-        final currentRoom = _currentRoom;
-        if (normalized != 'voice') {
-          final voice = ref.read(voiceRoomProvider);
-          if (voice.isConnected || voice.isConnecting) {
-            ref.read(voiceRoomProvider.notifier).leaveVoice();
-          }
-        }
-        final isScreening = normalized == 'screening';
-        final nextVideoId = isScreening ? currentRoom?.cinemaVideoId : null;
-        final nextCinemaState =
-            isScreening ? (currentRoom?.cinemaState ?? 'STOPPED') : 'STOPPED';
-        final nextCurrentTime =
-            isScreening ? (currentRoom?.cinemaCurrentTime ?? 0.0) : 0.0;
-
-        setState(() => _isSwitchingActivity = true);
-        _applyRoomMode(
-          normalized,
-          cinemaVideoId: nextVideoId,
-          cinemaState: nextCinemaState,
-          cinemaCurrentTime: nextCurrentTime,
-        );
-        debugPrint('[MODE_DEBUG] Emitiendo cambio de modo a HTTP: '
-            'sala=${widget.roomId}, modo=$normalized');
-        ref.read(roomRepositoryProvider).updateRoomMode(
-          widget.roomId,
-          normalized,
-          videoId: nextVideoId,
-          cinemaState: nextCinemaState,
-          currentTime: nextCurrentTime,
-        ).then((updated) {
-          if (!mounted) return;
-          setState(() {
-            _lastModeChangeAt = DateTime.now();
-            _isSwitchingActivity = false;
-          });
-          ref
-              .read(salaDetailControllerProvider(widget.roomId).notifier)
-              .applyRoom(updated);
-          ref.read(salasControllerProvider.notifier).applyRoom(updated);
-        }).catchError((err) {
-          debugPrint('[MODE_DEBUG] Error en updateRoomMode HTTP: $err');
-          if (mounted) setState(() => _isSwitchingActivity = false);
-        });
+        _requestModeChange(mode, popContext: true);
       },
       child: Container(
         padding: const EdgeInsets.all(12),

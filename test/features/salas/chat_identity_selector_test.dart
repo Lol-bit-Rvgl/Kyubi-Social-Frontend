@@ -300,6 +300,62 @@ void main() {
       final cachedImage = tester.widget<CachedNetworkImage>(find.byType(CachedNetworkImage));
       expect(cachedImage.imageUrl, equals('https://example.com/aria.png'));
     });
+
+    testWidgets('Filtra rigurosamente roles nulos o corruptos y no muestra filas fantasma', (tester) async {
+      const corruptRole1 = RoleCharacter(
+        id: '',
+        name: '',
+        isTaken: true,
+        takenByUserId: 'my-user-id',
+      );
+      const corruptRole2 = RoleCharacter(
+        id: 'corrupt-dots',
+        name: '...',
+        isTaken: true,
+        takenByUserId: 'my-user-id',
+      );
+      const corruptRole3 = RoleCharacter(
+        id: 'corrupt-spaces',
+        name: '   ',
+        isTaken: true,
+        takenByUserId: 'my-user-id',
+      );
+      const validRole = RoleCharacter(
+        id: 'valid-role',
+        name: 'Heroe Real',
+        tagline: 'Defensor',
+        isTaken: true,
+        takenByUserId: 'my-user-id',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChatMessageInputBar(
+              isRoleplay: true,
+              userName: 'Tester',
+              currentUserId: 'my-user-id',
+              availableRoles: const [corruptRole1, corruptRole2, corruptRole3, validRole],
+              onSendMessage: (_) {},
+              onSendImage: (_) {},
+              onSendAudio: (_, _, _) {},
+              onSendDiceRoll: (_, _, _) {},
+              onSendPoll: (_, _) {},
+            ),
+          ),
+        ),
+      );
+
+      // Abrir modal de identidades
+      await tester.tap(find.byTooltip('Identidad: Mi Perfil (Tester)'));
+      await tester.pumpAndSettle();
+
+      // Debe mostrar solo 1 rol válido
+      expect(find.text('ROLES Y PERSONAJES ASIGNADOS (1)'), findsOneWidget);
+      expect(find.text('Heroe Real'), findsOneWidget);
+      expect(find.text('...'), findsNothing);
+      expect(find.text('Ficha de Rol equipada'), findsNothing);
+    });
   });
 }
 
