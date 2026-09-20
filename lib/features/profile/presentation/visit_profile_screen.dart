@@ -245,7 +245,6 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
 
     final user = _user!;
     final metrics = ref.watch(profileMetricsProvider(user));
-    final coins = user.level * 150 + 420;
     final wallpaperUrl = user.effectiveBannerUrl;
 
     return DefaultTabController(
@@ -293,7 +292,6 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
                     ),
                   ),
                   actions: [
-                    if (coins > 0) _buildCoinsChip(coins),
                     IconButton(
                       onPressed: () => _shareProfile(user),
                       icon: const Icon(
@@ -387,37 +385,6 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCoinsChip(int coins) {
-    return Container(
-      margin: const EdgeInsets.only(right: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xCC14141E),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2D2544), width: 0.8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.monetization_on_rounded,
-            color: Color(0xFFFFD600),
-            size: 15,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '$coins',
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFFFFD600),
-            ),
-          ),
-        ],
       ),
     );
   }

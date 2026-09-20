@@ -1,11 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/hexagon_avatar.dart';
+import '../../../../models/character.dart';
 import '../../../../models/role_character.dart';
+import '../../../../repositories/character_repository.dart';
+import '../../../../services/providers.dart';
 
 TextInputFormatter _graphemeLimiter(int maxGraphemes) {
   return TextInputFormatter.withFunction((oldValue, newValue) {
@@ -33,16 +39,17 @@ const _paletteColors = [
 ];
 
 /// Pantalla para crear o editar un Rol/Personaje (Ref: Screenshot_20260729_212217_Gallery.jpg).
-class RoleEditorScreen extends StatefulWidget {
+class RoleEditorScreen extends ConsumerStatefulWidget {
   const RoleEditorScreen({super.key, this.initialRole});
 
   final RoleCharacter? initialRole;
 
   @override
-  State<RoleEditorScreen> createState() => _RoleEditorScreenState();
+  ConsumerState<RoleEditorScreen> createState() => _RoleEditorScreenState();
 }
 
-class _RoleEditorScreenState extends State<RoleEditorScreen> {
+class _RoleEditorScreenState extends ConsumerState<RoleEditorScreen> {
+  bool _saving = false;
   final _nameController = TextEditingController();
   final _taglineController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -174,7 +181,9 @@ class _RoleEditorScreenState extends State<RoleEditorScreen> {
     );
   }
 
-  void _saveRole() {
+  Future<void> _saveRole() async {
+    if (_saving) return;
+
     final rawName = _nameController.text.trim();
     final name = rawName.characters.length > 20
         ? rawName.characters.take(20).toString()
@@ -198,18 +207,84 @@ class _RoleEditorScreenState extends State<RoleEditorScreen> {
 
     final hex =
         '#${_selectedColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
+
+    setState(() => _saving = true);
+
+    String? uploadedAvatarUrl = _avatarPath;
+    if (_avatarPath != null &&
+        _avatarPath!.isNotEmpty &&
+        !_avatarPath!.startsWith('http://') &&
+        !_avatarPath!.startsWith('https://')) {
+      try {
+        final file = File(_avatarPath!);
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          final ext = _avatarPath!.split('.').last;
+          final filename =
+              'avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+          uploadedAvatarUrl = await ref
+              .read(uploadRepositoryProvider)
+              .uploadFile(
+                'avatar',
+                bytes: bytes,
+                filename: filename,
+                contentType: 'image/$ext',
+              );
+        }
+      } catch (e) {
+        debugPrint('[ROLE_EDITOR] Error al subir avatar: $e');
+      }
+    }
+
+    String finalRoleId = widget.initialRole?.id ?? '';
+    if (widget.initialRole != null && finalRoleId.isNotEmpty) {
+      try {
+        await ref.read(characterRepositoryProvider).updateCharacter(
+          finalRoleId,
+          {
+            'name': name,
+            'tagline': tagline,
+            'description': description,
+            'avatarUrl': uploadedAvatarUrl,
+            'themeColor': hex,
+          },
+        );
+      } catch (e) {
+        debugPrint('[ROLE_EDITOR] Error al actualizar personaje en backend: $e');
+      }
+    } else {
+      try {
+        final created = await ref.read(characterRepositoryProvider).createCharacter({
+          'name': name,
+          'tagline': tagline,
+          'description': description,
+          'avatarUrl': uploadedAvatarUrl,
+          'themeColor': hex,
+        });
+        finalRoleId = created.id;
+      } catch (e) {
+        debugPrint('[ROLE_EDITOR] Error al crear personaje en backend: $e');
+        finalRoleId = 'role_${DateTime.now().millisecondsSinceEpoch}';
+      }
+    }
+
+    ref.invalidate(myCharactersProvider);
+
     final result = RoleCharacter(
-      id:
-          widget.initialRole?.id ??
-          'role_${DateTime.now().millisecondsSinceEpoch}',
+      id: finalRoleId.isNotEmpty
+          ? finalRoleId
+          : 'role_${DateTime.now().millisecondsSinceEpoch}',
       name: name,
-      avatarUrl: _avatarPath,
+      avatarUrl: uploadedAvatarUrl,
       colorHex: hex,
       tagline: tagline,
       description: description,
     );
 
-    context.pop(result);
+    if (mounted) {
+      setState(() => _saving = false);
+      context.pop(result);
+    }
   }
 
   @override
@@ -254,7 +329,7 @@ class _RoleEditorScreenState extends State<RoleEditorScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: _saveRole,
+                    onTap: _saving ? null : _saveRole,
                     child: Container(
                       width: 40,
                       height: 40,
@@ -262,11 +337,22 @@ class _RoleEditorScreenState extends State<RoleEditorScreen> {
                         color: Color(0xFF1E1A2B),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.check_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
+                      child: _saving
+                          ? const Center(
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.accentCyan,
+                                ),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.check_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
                     ),
                   ),
                 ],

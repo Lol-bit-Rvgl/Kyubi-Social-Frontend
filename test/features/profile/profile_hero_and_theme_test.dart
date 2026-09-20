@@ -247,6 +247,30 @@ void main() {
       // 4. NO debe mostrar el botón "Fichas de Rol"
       expect(find.text('Fichas de Rol'), findsNothing);
     });
+
+    testWidgets('ProfileScreen muestra el chip de monedas con el saldo del usuario autenticado', (tester) async {
+      final userWithCoins = ownUser.copyWith(
+        extensions: {'coins': 570},
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authControllerProvider.overrideWith(() => _FakeAuthNotifier(userWithCoins)),
+            userRepositoryProvider.overrideWithValue(_FakeProfileUserRepository(userWithCoins)),
+          ],
+          child: const MaterialApp(
+            home: ProfileScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('570'), findsOneWidget);
+      expect(find.byIcon(Icons.monetization_on_rounded), findsOneWidget);
+    });
   });
 }
 

@@ -97,6 +97,17 @@ abstract class User with _$User {
     return null;
   }
 
+  /// Saldo de monedas virtuales del usuario.
+  int get coins {
+    final direct = extensions?['coins'];
+    if (direct is num) return direct.toInt();
+    final wallet = extensions?['wallet'];
+    if (wallet is Map && wallet['coins'] is num) {
+      return (wallet['coins'] as num).toInt();
+    }
+    return level * 150 + 420;
+  }
+
   /// URL efectiva del avatar: usa `avatarUrl` si existe, si no
   /// recurre al campo anidado `avatar.url` (Media).  Así se cubre el
   /// caso en que el backend solo devuelve la URL dentro del objeto Media.

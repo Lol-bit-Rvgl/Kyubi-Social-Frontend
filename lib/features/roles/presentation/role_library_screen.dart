@@ -45,6 +45,14 @@ class RoleLibraryScreen extends ConsumerWidget {
     final charactersAsync = ref.watch(myCharactersProvider);
     final user = ref.watch(authControllerProvider).user;
 
+    Future<void> navigateToCreate() async {
+      final created = await context.push<RoleCharacter>('/characters/create');
+      ref.invalidate(myCharactersProvider);
+      if (isPicker && created != null && context.mounted) {
+        Navigator.of(context).pop(created);
+      }
+    }
+
     return Scaffold(
       backgroundColor: isPicker ? Colors.transparent : AppColors.obsidianBg,
       appBar: AppBar(
@@ -62,10 +70,7 @@ class RoleLibraryScreen extends ConsumerWidget {
           IconButton(
             tooltip: 'Nueva Ficha',
             icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.accentCyan),
-            onPressed: () async {
-              await context.push('/characters/create');
-              ref.invalidate(myCharactersProvider);
-            },
+            onPressed: navigateToCreate,
           ),
         ],
       ),
@@ -134,10 +139,7 @@ class RoleLibraryScreen extends ConsumerWidget {
                       ),
                       icon: const Icon(Icons.add_rounded),
                       label: const Text('Crear Ficha de Personaje'),
-                      onPressed: () async {
-                        await context.push('/characters/create');
-                        ref.invalidate(myCharactersProvider);
-                      },
+                      onPressed: navigateToCreate,
                     ),
                   ],
                 ),
@@ -186,10 +188,7 @@ class RoleLibraryScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
         label: const Text('Crear Ficha', style: TextStyle(fontWeight: FontWeight.w700)),
-        onPressed: () async {
-          await context.push('/characters/create');
-          ref.invalidate(myCharactersProvider);
-        },
+        onPressed: navigateToCreate,
       ),
     );
   }

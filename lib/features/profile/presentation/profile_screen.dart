@@ -364,6 +364,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ProfileSliverAppBar(
                   user: user,
                   actions: [
+                    _buildCoinsChip(user.coins),
                     if (_refreshing)
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
@@ -411,6 +412,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Widget _buildCoinsChip(int coins) {
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xCC14141E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2D2544), width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.monetization_on_rounded,
+            color: Color(0xFFFFD600),
+            size: 15,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '$coins',
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFFFD600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSavedTab() {
     return const SavedPostsList();

@@ -196,9 +196,9 @@ class KyubiDrawer extends ConsumerWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
-                          '🪙 150',
-                          style: TextStyle(
+                        Text(
+                          '🪙 ${activeUser?.coins ?? 150}',
+                          style: const TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFFFFD700),

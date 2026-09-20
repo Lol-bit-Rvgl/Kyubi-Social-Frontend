@@ -54,7 +54,7 @@ class CharacterRepository {
   /// Obtiene las fichas de personaje creadas por el usuario autenticado.
   Future<List<Character>> getMyRoles() async {
     try {
-      final json = await _client.getJson('/users/me/roles');
+      final json = await _client.getJson('/characters/mine');
       final data = json['data'] ?? json['characters'] ?? json['roles'];
       if (data is List) {
         return data

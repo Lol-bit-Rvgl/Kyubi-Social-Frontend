@@ -22,6 +22,7 @@ class Character {
     this.abilities = const [],
     this.galleryUrls = const [],
     this.isPublic = true,
+    this.themeColor,
     this.createdAt,
     this.updatedAt,
   });
@@ -42,6 +43,7 @@ class Character {
   final List<String> abilities;
   final List<String> galleryUrls;
   final bool isPublic;
+  final String? themeColor;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -55,15 +57,15 @@ class Character {
               json['imageUrl'] ??
               json['image'] ??
               json['photoUrl']) as String?,
-      bio: json['bio'] as String?,
+      bio: (json['bio'] ?? json['description'] ?? json['tagline']) as String?,
       age: json['age'] as String?,
       gender: json['gender'] as String?,
       species: json['species'] as String?,
-      role: json['role'] as String?,
+      role: (json['role'] ?? json['tagline'] ?? json['description']) as String?,
       alignment: json['alignment'] as String?,
       personality: json['personality'] as String?,
       appearance: json['appearance'] as String?,
-      background: json['background'] as String?,
+      background: (json['background'] ?? json['lore'] ?? json['description']) as String?,
       abilities:
           (json['abilities'] as List<dynamic>?)
               ?.map((e) => e.toString())
@@ -75,6 +77,7 @@ class Character {
               .toList() ??
           const [],
       isPublic: json['isPublic'] as bool? ?? true,
+      themeColor: json['themeColor'] as String?,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString())
           : null,
@@ -102,6 +105,7 @@ class Character {
     'abilities': abilities,
     'galleryUrls': galleryUrls,
     'isPublic': isPublic,
+    'themeColor': themeColor,
   };
 
   /// Convierte la ficha de personaje en un Rol para el escenario de sala.
@@ -110,7 +114,9 @@ class Character {
       id: id,
       name: name,
       avatarUrl: avatarUrl,
-      colorHex: '#E5A93C',
+      colorHex: (themeColor != null && themeColor!.isNotEmpty)
+          ? (themeColor!.startsWith('#') ? themeColor! : '#$themeColor')
+          : '#E5A93C',
       tagline: role ?? bio ?? 'Personaje',
       description: background ?? bio ?? '',
       isTaken: currentUserId != null,

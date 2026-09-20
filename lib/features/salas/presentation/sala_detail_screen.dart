@@ -2823,7 +2823,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                       );
                     }
                   },
-            onEditRole: canManage
+            onEditRole: (canManage || isMyRole)
                 ? () async {
                     Navigator.pop(modalCtx);
                     final updated = await Navigator.push<RoleCharacter>(
@@ -2852,6 +2852,27 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                           _currentActiveRole = merged;
                         }
                       });
+
+                      final currentRoom = ref
+                          .read(salaDetailControllerProvider(widget.roomId))
+                          .room;
+                      if (currentRoom != null) {
+                        final updatedRoles = currentRoom.stageRoles.map((r) {
+                          if (r.id == liveRole.id) return merged;
+                          return r;
+                        }).toList();
+                        ref
+                            .read(salaDetailControllerProvider(widget.roomId)
+                                .notifier)
+                            .applyRoom(currentRoom.copyWith(
+                              stageRoles: updatedRoles,
+                              activeCharacter:
+                                  _currentActiveRole?.id == liveRole.id
+                                      ? merged
+                                      : currentRoom.activeCharacter,
+                            ));
+                      }
+
                       ref
                           .read(roomRepositoryProvider)
                           .saveStageRole(widget.roomId, merged)
