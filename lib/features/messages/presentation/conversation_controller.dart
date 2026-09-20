@@ -217,11 +217,11 @@ class ConversationChatNotifier
     final hasExtensions = extensions != null && extensions.isNotEmpty;
     final hasSpecialType = (mediaType != null && mediaType.isNotEmpty) ||
         (type != null && type.isNotEmpty);
-    if ((text.isEmpty && !hasMedia && !hasPoll && !hasExtensions && !hasSpecialType) ||
-        state.sending) {
+    if (text.isEmpty && !hasMedia && !hasPoll && !hasExtensions && !hasSpecialType) {
       return false;
     }
-    final myId = ref.read(authControllerProvider).user?.id ?? '';
+    final currentUser = ref.read(authControllerProvider).user;
+    final myId = currentUser?.id ?? '';
     final combinedExt = <String, dynamic>{
       ...?extensions,
       'poll': ?poll,
@@ -233,11 +233,21 @@ class ConversationChatNotifier
         : (poll != null
             ? '📊 Encuesta: ${poll['question'] ?? 'Encuesta'}'
             : (mediaType == 'sticker' || type == 'STICKER' ? '🎨 Sticker' : ''));
+    final myName = currentUser?.displayName.isNotEmpty == true
+        ? currentUser!.displayName
+        : (currentUser?.username.isNotEmpty == true
+            ? currentUser!.username
+            : 'Tú');
     final optimistic = Message(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}',
       conversationId: _conversationId,
       senderId: myId,
-      sender: ChatAuthor(id: myId, username: '', displayName: 'Tú'),
+      sender: ChatAuthor(
+        id: myId,
+        username: currentUser?.username ?? '',
+        displayName: myName,
+        avatarUrl: currentUser?.avatarUrl,
+      ),
       body: optimisticBody,
       mediaUrl: effectiveMediaUrl,
       mediaType: mediaType ?? (effectiveMediaUrl != null ? 'image' : null),

@@ -189,7 +189,7 @@ class DirectChatMessageBubble extends StatelessWidget {
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4.5),
+        padding: const EdgeInsets.symmetric(vertical: 2.5),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment:
@@ -449,7 +449,7 @@ class DirectChatMessageBubble extends StatelessWidget {
 
     return Container(
       constraints: BoxConstraints(maxWidth: screenWidth * 0.78),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: bubbleColor,
         borderRadius: bubbleRadius,

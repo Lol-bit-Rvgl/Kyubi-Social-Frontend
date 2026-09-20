@@ -957,6 +957,7 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
         final isMine = message.senderId == myId;
 
         return _DirectMessageBubble(
+          key: ValueKey(message.id),
           body: message.body,
           timestamp: _timeLabel(message.createdAt),
           isMine: isMine,
@@ -984,8 +985,8 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
         : (user?.username ?? 'Tú');
 
     return ChatMessageInputBar(
-      enabled: !state.sending,
-      disabledHint: state.sending ? 'Enviando...' : 'Escribe un mensaje...',
+      enabled: true,
+      disabledHint: 'Escribe un mensaje...',
       isRoleplay: false,
       userName: myName,
       userAvatarUrl: user?.avatarUrl,

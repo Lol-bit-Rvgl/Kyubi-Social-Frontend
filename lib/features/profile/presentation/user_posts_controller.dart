@@ -124,6 +124,41 @@ class UserPostsNotifier extends FamilyNotifier<UserPostsState, String> {
       state = state.copyWith(loadingMore: false);
     }
   }
+
+  /// Remueve una publicación del estado local de manera optimista e inmediata.
+  void removePost(String postId) {
+    if (_disposed) return;
+    state = state.copyWith(
+      posts: state.posts.where((p) => p.id != postId).toList(),
+    );
+  }
+
+  /// Actualiza una publicación en el estado local tras ser editada.
+  void updatePost(Post updated) {
+    if (_disposed) return;
+    final index = state.posts.indexWhere((p) => p.id == updated.id);
+    if (index < 0) return;
+    final updatedList = [...state.posts];
+    updatedList[index] = updated;
+    state = state.copyWith(posts: updatedList);
+  }
+
+  /// Elimina una publicación de forma optimista: la retira inmediatamente del
+  /// estado y solicita el borrado en el backend; revierte si falla.
+  Future<bool> deletePost(String postId) async {
+    if (_disposed) return false;
+    final prevPosts = state.posts;
+    removePost(postId);
+    try {
+      await _repo.deletePost(postId);
+      return true;
+    } catch (_) {
+      if (!_disposed) {
+        state = state.copyWith(posts: prevPosts);
+      }
+      return false;
+    }
+  }
 }
 
 final userPostsProvider =

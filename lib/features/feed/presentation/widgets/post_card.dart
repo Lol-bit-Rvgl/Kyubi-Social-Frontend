@@ -19,6 +19,7 @@ import '../../../../../models/reaction.dart';
 import '../../../../../services/auth_controller.dart';
 import '../../../../../services/providers.dart';
 import '../feed_controller.dart';
+import '../../../profile/presentation/user_posts_controller.dart';
 import '../../../../features/saved/presentation/bookmarks_controller.dart';
 import 'interactive_poll_card.dart';
 import 'floating_reaction_menu.dart';
@@ -685,6 +686,7 @@ class PostCard extends ConsumerWidget {
 
   void _showEditSheet(BuildContext context, WidgetRef ref) {
     final controller = TextEditingController(text: post.body);
+    var selectedVisibility = post.visibility;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -735,6 +737,80 @@ class PostCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
+            StatefulBuilder(
+              builder: (context, setSheetState) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 8),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Visibilidad:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFB0B0C0),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ChoiceChip(
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.public_rounded, size: 14),
+                            SizedBox(width: 4),
+                            Text('Público'),
+                          ],
+                        ),
+                        selected: selectedVisibility != 'PRIVATE',
+                        onSelected: (selected) {
+                          if (selected) {
+                            setSheetState(() => selectedVisibility = 'PUBLIC');
+                          }
+                        },
+                        selectedColor: AppColors.accentCyan.withValues(alpha: 0.25),
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          fontWeight: selectedVisibility != 'PRIVATE'
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: selectedVisibility != 'PRIVATE'
+                              ? AppColors.accentCyan
+                              : const Color(0xFFB0B0C0),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.lock_rounded, size: 14),
+                            SizedBox(width: 4),
+                            Text('Solo yo'),
+                          ],
+                        ),
+                        selected: selectedVisibility == 'PRIVATE',
+                        onSelected: (selected) {
+                          if (selected) {
+                            setSheetState(() => selectedVisibility = 'PRIVATE');
+                          }
+                        },
+                        selectedColor: AppColors.accentCyan.withValues(alpha: 0.25),
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          fontWeight: selectedVisibility == 'PRIVATE'
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: selectedVisibility == 'PRIVATE'
+                              ? AppColors.accentCyan
+                              : const Color(0xFFB0B0C0),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -749,12 +825,19 @@ class PostCard extends ConsumerWidget {
                 ElevatedButton(
                   onPressed: () async {
                     final newBody = controller.text.trim();
-                    if (newBody.isEmpty || newBody == post.body) {
+                    final visibilityChanged = selectedVisibility != post.visibility;
+                    final bodyChanged = newBody.isNotEmpty && newBody != post.body;
+                    if (!visibilityChanged && !bodyChanged) {
                       Navigator.pop(sheetContext);
                       return;
                     }
                     Navigator.pop(sheetContext);
-                    await _updatePostBody(context, ref, newBody);
+                    await _updatePost(
+                      context,
+                      ref,
+                      body: bodyChanged ? newBody : null,
+                      visibility: visibilityChanged ? selectedVisibility : null,
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accentCyan,
@@ -773,15 +856,21 @@ class PostCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _updatePostBody(
+  Future<void> _updatePost(
     BuildContext context,
-    WidgetRef ref,
-    String newBody,
-  ) async {
+    WidgetRef ref, {
+    String? body,
+    String? visibility,
+  }) async {
     final repo = ref.read(postRepositoryProvider);
     try {
-      final updated = await repo.updatePost(post.id, body: newBody);
+      final updated = await repo.updatePost(
+        post.id,
+        body: body,
+        visibility: visibility,
+      );
       ref.read(feedControllerProvider.notifier).updatePost(updated);
+      ref.read(userPostsProvider(post.author.id).notifier).updatePost(updated);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Publicación actualizada')),
@@ -838,15 +927,19 @@ class PostCard extends ConsumerWidget {
 
   Future<void> _deletePost(BuildContext context, WidgetRef ref) async {
     final repo = ref.read(postRepositoryProvider);
+    // Eliminación optimista inmediata tanto en el feed como en publicaciones de perfil
+    ref.read(feedControllerProvider.notifier).removePost(post.id);
+    ref.read(userPostsProvider(post.author.id).notifier).removePost(post.id);
     try {
       await repo.deletePost(post.id);
-      ref.read(feedControllerProvider.notifier).removePost(post.id);
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Publicación eliminada')));
       }
     } catch (_) {
+      ref.read(feedControllerProvider.notifier).refresh();
+      ref.read(userPostsProvider(post.author.id).notifier).refresh();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No se pudo eliminar la publicación')),

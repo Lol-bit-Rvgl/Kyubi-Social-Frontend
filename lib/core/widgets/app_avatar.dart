@@ -73,6 +73,9 @@ class AppAvatar extends StatelessWidget {
         child: imageUrl != null && imageUrl!.isNotEmpty
             ? CachedNetworkImage(
                 imageUrl: _cacheBusted(imageUrl!),
+                cacheKey: cacheKey ?? imageUrl,
+                memCacheWidth: (radius * 4).round().clamp(64, 256),
+                memCacheHeight: (radius * 4).round().clamp(64, 256),
                 fit: BoxFit.cover,
                 placeholder: (_, _) => _placeholder(),
                 errorWidget: (_, _, _) => _placeholder(),

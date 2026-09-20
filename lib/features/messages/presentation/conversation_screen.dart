@@ -263,6 +263,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         // DM 1:1: sin nombre dentro de la burbuja para mantener burbujas
         // compactas y proporcionales (especialmente con textos muy cortos).
         return ChatMessageBubble(
+          key: ValueKey(message.id),
           displayName: '',
           body: message.body,
           timestamp: _timeLabel(message.createdAt),
@@ -533,8 +534,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         : (user?.username ?? 'Tú');
 
     return ChatMessageInputBar(
-      enabled: !state.sending,
-      disabledHint: state.sending ? 'Enviando...' : 'Escribe un mensaje...',
+      enabled: true,
+      disabledHint: 'Escribe un mensaje...',
       isRoleplay: false,
       userName: myName,
       userAvatarUrl: user?.avatarUrl,

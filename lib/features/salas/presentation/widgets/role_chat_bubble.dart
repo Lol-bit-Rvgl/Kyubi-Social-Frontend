@@ -150,7 +150,7 @@ class RoleChatBubble extends StatelessWidget {
     final roleColor = _resolveRoleColor();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3.5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -384,7 +384,7 @@ class RoleChatBubble extends StatelessWidget {
 
   Widget _buildTextBubble() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         // Fondo estándar de chat: siempre oscuro uniforme (nunca el color del
         // rol). El acento del rol vive SOLO en el chip/tag del nombre.
@@ -421,6 +421,7 @@ class RoleChatBubble extends StatelessWidget {
           // (cita), nunca en el fondo/borde principal de la burbuja.
           final roleColor = _resolveRoleColor();
           return Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Cita / Reply contextual (Ref: Imagen 1)
