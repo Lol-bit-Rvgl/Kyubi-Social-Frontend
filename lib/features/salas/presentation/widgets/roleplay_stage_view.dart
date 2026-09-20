@@ -516,7 +516,7 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
       key: ValueKey('slot_${slotIndex}_${role.id}'),
       onTap: () {
         HapticFeedback.selectionClick();
-        if (isVacant && widget.onVacantSlotTap != null && !_userHasRole) {
+        if (isVacant && widget.onVacantSlotTap != null) {
           widget.onVacantSlotTap!(slotIndex);
         } else {
           widget.onRoleTap(role);
@@ -611,31 +611,18 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
     );
   }
 
-  bool get _userHasRole {
-    return widget.currentUserId != null &&
-        widget.roles.any(
-          (r) =>
-              r.takenByUserId == widget.currentUserId ||
-              r.id == widget.currentUserId,
-        );
-  }
-
   Widget _buildEmptySlot({int? slotIndex}) {
-    final alreadyHasRole = _userHasRole;
     return GestureDetector(
       key: ValueKey('empty_slot_${slotIndex ?? -1}'),
-      onTap: alreadyHasRole
-          ? null
-          : () {
-              // Gamefeel: impacto medio al ocupar un slot "+ Unirse";
-              // solo disponible si el usuario no posee ya un rol asignado.
-              HapticFeedback.mediumImpact();
-              if (widget.onVacantSlotTap != null) {
-                widget.onVacantSlotTap!(slotIndex);
-              } else {
-                widget.onAddRoleTap?.call();
-              }
-            },
+      onTap: () {
+        // Gamefeel: impacto medio al ocupar un slot "+ Unirse"
+        HapticFeedback.mediumImpact();
+        if (widget.onVacantSlotTap != null) {
+          widget.onVacantSlotTap!(slotIndex);
+        } else {
+          widget.onAddRoleTap?.call();
+        }
+      },
       child: SizedBox(
         width: 68,
         child: Column(
@@ -645,20 +632,14 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
             HexagonAvatar(
               size: 54,
               isDashed: true,
-              borderColor: alreadyHasRole
-                  ? Colors.white24
-                  : AppColors.accentCyan.withValues(alpha: 0.6),
+              borderColor: AppColors.accentCyan.withValues(alpha: 0.6),
               borderWidth: 1.5,
               child: Container(
-                color: alreadyHasRole
-                    ? Colors.white12
-                    : const Color(0x2200E5FF),
-                child: Center(
+                color: const Color(0x2200E5FF),
+                child: const Center(
                   child: Icon(
                     Icons.add_rounded,
-                    color: alreadyHasRole
-                        ? Colors.white38
-                        : AppColors.accentCyan,
+                    color: AppColors.accentCyan,
                     size: 24,
                   ),
                 ),

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kyubi/features/messages/presentation/conversation_controller.dart';
 import 'package:kyubi/features/messages/presentation/conversation_screen.dart';
 import 'package:kyubi/features/salas/presentation/widgets/chat_message_input_bar.dart';
+import 'package:kyubi/features/salas/presentation/widgets/roleplay_stage_view.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:kyubi/models/character.dart';
 import 'package:kyubi/models/role_character.dart';
@@ -355,6 +356,146 @@ void main() {
       expect(find.text('Heroe Real'), findsOneWidget);
       expect(find.text('...'), findsNothing);
       expect(find.text('Ficha de Rol equipada'), findsNothing);
+    });
+
+    testWidgets('Muestra múltiples roles asignados al usuario (ej. 4 roles) y permite conmutar turno sin vacantes ni roles ajenos', (tester) async {
+      const myRoles = [
+        RoleCharacter(
+          id: 'char-1',
+          name: 'Guerrero Arturo',
+          tagline: 'Defensor del reino',
+          isTaken: true,
+          takenByUserId: 'my-user-id',
+        ),
+        RoleCharacter(
+          id: 'char-2',
+          name: 'Maga Elena',
+          tagline: 'Maestra elemental',
+          isTaken: true,
+          takenByUserId: 'my-user-id',
+        ),
+        RoleCharacter(
+          id: 'char-3',
+          name: 'Pícaro Loki',
+          tagline: 'Sombra veloz',
+          isTaken: true,
+          takenByUserId: 'my-user-id',
+        ),
+        RoleCharacter(
+          id: 'char-4',
+          name: 'Clérigo Aarón',
+          tagline: 'Sanador sagrado',
+          isTaken: true,
+          takenByUserId: 'my-user-id',
+        ),
+        RoleCharacter(
+          id: 'slot-5',
+          name: 'Slot 5',
+          isTaken: false, // Vacante
+        ),
+        RoleCharacter(
+          id: 'char-other',
+          name: 'Rival Enmascarado',
+          isTaken: true,
+          takenByUserId: 'other-user-99',
+        ),
+      ];
+
+      RoleCharacter? selectedRole;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChatMessageInputBar(
+              isRoleplay: true,
+              userName: 'Tester',
+              currentUserId: 'my-user-id',
+              isHost: true, // Aunque sea host, no deben listarse slots vacantes para hablar
+              availableRoles: myRoles,
+              onRoleChanged: (r) => selectedRole = r,
+              onSendMessage: (_) {},
+              onSendImage: (_) {},
+              onSendAudio: (_, _, _) {},
+              onSendDiceRoll: (_, _, _) {},
+              onSendPoll: (_, _) {},
+            ),
+          ),
+        ),
+      );
+
+      // Abrir modal de identidad
+      await tester.tap(find.byTooltip('Identidad: Mi Perfil (Tester)'));
+      await tester.pumpAndSettle();
+
+      // Debe listar exactamente los 4 roles del usuario
+      expect(find.text('ROLES Y PERSONAJES ASIGNADOS (4)'), findsOneWidget);
+      expect(find.text('Guerrero Arturo'), findsOneWidget);
+      expect(find.text('Maga Elena'), findsOneWidget);
+      expect(find.text('Pícaro Loki'), findsOneWidget);
+      expect(find.text('Clérigo Aarón'), findsOneWidget);
+
+      // NO debe listar el slot vacante ni el rol del otro usuario
+      expect(find.text('Slot 5'), findsNothing);
+      expect(find.text('Rival Enmascarado'), findsNothing);
+
+      // Seleccionar el tercer personaje (Pícaro Loki)
+      await tester.tap(find.text('Pícaro Loki'));
+      await tester.pumpAndSettle();
+
+      expect(selectedRole?.name, 'Pícaro Loki');
+      expect(find.text('Mensaje como Pícaro Loki...'), findsOneWidget);
+    });
+
+    testWidgets('RoleplayStageView permite presionar + Unirse y slots vacantes aunque el usuario ya tenga otros roles', (tester) async {
+      int? tappedSlotIndex;
+      bool vacantSlotTapped = false;
+
+      final stageRoles = [
+        const RoleCharacter(
+          id: 'char-1',
+          name: 'Mi Primer Rol',
+          isTaken: true,
+          takenByUserId: 'my-user-id',
+        ),
+        const RoleCharacter(
+          id: 'slot-2',
+          name: 'Slot 2',
+          isTaken: false, // Slot vacante disponible
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RoleplayStageView(
+              isExpanded: true,
+              roles: stageRoles,
+              currentUserId: 'my-user-id',
+              onRoleTap: (_) {},
+              onPlayTap: () {},
+              onVacantSlotTap: (slotIdx) {
+                tappedSlotIndex = slotIdx;
+                vacantSlotTapped = true;
+              },
+            ),
+          ),
+        ),
+      );
+
+      // Tocar el slot vacante (Slot 2)
+      await tester.tap(find.text('Slot 2'));
+      await tester.pumpAndSettle();
+
+      expect(vacantSlotTapped, isTrue);
+      expect(tappedSlotIndex, 1);
+
+      // Tocar el botón "+ Unirse" del slot extra
+      vacantSlotTapped = false;
+      tappedSlotIndex = null;
+      await tester.tap(find.text('+ Unirse').first);
+      await tester.pumpAndSettle();
+
+      expect(vacantSlotTapped, isTrue);
     });
   });
 }

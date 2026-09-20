@@ -391,15 +391,12 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
             .where((r) => r.isValid)
             .toList();
 
-        // Sanitizar y deduplicar slots para evitar fusiones y duplicados fantasma
+        // Sanitizar y deduplicar slots para evitar colisiones de la misma ficha
         final seenCharIds = <String>{};
-        final seenOccupants = <String>{};
         final dedupedRoles = <RoleCharacter>[];
         for (final r in roles) {
           if (r.isTaken) {
-            final occupant = r.takenByUserId ?? r.occupiedBy;
-            if (seenCharIds.contains(r.id) ||
-                (occupant != null && seenOccupants.contains(occupant))) {
+            if (seenCharIds.contains(r.id)) {
               dedupedRoles.add(RoleCharacter.vacant(
                 id: 'slot-${dedupedRoles.length + 1}',
                 name: 'Slot ${dedupedRoles.length + 1}',
@@ -407,7 +404,6 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
               continue;
             }
             seenCharIds.add(r.id);
-            if (occupant != null) seenOccupants.add(occupant);
           }
           dedupedRoles.add(r);
         }
@@ -428,10 +424,20 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
               _currentActiveRole = null;
             }
           } else if (event.action == 'leave') {
-            if (event.userId == myId ||
-                event.roleId == _currentActiveRole?.id ||
-                !_stageRoles.any((r) => r.isTaken && r.takenByUserId == myId)) {
-              _currentActiveRole = null;
+            final freedRoleId = event.roleId?.toString().trim();
+            final isFreedActiveRole = _currentActiveRole != null &&
+                (_currentActiveRole!.id.toString().trim() == freedRoleId ||
+                    event.role?['id'] == _currentActiveRole!.id);
+            if (isFreedActiveRole ||
+                !_stageRoles.any((r) =>
+                    r.isTaken &&
+                    (r.takenByUserId == myId || r.occupiedBy == myId))) {
+              // Si el rol liberado era el activo, reasignar a otro rol que aún posea el usuario
+              final remaining = _stageRoles.where((r) =>
+                  r.isTaken &&
+                  r.isValid &&
+                  (r.takenByUserId == myId || r.occupiedBy == myId)).firstOrNull;
+              _currentActiveRole = remaining;
             }
           } else if (event.action == 'take' || event.action == 'occupy') {
             if (event.userId == myId && event.role != null) {
@@ -2239,15 +2245,12 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
     // Cargar roles: el backend (room.stageRoles) es la fuente autoritativa de roles del stage.
     final seenCharacterIds = <String>{};
-    final seenOccupantIds = <String>{};
     final deduplicatedRoles = <RoleCharacter>[];
 
     for (final r in room.stageRoles) {
       if (!r.isValid) continue;
       if (r.isTaken) {
-        final occupantId = r.takenByUserId ?? r.occupiedBy;
-        if (seenCharacterIds.contains(r.id) ||
-            (occupantId != null && seenOccupantIds.contains(occupantId))) {
+        if (seenCharacterIds.contains(r.id)) {
           deduplicatedRoles.add(RoleCharacter.vacant(
             id: 'slot-${deduplicatedRoles.length + 1}',
             name: 'Slot ${deduplicatedRoles.length + 1}',
@@ -2255,7 +2258,6 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           continue;
         }
         seenCharacterIds.add(r.id);
-        if (occupantId != null) seenOccupantIds.add(occupantId);
       }
       deduplicatedRoles.add(r);
     }
@@ -3030,11 +3032,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     setState(() {
       _currentActiveRole = updatedRole;
 
-      // Liberar cualquier slot anterior que tuviera este usuario o este rol
+      // Si la misma ficha de personaje ya estaba en otro slot previo, vaciarlo para moverla
       for (int i = 0; i < _stageRoles.length; i++) {
-        if (_stageRoles[i].takenByUserId == myId ||
-            _stageRoles[i].occupiedBy == myId ||
-            _stageRoles[i].id == role.id) {
+        if (_stageRoles[i].id == role.id) {
           _stageRoles[i] = RoleCharacter.vacant(
             id: 'slot-${i + 1}',
             name: 'Slot ${i + 1}',
@@ -5053,15 +5053,9 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                     onSendEdit: _submitEdit,
                     onIdentityChanged: (selected) {
                       setState(() => _currentActiveRole = selected);
-                      if (selected != null && _currentRoomMode == 'roleplay') {
-                        _occupyStageWithRole(selected);
-                      }
                     },
                     onRoleChanged: (selected) {
                       setState(() => _currentActiveRole = selected);
-                      if (selected != null && _currentRoomMode == 'roleplay') {
-                        _occupyStageWithRole(selected);
-                      }
                     },
                     onTypingChanged: (typing) {
                       // Mientras se escribe se pausan los emojis animados.
