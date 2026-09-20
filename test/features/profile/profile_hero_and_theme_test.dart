@@ -209,7 +209,7 @@ void main() {
       displayName: 'Cosmic Fox',
     );
 
-    testWidgets('Muestra "Editar perfil" y Configuración, y NO muestra "Fichas de Rol"', (tester) async {
+    testWidgets('Muestra "Editar perfil" en ancho completo y NO muestra botones redundantes de configuración ni "Fichas de Rol"', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -225,11 +225,26 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Debe mostrar Editar perfil como botón de acción
-      expect(find.text('Editar perfil'), findsOneWidget);
-      // Debe mostrar el botón de Configuración
-      expect(find.byTooltip('Configuración'), findsOneWidget);
-      // NO debe mostrar el botón "Fichas de Rol"
+      // 1. Debe mostrar "Editar perfil"
+      final editProfileFinder = find.text('Editar perfil');
+      expect(editProfileFinder, findsOneWidget);
+
+      // 2. Verificar que "Editar perfil" ocupa el ancho disponible dentro de SizedBox(width: double.infinity)
+      final sizedBoxFinder = find.ancestor(
+        of: editProfileFinder,
+        matching: find.byType(SizedBox),
+      );
+      expect(sizedBoxFinder, findsWidgets);
+      final sizedBox = tester.widget<SizedBox>(sizedBoxFinder.first);
+      expect(sizedBox.width, double.infinity);
+
+      // 3. NO debe mostrar los botones de configuración redundantes ('Configuración' ni 'Ajustes')
+      expect(find.byTooltip('Configuración'), findsNothing);
+      expect(find.byTooltip('Ajustes'), findsNothing);
+      expect(find.byIcon(Icons.settings_rounded), findsNothing);
+      expect(find.byIcon(Icons.settings_outlined), findsNothing);
+
+      // 4. NO debe mostrar el botón "Fichas de Rol"
       expect(find.text('Fichas de Rol'), findsNothing);
     });
   });

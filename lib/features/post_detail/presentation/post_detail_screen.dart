@@ -20,7 +20,6 @@ import '../../../../services/providers.dart';
 import '../../feed/presentation/widgets/interactive_poll_card.dart';
 import '../../feed/presentation/widgets/reaction_picker_popup.dart';
 import '../../feed/presentation/widgets/floating_reaction_menu.dart';
-import '../../roles/presentation/widgets/role_slots_section.dart';
 
 /// Detalle de una publicación con comentarios.
 class PostDetailScreen extends ConsumerStatefulWidget {
@@ -360,13 +359,6 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                 .toList(),
           ),
         ],
-        // Vacantes de rol del post (RoleSlots)
-        const SizedBox(height: AppDimens.md),
-        RoleSlotsSection(
-          postId: post.id,
-          isPostAuthor:
-              post.author.id == ref.read(authControllerProvider).user?.id,
-        ),
         if (post.extensions?['poll'] is Map<String, dynamic>) ...[
           const SizedBox(height: AppDimens.sm),
           InteractivePollCard(

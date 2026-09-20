@@ -20,7 +20,6 @@ import 'user_posts_controller.dart';
 import 'user_wall_comments_controller.dart';
 import 'widgets/badges_modal_sheet.dart';
 import 'widgets/media_grid_tab.dart';
-import 'widgets/nebulae_buttons.dart';
 import 'widgets/nebulae_profile_avatar.dart';
 import 'widgets/posts_tab_section.dart';
 import 'widgets/profile_sliver_app_bar.dart';
@@ -377,17 +376,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: IconButton(
-                        onPressed: () => context.push('/settings'),
-                        icon: const Icon(
-                          Icons.settings_rounded,
-                          color: Colors.white,
-                        ),
-                        tooltip: 'Ajustes',
-                      ),
-                    ),
                   ],
                 ),
                 SliverToBoxAdapter(
@@ -911,23 +899,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildActionButtons(User user) {
-    return Row(
-      children: [
-        Expanded(
-          child: LiquidGlassButton(
-            label: 'Editar perfil',
-            icon: Icons.edit_rounded,
-            borderColor: user.themeSettings.primary,
-            onTap: () => context.push('/edit-profile'),
-          ),
-        ),
-        const SizedBox(width: 8),
-        NebulaeToolIconButton(
-          icon: Icons.settings_outlined,
-          onTap: () => context.push('/settings'),
-          tooltip: 'Configuración',
-        ),
-      ],
+    return SizedBox(
+      width: double.infinity,
+      child: LiquidGlassButton(
+        label: 'Editar perfil',
+        icon: Icons.edit_rounded,
+        borderColor: user.themeSettings.primary,
+        onTap: () => context.push('/edit-profile'),
+      ),
     );
   }
 

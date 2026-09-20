@@ -15,7 +15,7 @@ class ProfileSliverAppBar extends StatelessWidget {
     super.key,
     required this.user,
     this.leading,
-    required this.actions,
+    this.actions = const [],
     this.pinned = false,
     this.floating = false,
   });
@@ -49,10 +49,12 @@ class ProfileSliverAppBar extends StatelessWidget {
               ),
             )
           : null,
-      actions: [
-        for (final action in actions) _WithIconShadow(child: action),
-        const SizedBox(width: 8),
-      ],
+      actions: actions.isEmpty
+          ? null
+          : [
+              for (final action in actions) _WithIconShadow(child: action),
+              const SizedBox(width: 8),
+            ],
       flexibleSpace: FlexibleSpaceBar(
         stretchModes: const [
           StretchMode.zoomBackground,
