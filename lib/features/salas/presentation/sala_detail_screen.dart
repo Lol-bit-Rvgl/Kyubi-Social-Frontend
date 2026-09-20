@@ -210,10 +210,12 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     _activityDebounceTimer?.cancel();
     _highlightTimer?.cancel();
     RoomSocketService.instance.leaveRoom(widget.roomId);
-    final voiceState = ref.read(voiceRoomProvider);
-    if (voiceState.activeRoomId == widget.roomId) {
-      ref.read(voiceRoomProvider.notifier).leaveRoom();
-    }
+    try {
+      final voiceState = ref.read(voiceRoomProvider);
+      if (voiceState.activeRoomId == widget.roomId) {
+        ref.read(voiceRoomProvider.notifier).leaveRoom();
+      }
+    } catch (_) {}
     _scrollController.dispose();
     _chatAnimationsEnabled.dispose();
     super.dispose();
@@ -2251,6 +2253,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }
 
   void _sendMessage(String text) {
+    if (!_isJoined) {
+      _showSendError('Debes unirte a la sala para poder participar en el chat');
+      return;
+    }
     if (!_canSendMessage) {
       _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
       return;
@@ -2261,6 +2267,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }
 
   void _sendDiceRoll(String diceName, String result, String emoji) {
+    if (!_isJoined) {
+      _showSendError('Debes unirte a la sala para poder participar en el chat');
+      return;
+    }
     if (!_canSendMessage) {
       _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
       return;
@@ -2283,6 +2293,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }
 
   void _sendPoll(String question, List<String> options) {
+    if (!_isJoined) {
+      _showSendError('Debes unirte a la sala para poder participar en el chat');
+      return;
+    }
     if (!_canSendMessage) {
       _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
       return;
@@ -2311,6 +2325,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }
 
   void _sendSticker(StickerItem sticker) {
+    if (!_isJoined) {
+      _showSendError('Debes unirte a la sala para poder participar en el chat');
+      return;
+    }
     if (!_canSendMessage) {
       _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
       return;
@@ -2340,6 +2358,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }
 
   Future<void> _sendImageFromPath(String path) async {
+    if (!_isJoined) {
+      _showSendError('Debes unirte a la sala para poder participar en el chat');
+      return;
+    }
     if (!_canSendMessage) {
       _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
       return;
@@ -2380,6 +2402,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     Uint8List audioBytes,
     String filename,
   ) async {
+    if (!_isJoined) {
+      _showSendError('Debes unirte a la sala para poder participar en el chat');
+      return;
+    }
     if (!_canSendMessage) {
       _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
       return;
@@ -2497,6 +2523,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     String contentUrl = '',
     Map<String, dynamic>? metadata,
   }) {
+    if (!_isJoined) {
+      _showSendError('Debes unirte a la sala para poder participar en el chat');
+      return;
+    }
     if (!_canSendMessage) {
       _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
       return;
@@ -3332,6 +3362,18 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   Room? get _currentRoom =>
       ref.read(salaDetailControllerProvider(widget.roomId)).room;
 
+  bool get _isJoined {
+    if (_isConnected) return true;
+    final room = _currentRoom;
+    if (room == null) return false;
+    final myId = ref.read(authControllerProvider).user?.id ?? '';
+    if (myId.isEmpty) return false;
+    return room.isHost ||
+        room.isParticipant ||
+        room.host.id == myId ||
+        room.participants.any((p) => p.user.id == myId && p.role != 'INVITED');
+  }
+
   // ── Follow del host (header) ───────────────────────────────────────────
   Widget _buildFollowButton(Room? room) {
     final host = room?.host;
@@ -3340,11 +3382,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return const SizedBox.shrink();
     }
 
-    ref.read(userFollowNotifierProvider(host.id).notifier).initialize(
-          isFollowing: host.isFollowing,
-        );
+    final followNotifier =
+        ref.read(userFollowNotifierProvider(host.id).notifier);
+    if (!followNotifier.isInitialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        followNotifier.initialize(isFollowing: host.isFollowing);
+      });
+    }
     final followState = ref.watch(userFollowNotifierProvider(host.id));
-    final following = followState.isFollowing;
+    final following =
+        followNotifier.isInitialized ? followState.isFollowing : host.isFollowing;
     final isBusy = followState.isBusy;
 
     return GestureDetector(
@@ -3367,8 +3415,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
               }
             },
       child: Container(
-        height: 20,
-        padding: const EdgeInsets.symmetric(horizontal: 7),
+        height: 19,
+        padding: const EdgeInsets.symmetric(horizontal: 5),
         decoration: BoxDecoration(
           color: following
               ? AppColors.accentCyan.withValues(alpha: 0.12)
@@ -3384,10 +3432,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         child: Center(
           child: isBusy
               ? const SizedBox(
-                  width: 11,
-                  height: 11,
+                  width: 10,
+                  height: 10,
                   child: CircularProgressIndicator(
-                    strokeWidth: 1.6,
+                    strokeWidth: 1.4,
                     color: AppColors.accentCyan,
                   ),
                 )
@@ -3396,14 +3444,14 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                   children: [
                     Icon(
                       following ? Icons.check_rounded : Icons.add_rounded,
-                      size: 12,
+                      size: 11,
                       color: AppColors.accentCyan,
                     ),
                     const SizedBox(width: 2),
                     Text(
                       following ? 'Siguiendo' : 'Seguir',
                       style: const TextStyle(
-                        fontSize: 9.5,
+                        fontSize: 9,
                         fontWeight: FontWeight.w800,
                         color: AppColors.accentCyan,
                       ),
@@ -4816,8 +4864,8 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                   ),
                 ),
 
-                // ── Barra de Saludos Rápidos (Modo Previa) ──
-                if (!_isConnected && _canSendMessage) _buildQuickGreetings(),
+                // ── Barra de Saludos Rápidos: se oculta por completo a no participantes ──
+                if (_isJoined && !_isConnected && _canSendMessage) _buildQuickGreetings(),
 
                 // ── Banner de moderación / sanción activa ──
                 if (_isConnected && !_canSendMessage)
@@ -5096,7 +5144,7 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
   Widget _buildTopHeader(String roomName, Room? room) {
     final hostName = room?.host.displayName ?? room?.host.username ?? 'Host';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 12, 6),
+      padding: const EdgeInsets.fromLTRB(6, 4, 8, 6),
       child: Row(
         children: [
           // Flecha de regreso limpia
@@ -5108,16 +5156,17 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
             ),
             onPressed: _handleExit,
             tooltip: 'Volver',
-            splashRadius: 20,
-            constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-            padding: const EdgeInsets.all(6),
+            splashRadius: 18,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            padding: EdgeInsets.zero,
           ),
           const SizedBox(width: 4),
 
           // Portada squircle de la sala (GLL / imagen de portada)
           Container(
-            width: 38,
-            height: 38,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0xFF2E2744), width: 0.8),
@@ -5132,7 +5181,7 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                   )
                 : _buildRoomCoverFallback(roomName),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
 
           // Título y Host
           Expanded(
@@ -5183,12 +5232,16 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                             ),
                     ),
                     const SizedBox(width: 5),
-                    Text(
-                      hostName,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.accentTeal,
+                    Flexible(
+                      child: Text(
+                        hostName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.accentTeal,
+                        ),
                       ),
                     ),
                     if (room?.host.isVerified == true) ...[
@@ -5207,38 +5260,51 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
               ],
             ),
           ),
+          const SizedBox(width: 4),
 
-          // Botón Invitar amigos
-          IconButton(
-            tooltip: 'Invitar amigos',
-            icon: const Icon(
-              Icons.person_add_alt_1_rounded,
-              color: Colors.white70,
-              size: 20,
-            ),
-            onPressed: room != null
-                ? () => RoomInviteFriendsSheet.show(context, room: room)
-                : null,
-          ),
-
-          // Botón Info ⓘ
-          IconButton(
-            icon: const Icon(
-              Icons.info_outline_rounded,
-              color: Colors.white70,
-              size: 20,
-            ),
-            onPressed: () => _openRoomInfo(room),
-          ),
-
-          // Menú de opciones de la sala: contiene "Abandonar sala" (•••).
-          IconButton(
-            icon: const Icon(
-              Icons.more_vert_rounded,
-              color: Colors.white70,
-              size: 20,
-            ),
-            onPressed: _showRoomMenu,
+          // Contenedor de acciones derecho con tamaño intrínseco fijo protegido
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Invitar amigos',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                padding: EdgeInsets.zero,
+                icon: const Icon(
+                  Icons.person_add_alt_1_rounded,
+                  color: Colors.white70,
+                  size: 19,
+                ),
+                onPressed: room != null
+                    ? () => RoomInviteFriendsSheet.show(context, room: room)
+                    : null,
+              ),
+              IconButton(
+                tooltip: 'Información',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                padding: EdgeInsets.zero,
+                icon: const Icon(
+                  Icons.info_outline_rounded,
+                  color: Colors.white70,
+                  size: 19,
+                ),
+                onPressed: () => _openRoomInfo(room),
+              ),
+              IconButton(
+                tooltip: 'Opciones de la sala',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                padding: EdgeInsets.zero,
+                icon: const Icon(
+                  Icons.more_vert_rounded,
+                  color: Colors.white70,
+                  size: 19,
+                ),
+                onPressed: _showRoomMenu,
+              ),
+            ],
           ),
         ],
       ),
@@ -5439,6 +5505,7 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
   // ── Saludos Rápidos ──────────────────────────────────────────────────────
 
   Widget _buildQuickGreetings() {
+    if (!_isJoined) return const SizedBox.shrink();
     const greetings = ['Hi', 'Hello, 👋', 'Invite me, 🥳', 'How are you doing'];
 
     return Container(
@@ -5452,7 +5519,13 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
         itemBuilder: (context, index) {
           final text = greetings[index];
           return GestureDetector(
-            onTap: () => _sendMessage(text),
+            onTap: () {
+              if (!_isJoined) {
+                _showSendError('Debes unirte a la sala para poder participar en el chat');
+                return;
+              }
+              _sendMessage(text);
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(

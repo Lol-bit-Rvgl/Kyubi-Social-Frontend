@@ -6,6 +6,7 @@ import '../../../repositories/room_repository.dart';
 import '../../../services/auth_controller.dart';
 import '../../../services/providers.dart';
 import '../../../services/room_socket.dart';
+import 'sala_detail_controller.dart';
 
 /// Estado del chat en vivo de una sala (mensajes cronológicos ascendentes).
 class SalaChatState {
@@ -120,10 +121,13 @@ class SalaChatNotifier
           break;
       }
     });
+    final socket = _socket;
     ref.onDispose(() {
       _disposed = true;
       sub.cancel();
-      _socket.leaveRoom(_roomId);
+      try {
+        socket.leaveRoom(_roomId);
+      } catch (_) {}
     });
   }
 
@@ -220,6 +224,16 @@ class SalaChatNotifier
     if (text.isEmpty || state.sending) return false;
     final me = ref.read(authControllerProvider).user;
     final myId = me?.id ?? '';
+    final room = ref.read(salaDetailControllerProvider(_roomId)).room;
+    if (room != null) {
+      final isParticipant = room.isHost ||
+          room.isParticipant ||
+          (myId.isNotEmpty && room.host.id == myId) ||
+          room.participants.any((p) => p.user.id == myId && p.role != 'INVITED');
+      if (!isParticipant) {
+        return false;
+      }
+    }
     final optimistic = RoomChatMessage(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}',
       roomId: _roomId,
