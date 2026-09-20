@@ -513,6 +513,7 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
     final isVacant = !role.isTaken;
     final occupantName = role.takenByUsername ?? role.occupiedByName;
     return GestureDetector(
+      key: ValueKey('slot_${slotIndex}_${role.id}'),
       onTap: () {
         HapticFeedback.selectionClick();
         if (isVacant && widget.onVacantSlotTap != null && !_userHasRole) {
@@ -622,6 +623,7 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
   Widget _buildEmptySlot({int? slotIndex}) {
     final alreadyHasRole = _userHasRole;
     return GestureDetector(
+      key: ValueKey('empty_slot_${slotIndex ?? -1}'),
       onTap: alreadyHasRole
           ? null
           : () {

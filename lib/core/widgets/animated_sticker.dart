@@ -26,15 +26,44 @@ class AnimatedSticker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final path = assetPath.toLowerCase();
+    final isNetwork =
+        assetPath.startsWith('http://') || assetPath.startsWith('https://');
+    final path = assetPath.toLowerCase().split('?').first;
+
     if (path.endsWith('.webp') ||
         path.endsWith('.png') ||
         path.endsWith('.gif')) {
+      if (isNetwork) {
+        return Image.network(
+          assetPath,
+          width: width,
+          height: height,
+          fit: fit,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (context, error, stackTrace) => _buildFallback(),
+        );
+      }
       return Image.asset(
         assetPath,
         width: width,
         height: height,
         fit: fit,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (context, error, stackTrace) => _buildFallback(),
+      );
+    }
+
+    if (isNetwork) {
+      return Lottie.network(
+        assetPath,
+        width: width,
+        height: height,
+        fit: fit,
+        repeat: repeat,
+        reverse: reverse,
+        animate: true,
         errorBuilder: (context, error, stackTrace) => _buildFallback(),
       );
     }

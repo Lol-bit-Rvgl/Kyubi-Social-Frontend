@@ -82,7 +82,28 @@ class RoleCharacter {
   }
 
   /// Retorna una copia de la ficha de personaje completamente vacante y desvinculada de cualquier usuario.
-  RoleCharacter toVacant() => copyWith(clearOccupant: true);
+  RoleCharacter toVacant({String? resetId, String? resetName}) {
+    if (resetId != null) {
+      return RoleCharacter.vacant(
+        id: resetId,
+        name: resetName ?? 'Slot Vacante',
+      );
+    }
+    return copyWith(clearOccupant: true);
+  }
+
+  /// Crea un slot vacante neutral sin dueño ni avatar.
+  factory RoleCharacter.vacant({required String id, required String name}) {
+    return RoleCharacter(
+      id: id,
+      name: name,
+      isTaken: false,
+      takenByUserId: null,
+      takenByUsername: null,
+      avatarUrl: null,
+      colorHex: '#00E5FF',
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,

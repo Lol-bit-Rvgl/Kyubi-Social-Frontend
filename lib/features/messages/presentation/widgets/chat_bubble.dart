@@ -222,8 +222,15 @@ class DirectChatMessageBubble extends StatelessWidget {
 
     if (assetPath == null) {
       final url = mediaUrl;
-      if (url != null && (url.endsWith('.json') || url.endsWith('.webp') || url.endsWith('.png'))) {
-        assetPath = url;
+      if (url != null) {
+        final cleanUrl = url.toLowerCase().split('?').first;
+        if (cleanUrl.endsWith('.json') ||
+            cleanUrl.endsWith('.webp') ||
+            cleanUrl.endsWith('.png') ||
+            cleanUrl.endsWith('.gif') ||
+            cleanUrl.contains('/stickers/')) {
+          assetPath = url;
+        }
       }
     }
 

@@ -390,9 +390,31 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
             .whereType<RoleCharacter>()
             .where((r) => r.isValid)
             .toList();
+
+        // Sanitizar y deduplicar slots para evitar fusiones y duplicados fantasma
+        final seenCharIds = <String>{};
+        final seenOccupants = <String>{};
+        final dedupedRoles = <RoleCharacter>[];
+        for (final r in roles) {
+          if (r.isTaken) {
+            final occupant = r.takenByUserId ?? r.occupiedBy;
+            if (seenCharIds.contains(r.id) ||
+                (occupant != null && seenOccupants.contains(occupant))) {
+              dedupedRoles.add(RoleCharacter.vacant(
+                id: 'slot-${dedupedRoles.length + 1}',
+                name: 'Slot ${dedupedRoles.length + 1}',
+              ));
+              continue;
+            }
+            seenCharIds.add(r.id);
+            if (occupant != null) seenOccupants.add(occupant);
+          }
+          dedupedRoles.add(r);
+        }
+
         setState(() {
-          _stageRoles = roles;
-          _salas.setRoomRoles(widget.roomId, roles);
+          _stageRoles = dedupedRoles;
+          _salas.setRoomRoles(widget.roomId, dedupedRoles);
           if (event.action == 'delete') {
             final deletedId = event.roleId?.toString().trim() ?? '';
             if (deletedId.isNotEmpty) {
@@ -411,7 +433,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                 !_stageRoles.any((r) => r.isTaken && r.takenByUserId == myId)) {
               _currentActiveRole = null;
             }
-          } else if (event.action == 'take') {
+          } else if (event.action == 'take' || event.action == 'occupy') {
             if (event.userId == myId && event.role != null) {
               _currentActiveRole = RoleCharacter.fromJson(event.role!);
             }
@@ -419,7 +441,43 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         });
       } else {
         setState(() {
-          if (event.action == 'delete') {
+          final slotIdx = event.slotIndex;
+          if (event.action == 'occupy' || event.action == 'take') {
+            if (event.role != null) {
+              final newRole = RoleCharacter.fromJson(event.role!);
+              if (slotIdx != null && slotIdx >= 0 && slotIdx < _stageRoles.length) {
+                _stageRoles[slotIdx] = newRole;
+              } else {
+                final idx = _stageRoles.indexWhere((r) => r.id == newRole.id);
+                if (idx >= 0) {
+                  _stageRoles[idx] = newRole;
+                }
+              }
+              if (event.userId == myId) {
+                _currentActiveRole = newRole;
+              }
+            }
+          } else if (event.action == 'leave') {
+            if (slotIdx != null && slotIdx >= 0 && slotIdx < _stageRoles.length) {
+              _stageRoles[slotIdx] = RoleCharacter.vacant(
+                id: 'slot-${slotIdx + 1}',
+                name: 'Slot ${slotIdx + 1}',
+              );
+            } else if (event.roleId != null) {
+              final idx = _stageRoles.indexWhere((r) => r.id == event.roleId);
+              if (idx >= 0) {
+                _stageRoles[idx] = RoleCharacter.vacant(
+                  id: 'slot-${idx + 1}',
+                  name: 'Slot ${idx + 1}',
+                );
+              }
+            }
+            if (event.userId == myId ||
+                event.roleId == _currentActiveRole?.id ||
+                !_stageRoles.any((r) => r.isTaken && r.takenByUserId == myId)) {
+              _currentActiveRole = null;
+            }
+          } else if (event.action == 'delete') {
             final deletedId = event.roleId?.toString().trim() ?? '';
             if (deletedId.isNotEmpty) {
               _salas.removeRoomRole(widget.roomId, deletedId);
@@ -430,14 +488,6 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
             if (_currentActiveRole != null &&
                 _currentActiveRole!.id.toString().trim() == deletedId) {
               _currentActiveRole = null;
-            }
-          } else if (event.action == 'leave') {
-            if (event.userId == myId || event.roleId == _currentActiveRole?.id) {
-              _currentActiveRole = null;
-            }
-          } else if (event.action == 'take') {
-            if (event.userId == myId && event.role != null) {
-              _currentActiveRole = RoleCharacter.fromJson(event.role!);
             }
           }
         });
@@ -2188,7 +2238,29 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     _verifyAccess(room);
 
     // Cargar roles: el backend (room.stageRoles) es la fuente autoritativa de roles del stage.
-    _stageRoles = room.stageRoles.where((r) => r.isValid).toList();
+    final seenCharacterIds = <String>{};
+    final seenOccupantIds = <String>{};
+    final deduplicatedRoles = <RoleCharacter>[];
+
+    for (final r in room.stageRoles) {
+      if (!r.isValid) continue;
+      if (r.isTaken) {
+        final occupantId = r.takenByUserId ?? r.occupiedBy;
+        if (seenCharacterIds.contains(r.id) ||
+            (occupantId != null && seenOccupantIds.contains(occupantId))) {
+          deduplicatedRoles.add(RoleCharacter.vacant(
+            id: 'slot-${deduplicatedRoles.length + 1}',
+            name: 'Slot ${deduplicatedRoles.length + 1}',
+          ));
+          continue;
+        }
+        seenCharacterIds.add(r.id);
+        if (occupantId != null) seenOccupantIds.add(occupantId);
+      }
+      deduplicatedRoles.add(r);
+    }
+
+    _stageRoles = deduplicatedRoles;
     _salas.setRoomRoles(widget.roomId, _stageRoles);
 
     // Sincronizar estrictamente el rol activo del usuario autenticado:
@@ -2660,12 +2732,19 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   /// Si el usuario tiene otros roles asignados en el stage, preserva dichos roles
   /// y reasigna el rol activo al primero restante.
   void _leaveRole(RoleCharacter role, {int? slotIndex}) {
-    final freed = role.toVacant();
-    _salas.updateRoomRole(widget.roomId, freed);
     final myId = ref.read(authControllerProvider).user?.id ?? '';
 
     final targetIndex = slotIndex ??
         _stageRoles.indexWhere((r) => r.id.trim() == role.id.trim());
+
+    final effectiveIndex = targetIndex >= 0
+        ? targetIndex
+        : _stageRoles.indexWhere((r) => r.id == role.id);
+
+    final resetId = effectiveIndex >= 0 ? 'slot-${effectiveIndex + 1}' : 'slot-1';
+    final resetName = effectiveIndex >= 0 ? 'Slot ${effectiveIndex + 1}' : 'Slot 1';
+    final freed = RoleCharacter.vacant(id: resetId, name: resetName);
+    _salas.updateRoomRole(widget.roomId, freed);
 
     setState(() {
       if (targetIndex >= 0 && targetIndex < _stageRoles.length) {
@@ -2676,7 +2755,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       }
 
       // Si el rol liberado era el activo, buscar si el usuario aún posee otro rol en el stage
-      if (_currentActiveRole?.id == role.id) {
+      if (_currentActiveRole?.id == role.id ||
+          (myId.isNotEmpty &&
+              (_currentActiveRole?.takenByUserId == myId ||
+                  _currentActiveRole?.occupiedBy == myId))) {
         RoleCharacter? remainingRole;
         for (final r in _stageRoles) {
           if (r.isTaken &&
@@ -2948,11 +3030,15 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     setState(() {
       _currentActiveRole = updatedRole;
 
-      // Liberar cualquier slot anterior que tuviera este usuario
+      // Liberar cualquier slot anterior que tuviera este usuario o este rol
       for (int i = 0; i < _stageRoles.length; i++) {
         if (_stageRoles[i].takenByUserId == myId ||
-            _stageRoles[i].occupiedBy == myId) {
-          _stageRoles[i] = _stageRoles[i].toVacant();
+            _stageRoles[i].occupiedBy == myId ||
+            _stageRoles[i].id == role.id) {
+          _stageRoles[i] = RoleCharacter.vacant(
+            id: 'slot-${i + 1}',
+            name: 'Slot ${i + 1}',
+          );
         }
       }
 

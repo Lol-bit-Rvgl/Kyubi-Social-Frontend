@@ -72,6 +72,7 @@ class RoomStageRoleChanged extends RoomSocketEvent {
       ? Map<String, dynamic>.from(payload['role'] as Map)
       : null;
   List<dynamic>? get stageRoles => payload['stageRoles'] as List<dynamic>?;
+  int? get slotIndex => (payload['slotIndex'] as num?)?.toInt();
 }
 
 /// Actualización de encuesta votada (`room:poll_voted`).

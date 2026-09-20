@@ -18,7 +18,6 @@ import 'animated_emoji_keyboard.dart';
 import 'dice_selector_modal.dart';
 import 'poll_creation_modal.dart';
 import 'rich_text_roleplay_modal.dart';
-import 'package:kyubi/features/roles/presentation/role_library_screen.dart';
 
 /// Barra de Input y Herramientas Rápidas de Chat con selector de identidad,
 /// editor A⁺ enriquecido y panel de grabación de audio en vivo.
@@ -152,8 +151,24 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
         widget.onRoleChanged?.call(null);
         widget.onIdentityChanged?.call(null);
       }
-    } else if (widget.currentRole != oldWidget.currentRole) {
-      _selectedRole = widget.currentRole;
+    } else {
+      if (widget.currentRole != oldWidget.currentRole) {
+        _selectedRole = widget.currentRole;
+      }
+      if (_selectedRole != null) {
+        final myId = widget.currentUserId ?? '';
+        final isStillValid = widget.availableRoles.any((r) =>
+            r.id == _selectedRole!.id &&
+            r.isValid &&
+            ((r.takenByUserId != null && r.takenByUserId == myId) ||
+                (r.occupiedBy != null && r.occupiedBy == myId) ||
+                (widget.isHost && !r.isTaken)));
+        if (!isStillValid) {
+          _selectedRole = null;
+          widget.onRoleChanged?.call(null);
+          widget.onIdentityChanged?.call(null);
+        }
+      }
     }
     if (widget.editingMessage != oldWidget.editingMessage) {
       if (widget.editingMessage != null) {
@@ -423,7 +438,19 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
 
   @override
   Widget build(BuildContext context) {
-    final activeRole = widget.isRoleplay ? _selectedRole : null;
+    RoleCharacter? activeRole;
+    if (widget.isRoleplay && _selectedRole != null) {
+      final myId = widget.currentUserId ?? '';
+      final isStillValid = widget.availableRoles.any((r) =>
+          r.id == _selectedRole!.id &&
+          r.isValid &&
+          ((r.takenByUserId != null && r.takenByUserId == myId) ||
+              (r.occupiedBy != null && r.occupiedBy == myId) ||
+              (widget.isHost && !r.isTaken)));
+      if (isStillValid) {
+        activeRole = _selectedRole;
+      }
+    }
 
     return Container(
       padding: EdgeInsets.only(
@@ -1307,12 +1334,10 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
       return false;
     }).toList();
 
-    // Asegurar que si hay un rol seleccionado actualmente, figure en la lista sólo si es válido
+    // Asegurar que si hay un rol seleccionado actualmente, figure en la lista sólo si es válido y está asignado
     if (_selectedRole != null) {
-      if (!_selectedRole!.isValid) {
+      if (!_selectedRole!.isValid || !userRoles.any((r) => r.id == _selectedRole!.id)) {
         _selectedRole = null;
-      } else if (!userRoles.any((r) => r.id == _selectedRole!.id)) {
-        userRoles.insert(0, _selectedRole!);
       }
     }
 
@@ -1500,33 +1525,6 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                       ),
                     );
                   }),
-
-                const SizedBox(height: 10),
-                const Divider(color: Color(0xFF262038), height: 1),
-                const SizedBox(height: 10),
-
-                // Opción: Abrir Biblioteca de Roles (OCs)
-                _buildIdentityTile(
-                  ctx: ctx,
-                  title: 'Mi Biblioteca de Roles',
-                  subtitle: 'Elegir o equipar una ficha de personaje (OC)',
-                  imageUrl: null,
-                  avatarUrl: null,
-                  isSelected: false,
-                  fallbackColor: const Color(0xFFFFD600),
-                  roleBadgeColor: const Color(0xFFFFD600),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    final picked = await RoleLibraryScreen.showPicker(context);
-                    if (picked != null && mounted) {
-                      setState(() {
-                        _selectedRole = picked;
-                      });
-                      widget.onRoleChanged?.call(picked);
-                      widget.onIdentityChanged?.call(picked);
-                    }
-                  },
-                ),
               ],
             ),
           ),
@@ -1568,34 +1566,14 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
         ),
         child: Row(
           children: [
-            // Avatar de rol o cuenta personal con soporte de imágenes y fallbacks
-            if (title.contains('Biblioteca'))
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: fallbackColor.withValues(alpha: 0.15),
-                  border: Border.all(
-                    color: fallbackColor,
-                    width: 1.2,
-                  ),
-                ),
-                child: Icon(
-                  Icons.theater_comedy_rounded,
-                  size: 20,
-                  color: fallbackColor,
-                ),
-              )
-            else
-              AppAvatar(
-                imageUrl: (effectiveImageUrl != null && effectiveImageUrl.isNotEmpty)
-                    ? effectiveImageUrl
-                    : null,
-                name: title,
-                radius: 19,
-                borderColor: roleBadgeColor ?? fallbackColor,
-              ),
+            AppAvatar(
+              imageUrl: (effectiveImageUrl != null && effectiveImageUrl.isNotEmpty)
+                  ? effectiveImageUrl
+                  : null,
+              name: title,
+              radius: 19,
+              borderColor: roleBadgeColor ?? fallbackColor,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
