@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -65,8 +67,11 @@ class _InteractivePollCardState extends State<InteractivePollCard> {
   }
 
   int get _totalVotes {
-    if (widget.totalVotesCount != null) return widget.totalVotesCount!;
-    return _options.fold(0, (sum, o) => sum + o.votes);
+    final optionsSum = _options.fold(0, (sum, o) => sum + o.votes);
+    if (widget.totalVotesCount != null) {
+      return math.max(widget.totalVotesCount!, optionsSum);
+    }
+    return optionsSum;
   }
 
   bool get _hasVoted => _selectedOptionId != null || widget.isExpired;

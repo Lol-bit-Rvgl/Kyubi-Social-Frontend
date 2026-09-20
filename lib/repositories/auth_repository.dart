@@ -185,14 +185,18 @@ class SessionRepository {
       return null;
     }
     try {
-      return await _auth.me();
+      final me = await _auth.me();
+      await LastUserStorage.save(me.toJson());
+      return me;
     } on ApiException catch (e) {
       if (e.isUnauthorized) {
         // Intenta renovar el token antes de expulsar al usuario.
         final refreshed = await ApiClient.instance.runRefreshExplicit();
         if (refreshed) {
           try {
-            return await _auth.me();
+            final me = await _auth.me();
+            await LastUserStorage.save(me.toJson());
+            return me;
           } catch (_) {}
         }
         final hasRefresh =
@@ -208,6 +212,10 @@ class SessionRepository {
         return null;
       }
       // Sin red: recuperar el último usuario cacheado.
+      final cached = await LastUserStorage.read();
+      if (cached != null) return User.fromJson(cached);
+      rethrow;
+    } catch (_) {
       final cached = await LastUserStorage.read();
       if (cached != null) return User.fromJson(cached);
       rethrow;

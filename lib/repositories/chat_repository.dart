@@ -100,6 +100,22 @@ class ChatRepository {
     );
   }
 
+  Future<Message> votePoll(
+    String conversationId,
+    String messageId, {
+    String? optionId,
+    int? optionIndex,
+  }) async {
+    final json = await _api.postJson(
+      AppConfig.conversationMessageVote(conversationId, messageId),
+      data: {
+        'optionId': ?optionId,
+        'optionIndex': ?optionIndex,
+      },
+    );
+    return Message.fromJson(json);
+  }
+
   Future<void> setMuted(String conversationId, bool muted) async {
     await _api.patchJson(
       AppConfig.roomDetail(conversationId),

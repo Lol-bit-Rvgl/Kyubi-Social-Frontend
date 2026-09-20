@@ -408,6 +408,71 @@ class ConversationChatNotifier
   void leave() {
     _socket.leaveConversation(_conversationId);
   }
+
+  Future<void> votePoll(String messageId, String optionId) async {
+    final myId = ref.read(authControllerProvider).user?.id ?? '';
+    final msgIndex = state.messages.indexWhere((m) => m.id == messageId);
+    if (msgIndex < 0) return;
+
+    final targetMessage = state.messages[msgIndex];
+    final extensions = Map<String, dynamic>.from(targetMessage.extensions ?? {});
+    final pollMap = Map<String, dynamic>.from(
+      (extensions['poll'] as Map<String, dynamic>?) ?? {},
+    );
+    final rawOptions = (pollMap['options'] as List<dynamic>?) ?? [];
+    final votes = Map<String, dynamic>.from(
+      (pollMap['votes'] as Map<String, dynamic>?) ?? {},
+    );
+
+    // Si ya votó por esta opción, no reenviar
+    if (votes[myId] == optionId) return;
+    votes[myId] = optionId;
+
+    // Recalcular conteo de votos
+    final updatedOptions = rawOptions.map((opt) {
+      if (opt is Map<String, dynamic>) {
+        final optCopy = Map<String, dynamic>.from(opt);
+        final optId = optCopy['id'] as String? ?? '';
+        final count = votes.values.where((v) => v == optId).length;
+        optCopy['votes'] = count;
+        return optCopy;
+      }
+      return opt;
+    }).toList();
+
+    final totalVotes = votes.length;
+    pollMap['options'] = updatedOptions;
+    pollMap['votes'] = votes;
+    pollMap['totalVotes'] = totalVotes;
+    extensions['poll'] = pollMap;
+
+    final optimisticMessage = targetMessage.copyWith(
+      extensions: extensions,
+    );
+
+    final updatedList = [...state.messages];
+    updatedList[msgIndex] = optimisticMessage;
+    state = state.copyWith(messages: updatedList);
+
+    try {
+      final updatedFromServer = await _repo.votePoll(
+        _conversationId,
+        messageId,
+        optionId: optionId,
+      );
+      if (_disposed) return;
+      final currentIndex = state.messages.indexWhere((m) => m.id == messageId);
+      if (currentIndex >= 0) {
+        final syncedList = [...state.messages];
+        syncedList[currentIndex] = updatedFromServer;
+        state = state.copyWith(messages: syncedList);
+      }
+    } catch (_) {
+      if (!_disposed) {
+        await _load();
+      }
+    }
+  }
 }
 
 final conversationChatProvider = NotifierProvider.autoDispose

@@ -101,6 +101,22 @@ class ChatSocketService extends BaseSocket<ChatSocketEvent> {
       }
     });
 
+    socket.on('message:updated', (payload) {
+      final data = asMap(payload);
+      final conversationId = data['conversationId'] as String? ?? '';
+      if (conversationId.isNotEmpty) {
+        emitEvent(ChatMessageReceived(conversationId, data));
+      }
+    });
+
+    socket.on('conversation:message_updated', (payload) {
+      final data = asMap(payload);
+      final conversationId = data['conversationId'] as String? ?? '';
+      if (conversationId.isNotEmpty) {
+        emitEvent(ChatMessageReceived(conversationId, data));
+      }
+    });
+
     socket.on('conversation:new', (payload) {
       final data = asMap(payload);
       emitEvent(ChatConversationNew(data));

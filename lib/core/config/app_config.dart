@@ -192,6 +192,8 @@ class AppConfig {
   static String roomMessages(String id) => '/rooms/$id/messages';
   static String conversationMessages(String id) =>
       '/conversations/$id/messages';
+  static String conversationMessageVote(String convId, String msgId) =>
+      '/conversations/$convId/messages/$msgId/vote';
   static const String storiesBase = '/stories';
   static const String storiesFeed = '/stories/feed';
   static String storyDetail(String id) => '/stories/$id';

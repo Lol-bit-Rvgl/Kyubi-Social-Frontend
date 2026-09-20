@@ -276,6 +276,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
           mediaType: message.mediaType,
           type: message.extensions?['type'] as String?,
           extensions: message.extensions,
+          currentUserId: myId,
+          onPollVote: (optId) => ref
+              .read(conversationChatProvider(widget.conversationId).notifier)
+              .votePoll(message.id, optId),
         );
       },
     );

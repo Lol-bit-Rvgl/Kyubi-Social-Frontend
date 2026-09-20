@@ -52,6 +52,8 @@ class DirectChatMessageBubble extends StatelessWidget {
     this.roleLabel,
     this.roleColor,
     this.onAvatarTap,
+    this.onPollVote,
+    this.currentUserId,
   });
 
   final String body;
@@ -73,6 +75,8 @@ class DirectChatMessageBubble extends StatelessWidget {
   final String? roleLabel;
   final Color? roleColor;
   final VoidCallback? onAvatarTap;
+  final void Function(String optionId)? onPollVote;
+  final String? currentUserId;
 
   // ── Detecciones de tipo especial ──────────────────────────────────────────
 
@@ -400,12 +404,19 @@ class DirectChatMessageBubble extends StatelessWidget {
       ];
     }
 
+    final votesMap = (pollExt?['votes'] ?? extensions?['votes']) as Map<String, dynamic>?;
+    final userVotedOptionId = currentUserId != null
+        ? (votesMap?[currentUserId] as String?)
+        : null;
+
     return Container(
       constraints: const BoxConstraints(maxWidth: 310),
       child: InteractivePollCard(
         question: question,
         options: options,
-        totalVotesCount: pollExt?['totalVotes'] as int?,
+        totalVotesCount: (pollExt?['totalVotes'] ?? extensions?['totalVotes']) as int?,
+        userVotedOptionId: userVotedOptionId,
+        onVote: onPollVote,
       ),
     );
   }

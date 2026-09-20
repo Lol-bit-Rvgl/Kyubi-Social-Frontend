@@ -29,6 +29,8 @@ class ChatMessageBubble extends StatelessWidget {
     this.type,
     this.extensions,
     this.onAvatarTap,
+    this.onPollVote,
+    this.currentUserId,
   });
 
   final String displayName; // Opcional: en DMs 1:1 va vacio para burbuja compacta.
@@ -50,6 +52,8 @@ class ChatMessageBubble extends StatelessWidget {
   final String? type;
   final Map<String, dynamic>? extensions;
   final VoidCallback? onAvatarTap;
+  final void Function(String optionId)? onPollVote;
+  final String? currentUserId;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +77,8 @@ class ChatMessageBubble extends StatelessWidget {
       roleLabel: roleLabel,
       roleColor: roleColor,
       onAvatarTap: onAvatarTap,
+      onPollVote: onPollVote,
+      currentUserId: currentUserId,
     );
   }
 }

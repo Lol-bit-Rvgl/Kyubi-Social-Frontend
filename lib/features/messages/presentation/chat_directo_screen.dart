@@ -972,7 +972,11 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
           type: message.extensions?['type'] as String?,
           extensions: message.extensions,
           isDeleted: message.isDeleted,
+          currentUserId: myId,
           onAvatarTap: () => _openUserProfile(context, message.sender),
+          onPollVote: (optId) => ref
+              .read(conversationChatProvider(widget.conversationId).notifier)
+              .votePoll(message.id, optId),
         );
       },
     );

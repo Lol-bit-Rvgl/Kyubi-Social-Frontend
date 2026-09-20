@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -118,6 +120,24 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> restoreSession() async {
     final repo = SessionRepository(_auth);
     try {
+      // 1. Hidratación inmediata en fotograma 0: si existen tokens y datos del usuario
+      // en caché local, exponer estado autenticado de inmediato con su avatar y perfil.
+      final access = await TokenStorage.accessToken();
+      final refresh = await TokenStorage.refreshToken();
+      if ((access != null && access.isNotEmpty) ||
+          (refresh != null && refresh.isNotEmpty)) {
+        final cachedJson = await LastUserStorage.read();
+        if (cachedJson != null) {
+          try {
+            final cachedUser = User.fromJson(cachedJson);
+            state = AuthState(
+              status: AuthStatus.authenticated,
+              user: cachedUser,
+            );
+          } catch (_) {}
+        }
+      }
+
       final user = await repo.restoreUser();
       state = user != null
           ? AuthState(status: AuthStatus.authenticated, user: user)
@@ -200,6 +220,7 @@ class AuthNotifier extends Notifier<AuthState> {
         busy: false,
       );
       _onUserSessionAuthenticated();
+      unawaited(refreshMe());
       // Push: registrar token FCM del dispositivo en el backend.
       await NotificationService.instance.syncTokenWithBackend(
         ref.read(apiClientProvider),
@@ -234,6 +255,7 @@ class AuthNotifier extends Notifier<AuthState> {
         busy: false,
       );
       _onUserSessionAuthenticated();
+      unawaited(refreshMe());
       // Push: registrar token FCM del dispositivo en el backend.
       await NotificationService.instance.syncTokenWithBackend(
         ref.read(apiClientProvider),
@@ -263,6 +285,7 @@ class AuthNotifier extends Notifier<AuthState> {
         busy: false,
       );
       _onUserSessionAuthenticated();
+      unawaited(refreshMe());
       // Push: registrar token FCM del dispositivo en el backend.
       await NotificationService.instance.syncTokenWithBackend(
         ref.read(apiClientProvider),
@@ -336,6 +359,17 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  Future<User?> refreshMe() async {
+    try {
+      final me = await _auth.me();
+      updateUser(me);
+      return me;
+    } catch (e) {
+      debugPrint('[Auth] Error al refrescar datos del usuario: $e');
+      return null;
+    }
+  }
+
   void clearError() => state = state.copyWith(error: null);
 
   Future<void> forgotPassword(String email) => _auth.forgotPassword(email);
@@ -384,3 +418,8 @@ class AuthNotifier extends Notifier<AuthState> {
 final authControllerProvider = NotifierProvider<AuthNotifier, AuthState>(
   AuthNotifier.new,
 );
+
+final currentUserProvider = Provider<User?>((ref) {
+  return ref.watch(authControllerProvider).user;
+});
+
