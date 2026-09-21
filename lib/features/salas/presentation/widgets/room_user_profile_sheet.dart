@@ -128,33 +128,18 @@ class RoomUserProfileSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // ── 1. Barra de Arrastre Superior & Menú ──
-            Row(
-              children: [
-                const SizedBox(width: 32),
-                Expanded(
-                  child: Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3A3A4A),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
+            // ── 1. Barra de Arrastre Superior ──
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3A3A4A),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.more_horiz_rounded,
-                    color: AppColors.textSecondary,
-                    size: 20,
-                  ),
-                  onPressed: () {},
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
 
             // ── 2. Avatar con Halo Neón y Badge de Estado ──
             Stack(
@@ -408,34 +393,7 @@ class RoomUserProfileSheet extends StatelessWidget {
             // ── 4. Botones de Acción Directa ──
             Row(
               children: [
-                // Botón Perfil Icono
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-                    _openProfile(context);
-                  },
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1A2E),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFF332B4F),
-                        width: 0.8,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.person_outline_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 10),
-
-                // Botón Principal: Chat / Perfil Completo
+                // Botón Principal: Chat / Perfil Completo (ocupa todo el ancho disponible)
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
@@ -477,79 +435,34 @@ class RoomUserProfileSheet extends StatelessWidget {
                   ),
                 ),
 
-                // Acciones de Moderación (Silenciar / Desilenciar / Expulsar)
-                if (!isSelf) ...[
+                // Expulsar (Solo si el usuario actual es Admin/Host y no es a sí mismo)
+                if (!isSelf && canManage) ...[
                   const SizedBox(width: 8),
-                  // Silenciar / Desilenciar (toggle según isMuted)
                   GestureDetector(
                     onTap: () {
                       Navigator.pop(context);
-                      onMute?.call();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isMuted
-                                ? 'Usuario $displayName desilenciado en esta sala'
-                                : 'Usuario $displayName silenciado en esta sala',
-                          ),
-                          backgroundColor: const Color(0xFF1E1A2E),
-                        ),
-                      );
+                      _showKickConfirmDialog(context);
                     },
                     child: Container(
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E1A2E),
+                        color: const Color(0xFF2A121E),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isMuted
-                              ? AppColors.accentTeal.withValues(alpha: 0.7)
-                              : const Color(0xFF332B4F),
-                          width: 0.8,
+                          color: AppColors.accentCrimson.withValues(
+                            alpha: 0.6,
+                          ),
+                          width: 1,
                         ),
                       ),
-                      child: Icon(
-                        isMuted
-                            ? Icons.volume_up_rounded
-                            : Icons.volume_off_rounded,
-                        color: isMuted
-                            ? AppColors.accentTeal
-                            : AppColors.textSecondary,
+                      child: const Icon(
+                        Icons.person_remove_rounded,
+                        color: AppColors.accentCrimson,
                         size: 20,
                       ),
                     ),
                   ),
-
-                  // Expulsar (Solo si el usuario actual es Admin/Host)
-                  if (canManage) ...[
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showKickConfirmDialog(context);
-                      },
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2A121E),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.accentCrimson.withValues(
-                              alpha: 0.6,
-                            ),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.person_remove_rounded,
-                          color: AppColors.accentCrimson,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ],
             ),

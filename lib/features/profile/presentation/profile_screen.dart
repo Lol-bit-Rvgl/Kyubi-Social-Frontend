@@ -843,9 +843,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ? user.profileViews
         : (_lastKnownVisitsCount ?? 0);
     final followers = user.followersCount;
-    final levelName = metrics.levelName.isNotEmpty
-        ? metrics.levelName
-        : 'Lv. ${user.level} Novato';
 
     return LiquidGlassContainer(
       borderRadius: AppDimens.radiusCard,
@@ -909,18 +906,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 label: 'Siguiendo',
                 icon: Icons.person_add_alt_1_rounded,
                 color: const Color(0xFFA594F9),
-              ),
-            ),
-          ),
-          const ProfileStatDivider(),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _showBadgesModal(user),
-              child: ProfileStatItem(
-                value: 'Lv ${user.level}',
-                label: levelName,
-                icon: Icons.bolt_rounded,
-                color: const Color(0xFFFFD600),
               ),
             ),
           ),

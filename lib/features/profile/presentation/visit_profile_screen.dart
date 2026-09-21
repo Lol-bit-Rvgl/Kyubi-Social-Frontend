@@ -719,9 +719,6 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
         ? user.profileViews
         : (_lastKnownVisitsCount ?? 0);
     final followers = followState.followersCount ?? user.followersCount;
-    final levelName = metrics.levelName.isNotEmpty
-        ? metrics.levelName
-        : 'Lv. ${user.level} Novato';
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
@@ -779,18 +776,6 @@ class _VisitProfileScreenState extends ConsumerState<VisitProfileScreen> {
                 label: 'Siguiendo',
                 icon: Icons.person_add_alt_1_rounded,
                 color: const Color(0xFFA594F9),
-              ),
-            ),
-          ),
-          const ProfileStatDivider(),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _showBadgesModal(user),
-              child: ProfileStatItem(
-                value: 'Lv ${user.level}',
-                label: levelName,
-                icon: Icons.bolt_rounded,
-                color: const Color(0xFFFFD600),
               ),
             ),
           ),
