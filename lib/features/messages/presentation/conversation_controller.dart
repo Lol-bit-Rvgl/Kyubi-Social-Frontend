@@ -280,6 +280,16 @@ class ConversationChatNotifier
         ],
         sending: false,
       );
+      if (state.conversation != null) {
+        final updatedConv = state.conversation!.copyWith(
+          lastMessage: sent,
+          updatedAt: sent.createdAt,
+        );
+        state = state.copyWith(conversation: updatedConv);
+        ref
+            .read(conversationsControllerProvider.notifier)
+            .upsertConversation(updatedConv);
+      }
       try {
         await _markRead();
       } catch (_) {}

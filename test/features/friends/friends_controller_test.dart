@@ -212,7 +212,25 @@ void main() {
       expect(find.text('Sakura Kitsune'), findsOneWidget);
     });
 
-    testWidgets('sin onFriendTap, un fallo al abrir el chat muestra aviso', (tester) async {
+    testWidgets('al tocar el botón de chat se dispara onChatTap con ese amigo', (tester) async {
+      final fake = _FakeUserRepository(friends: const [_friendA, _friendB]);
+      final chatTapped = <String>[];
+
+      await tester.pumpWidget(
+        _host(
+          FriendsListView(onChatTap: (user) => chatTapped.add(user.id)),
+          overrides: _overrides(fake),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.chat_bubble_outline_rounded).first);
+      await tester.pump();
+
+      expect(chatTapped, ['friend-1']);
+    });
+
+    testWidgets('al tocar el icono de chat sin onChatTap, un fallo al abrir el chat muestra aviso', (tester) async {
       final fake = _FakeUserRepository(friends: const [_friendA]);
 
       await tester.pumpWidget(
@@ -223,7 +241,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Sakura Kitsune'));
+      await tester.tap(find.byIcon(Icons.chat_bubble_outline_rounded));
       await tester.pumpAndSettle();
 
       expect(find.text('No se pudo abrir la conversación'), findsOneWidget);

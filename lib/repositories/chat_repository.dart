@@ -19,6 +19,7 @@ class ChatRepository {
     return raw
         .whereType<Map<String, dynamic>>()
         .map(Conversation.fromJson)
+        .where((c) => c.lastMessage != null)
         .toList();
   }
 

@@ -87,7 +87,7 @@ class SalasNotifier extends Notifier<SalasState> {
   RoomRepository get _repo => ref.read(roomRepositoryProvider);
 
   bool _disposed = false;
-  bool _fetching = false;
+  int _requestId = 0;
 
   @override
   SalasState build() {
@@ -115,18 +115,27 @@ class SalasNotifier extends Notifier<SalasState> {
   }
 
   Future<void> _load() async {
-    if (_disposed || _fetching) return;
-    _fetching = true;
+    if (_disposed) return;
+    final reqId = ++_requestId;
     state = state.copyWith(loading: true, error: null);
     try {
       final rooms = await _fetch();
-      if (_disposed) return;
+      if (_disposed || reqId != _requestId) return;
       state = state.copyWith(rooms: _sortRooms(rooms), loading: false);
     } catch (e) {
-      if (_disposed) return;
+      if (_disposed || reqId != _requestId) return;
       state = state.copyWith(loading: false, error: e.toString());
-    } finally {
-      _fetching = false;
+    }
+  }
+
+  Future<void> _loadForRequest(int reqId) async {
+    try {
+      final rooms = await _fetch();
+      if (_disposed || reqId != _requestId) return;
+      state = state.copyWith(rooms: _sortRooms(rooms), loading: false);
+    } catch (e) {
+      if (_disposed || reqId != _requestId) return;
+      state = state.copyWith(loading: false, error: e.toString());
     }
   }
 
@@ -157,48 +166,58 @@ class SalasNotifier extends Notifier<SalasState> {
   }
 
   Future<void> refresh() async {
-    if (_disposed || _fetching) return;
-    _fetching = true;
+    if (_disposed) return;
+    final reqId = ++_requestId;
     state = state.copyWith(refreshing: true, error: null);
     try {
       final rooms = await _fetch();
-      if (_disposed) return;
+      if (_disposed || reqId != _requestId) return;
       state = state.copyWith(rooms: _sortRooms(rooms), refreshing: false);
     } catch (e) {
-      if (_disposed) return;
+      if (_disposed || reqId != _requestId) return;
       state = state.copyWith(refreshing: false, error: e.toString());
-    } finally {
-      _fetching = false;
     }
   }
 
   void filterByCircle(String? circleId) {
     if (state.circleId == circleId) return;
-    state = SalasState(circleId: circleId);
-    Future.microtask(_load);
+    final reqId = ++_requestId;
+    state = SalasState(
+      circleId: circleId,
+      rooms: const [],
+      loading: true,
+      pinnedRoomIds: state.pinnedRoomIds,
+    );
+    _loadForRequest(reqId);
   }
 
   void search(String query) {
     final trimmed = query.trim();
     if (state.query == trimmed) return;
+    final reqId = ++_requestId;
     state = SalasState(
       circleId: state.circleId,
       category: state.category,
       query: trimmed,
+      rooms: const [],
+      loading: true,
       pinnedRoomIds: state.pinnedRoomIds,
     );
-    Future.microtask(_load);
+    _loadForRequest(reqId);
   }
 
   void setCategory(String? category) {
     if (state.category == category) return;
+    final reqId = ++_requestId;
     state = SalasState(
       circleId: state.circleId,
       category: category,
       query: state.query,
+      rooms: const [],
+      loading: true,
       pinnedRoomIds: state.pinnedRoomIds,
     );
-    Future.microtask(_load);
+    _loadForRequest(reqId);
   }
 
   /// Aplica una sala actualizada (join/leave) en la lista.

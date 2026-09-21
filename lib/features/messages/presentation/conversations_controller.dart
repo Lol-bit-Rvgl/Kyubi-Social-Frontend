@@ -68,7 +68,10 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
     try {
       final cached = await ConversationsCache.read();
       if (cached.isEmpty || !_mounted) return;
-      final conversations = cached.map(Conversation.fromJson).toList();
+      final conversations = cached
+          .map(Conversation.fromJson)
+          .where((c) => c.lastMessage != null)
+          .toList();
       if (!_mounted) return;
       state = state.copyWith(conversations: conversations);
     } catch (_) {}
@@ -193,6 +196,7 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
   }
 
   void upsertConversation(Conversation conversation) {
+    if (conversation.lastMessage == null) return;
     final list = [...state.conversations];
     final index = list.indexWhere((c) => c.id == conversation.id);
     if (index >= 0) {
@@ -201,6 +205,7 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
       list.insert(0, conversation);
     }
     state = state.copyWith(conversations: _sorted(list));
+    ConversationsCache.save(state.conversations);
   }
 
   // ── Pin to My Chats ───────────────────────────────────────────────────

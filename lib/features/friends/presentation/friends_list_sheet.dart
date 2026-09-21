@@ -19,9 +19,12 @@ Future<void> openFriendChat(BuildContext context, WidgetRef ref, User friend) as
     final conversation = await ref
         .read(chatRepositoryProvider)
         .openOrCreateDirect(friend.id, username: friend.username);
-    ref
-        .read(conversationsControllerProvider.notifier)
-        .upsertConversation(conversation);
+    // Solo insertar en la lista de chats si ya contiene al menos un mensaje real
+    if (conversation.lastMessage != null) {
+      ref
+          .read(conversationsControllerProvider.notifier)
+          .upsertConversation(conversation);
+    }
     if (!context.mounted) return;
     context.push('/conversation/${conversation.id}');
   } catch (_) {
@@ -43,11 +46,15 @@ class FriendsListView extends ConsumerWidget {
   const FriendsListView({
     super.key,
     this.onFriendTap,
+    this.onChatTap,
     this.shrinkWrap = false,
   });
 
-  /// Acción al tocar un amigo. Si es null se abre el chat directo.
+  /// Acción al tocar un amigo (perfil). Si es null se navega al perfil.
   final ValueChanged<User>? onFriendTap;
+
+  /// Acción al tocar el botón de chat. Si es null se abre el chat directo.
+  final ValueChanged<User>? onChatTap;
 
   /// `true` dentro de hojas modales (la lista se ajusta a su contenido).
   final bool shrinkWrap;
@@ -104,8 +111,19 @@ class FriendsListView extends ConsumerWidget {
                 final friend = state.friends[index];
                 return _FriendTile(
                   friend: friend,
-                  onTap: () {
+                  onProfileTap: () {
                     final handler = onFriendTap;
+                    if (handler != null) {
+                      handler(friend);
+                      return;
+                    }
+                    final target = friend.username.isNotEmpty
+                        ? friend.username
+                        : friend.id;
+                    context.push('/profile/$target');
+                  },
+                  onChatTap: () {
+                    final handler = onChatTap;
                     if (handler != null) {
                       handler(friend);
                       return;
@@ -118,12 +136,19 @@ class FriendsListView extends ConsumerWidget {
     );
   }
 }
-/// Fila de amigo: avatar con estado, nombre, @username y acción de chat.
+
+/// Fila de amigo: avatar con estado, nombre, @username (con navegación a perfil)
+/// y botón dedicado de chat directo a la derecha.
 class _FriendTile extends StatelessWidget {
-  const _FriendTile({required this.friend, required this.onTap});
+  const _FriendTile({
+    required this.friend,
+    required this.onProfileTap,
+    required this.onChatTap,
+  });
 
   final User friend;
-  final VoidCallback onTap;
+  final VoidCallback onProfileTap;
+  final VoidCallback onChatTap;
 
   @override
   Widget build(BuildContext context) {
@@ -131,76 +156,95 @@ class _FriendTile extends StatelessWidget {
         ? AppColors.fromHex(friend.usernameColor)
         : Colors.white;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF14141B).withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(16),
-        splashColor: AppColors.primary.withValues(alpha: 0.10),
-        highlightColor: AppColors.primary.withValues(alpha: 0.05),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF14141B).withValues(alpha: 0.78),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: const Color(0xFF22222E),
-              width: 0.8,
-            ),
-          ),
-          child: Row(
-            children: [
-              AppAvatar(
-                imageUrl: friend.effectiveAvatarUrl,
-                name: friend.displayName,
-                radius: 22,
-                showOnline: true,
-                isOnline: friend.isOnline,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      friend.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
-                        color: nameColor,
-                        letterSpacing: -0.2,
+        border: Border.all(
+          color: const Color(0xFF22222E),
+          width: 0.8,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Row(
+          children: [
+            // Zona de navegación a perfil (Avatar + Nombre + Handle + Badge)
+            Expanded(
+              child: InkWell(
+                onTap: onProfileTap,
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(16),
+                ),
+                splashColor: AppColors.primary.withValues(alpha: 0.10),
+                highlightColor: AppColors.primary.withValues(alpha: 0.05),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      AppAvatar(
+                        imageUrl: friend.effectiveAvatarUrl,
+                        name: friend.displayName,
+                        radius: 22,
+                        showOnline: true,
+                        isOnline: friend.isOnline,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      friend.handle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textMutedNebulae,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              friend.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                                color: nameColor,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              friend.handle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textMutedNebulae,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      _OnlineBadge(isOnline: friend.isOnline),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              _OnlineBadge(isOnline: friend.isOnline),
-              const SizedBox(width: 4),
-              Tooltip(
-                message: 'Enviar mensaje',
-                child: Icon(
+            ),
+            // Botón de acción de chat directo
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: IconButton(
+                icon: Icon(
                   Icons.chat_bubble_outline_rounded,
-                  size: 19,
+                  size: 20,
                   color: Theme.of(context).colorScheme.primary,
                 ),
+                tooltip: 'Enviar mensaje',
+                splashRadius: 22,
+                onPressed: onChatTap,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

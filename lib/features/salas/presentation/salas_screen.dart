@@ -10,7 +10,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/widgets/kyubi_shimmer.dart';
 import '../../../../core/widgets/state_views.dart';
-import '../../../../models/post_author.dart';
 import '../../../../models/room.dart';
 import 'salas_controller.dart';
 
@@ -490,11 +489,18 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
 
   Widget _buildRoomsGrid(SalasState state) {
     if (state.loading && state.rooms.isEmpty) {
-      return const SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 50),
-          child: Center(
-            child: CircularProgressIndicator(color: AppColors.accentCrimson),
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.88,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => const _RoomCardShimmer(),
+            childCount: 4,
           ),
         ),
       );
@@ -509,14 +515,30 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
       );
     }
 
-    final allRooms = state.rooms.isNotEmpty ? state.rooms : _getDemoRooms();
-
     // Filtrar por categoría seleccionada si aplica
-    final filteredRooms = _selectedCategoryTag == null
-        ? allRooms
-        : allRooms
+    var filteredRooms = _selectedCategoryTag == null
+        ? List<Room>.from(state.rooms)
+        : state.rooms
             .where((r) => r.matchesCategory(_selectedCategoryTag!))
             .toList();
+
+    // Ordenar según pestaña superior seleccionada:
+    // 0: Recommended (salas activas primero y por defecto)
+    // 1: Popular (mayor número de participantes)
+    // 2: Latest (fecha de creación más reciente)
+    if (_selectedFilterTab == 1) {
+      filteredRooms.sort((a, b) => b.participantCount.compareTo(a.participantCount));
+    } else if (_selectedFilterTab == 2) {
+      filteredRooms.sort((a, b) {
+        final dateA = a.createdAt != null
+            ? DateTime.tryParse(a.createdAt!) ?? DateTime(0)
+            : DateTime(0);
+        final dateB = b.createdAt != null
+            ? DateTime.tryParse(b.createdAt!) ?? DateTime(0)
+            : DateTime(0);
+        return dateB.compareTo(dateA);
+      });
+    }
 
     if (filteredRooms.isEmpty) {
       return SliverToBoxAdapter(
@@ -535,9 +557,11 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  'No hay salas activas en esta categoría',
-                  style: TextStyle(
+                Text(
+                  _selectedCategoryTag != null
+                      ? 'No hay salas activas en esta categoría'
+                      : 'No hay salas activas disponibles',
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,
@@ -588,100 +612,55 @@ class _SalasScreenState extends ConsumerState<SalasScreen> {
       ),
     );
   }
+}
 
-  List<Room> _getDemoRooms() {
-    return const [
-      Room(
-        id: 'r_peaceful',
-        name: 'peaceful place 🌿',
-        host: PostAuthor(id: 'u1', username: 'flora', displayName: 'Flora'),
-        participantCount: 8,
-        currentMode: 'voice',
-        tags: ['Voice', 'Chill', 'Small Talk'],
-        imageUrl:
-            'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=500&auto=format&fit=crop&q=60',
+/// Shimmer de carga estilizado para tarjetas de sala
+class _RoomCardShimmer extends StatelessWidget {
+  const _RoomCardShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF14141B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF22222E), width: 0.8),
       ),
-      Room(
-        id: 'r_reino',
-        name: '༺•*•El reino infinito•*•༻',
-        host: PostAuthor(id: 'u2', username: 'shogun', displayName: 'Shogun'),
-        participantCount: 16,
-        currentMode: 'roleplay',
-        tags: ['Videojuegos', 'Rol', 'Anime'],
-        imageUrl:
-            'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=500&auto=format&fit=crop&q=60',
-      ),
-      Room(
-        id: 'r_cafe',
-        name: '🥖 Family~Friends~Cafe 🥐',
-        host: PostAuthor(id: 'u3', username: 'baker', displayName: 'Barista'),
-        participantCount: 12,
-        currentMode: 'screening',
-        cinemaVideoId: 'dQw4w9WgXcQ',
-        tags: ['Screening', 'Café', 'Charla'],
-        imageUrl:
-            'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&auto=format&fit=crop&q=60',
-      ),
-      Room(
-        id: 'r_crimson',
-        name: 'Guild Crimson ⚔️',
-        host: PostAuthor(
-          id: 'u4',
-          username: 'valerius',
-          displayName: 'Valerius',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Expanded(
+              child: KyubiShimmer(
+                color: Color(0xFF1B1B26),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  KyubiShimmer(
+                    width: 100,
+                    height: 12,
+                    borderRadius: BorderRadius.all(Radius.circular(6)),
+                    color: Color(0xFF222230),
+                  ),
+                  SizedBox(height: 6),
+                  KyubiShimmer(
+                    width: 60,
+                    height: 10,
+                    borderRadius: BorderRadius.all(Radius.circular(5)),
+                    color: Color(0xFF1E1E2A),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        participantCount: 24,
-        currentMode: 'roleplay',
-        tags: ['Small Talk', 'Roleplay', 'Medieval'],
-        imageUrl:
-            'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop&q=60',
       ),
-      Room(
-        id: 'r_wonderland',
-        name: 'wonderland ❄️',
-        host: PostAuthor(id: 'u5', username: 'alice', displayName: 'Alice'),
-        participantCount: 10,
-        currentMode: 'voice',
-        tags: ['Voice', 'Nieve', 'Música'],
-        imageUrl:
-            'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=500&auto=format&fit=crop&q=60',
-      ),
-      Room(
-        id: 'r_survivors',
-        name: 'Zver survivors',
-        host: PostAuthor(id: 'u6', username: 'klaus', displayName: 'Klaus'),
-        participantCount: 19,
-        currentMode: 'roleplay',
-        tags: ['Z Survivor', 'Anime', 'Roleplay'],
-        imageUrl:
-            'https://images.unsplash.com/photo-1563089145-599997674d42?w=500&auto=format&fit=crop&q=60',
-      ),
-      Room(
-        id: 'r_academy',
-        name: '⟫⟫Academy Kingdom⟪⟪',
-        host: PostAuthor(id: 'u7', username: 'rector', displayName: 'Director'),
-        participantCount: 29,
-        currentMode: 'roleplay',
-        tags: ['Roleplay', 'Fantasía', 'Magia'],
-        imageUrl:
-            'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500&auto=format&fit=crop&q=60',
-      ),
-      Room(
-        id: 'r_insomnia',
-        name: 'Insomnia 🌙',
-        host: PostAuthor(
-          id: 'u8',
-          username: 'nocturne',
-          displayName: 'Nocturne',
-        ),
-        participantCount: 14,
-        currentMode: 'screening',
-        cinemaVideoId: '9bZkp7q19f0',
-        tags: ['Anime & Manga', 'Screening', 'Late Night'],
-        imageUrl:
-            'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&auto=format&fit=crop&q=60',
-      ),
-    ];
+    );
   }
 }
 
