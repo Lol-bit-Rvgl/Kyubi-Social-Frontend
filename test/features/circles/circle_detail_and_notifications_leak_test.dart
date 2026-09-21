@@ -278,9 +278,63 @@ void main() {
 
       // Find Moderator cards
       expect(find.text('Voluntarios & Moderadores'), findsOneWidget);
+      await tester.drag(find.byType(TabBarView), const Offset(0, -300));
+      await tester.pumpAndSettle();
       expect(find.text('Bob Builder'), findsOneWidget);
       expect(find.text('@bob'), findsOneWidget);
       expect(find.text('🛡️ Admin'), findsOneWidget);
+    });
+
+    testWidgets('CircleDetailScreen has PopScope and prominent arrow_back_rounded leading button', (tester) async {
+      final fakeCircleRepo = _FakeCircleRepository(testCircle);
+      final fakeRoomRepo = _FakeRoomRepository([]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            circleRepositoryProvider.overrideWithValue(fakeCircleRepo),
+            roomRepositoryProvider.overrideWithValue(fakeRoomRepo),
+          ],
+          child: const MaterialApp(
+            home: CircleDetailScreen(circleId: 'circle-anime'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Check PopScope is present
+      expect(find.byWidgetPredicate((w) => w is PopScope), findsOneWidget);
+
+      // Check leading back button with arrow_back_rounded exists
+      final backButton = find.widgetWithIcon(IconButton, Icons.arrow_back_rounded);
+      expect(backButton, findsOneWidget);
+    });
+
+    testWidgets('Header does NOT have redundant secondary Salas button and only TabBar Salas exists', (tester) async {
+      final fakeCircleRepo = _FakeCircleRepository(testCircle);
+      final fakeRoomRepo = _FakeRoomRepository([]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            circleRepositoryProvider.overrideWithValue(fakeCircleRepo),
+            roomRepositoryProvider.overrideWithValue(fakeRoomRepo),
+          ],
+          child: const MaterialApp(
+            home: CircleDetailScreen(circleId: 'circle-anime'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Exactly one 'Salas' text exists (the Tab), not the old redundant header button
+      expect(find.text('Salas'), findsOneWidget);
+      expect(find.widgetWithText(Tab, 'Salas'), findsOneWidget);
+
+      // Membership button is present
+      expect(find.text('Unirse al Círculo'), findsOneWidget);
     });
   });
 }

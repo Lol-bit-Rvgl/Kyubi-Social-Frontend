@@ -40,6 +40,14 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     super.dispose();
   }
 
+  void _handleBack(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/comunidades');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(circleDetailControllerProvider(widget.circleId));
@@ -49,20 +57,50 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     final circle = state.circle;
 
     if (state.loading && circle == null) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0D0C15),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFA594F9)),
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          _handleBack(context);
+        },
+        child: Scaffold(
+          backgroundColor: const Color(0xFF0D0C15),
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              onPressed: () => _handleBack(context),
+            ),
+          ),
+          body: const Center(
+            child: CircularProgressIndicator(color: Color(0xFFA594F9)),
+          ),
         ),
       );
     }
     if (state.error != null && circle == null) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF0D0C15),
-        body: ErrorView(
-          message: state.error!,
-          onRetry: notifier.refresh,
-          title: 'No se pudo cargar el círculo',
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          _handleBack(context);
+        },
+        child: Scaffold(
+          backgroundColor: const Color(0xFF0D0C15),
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              onPressed: () => _handleBack(context),
+            ),
+          ),
+          body: ErrorView(
+            message: state.error!,
+            onRetry: notifier.refresh,
+            title: 'No se pudo cargar el círculo',
+          ),
         ),
       );
     }
@@ -70,65 +108,132 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
     final isMember = circle.isMember;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0C15),
-      floatingActionButton: isMember
-          ? FloatingActionButton.extended(
-              onPressed: () => _createPost(context),
-              backgroundColor: const Color(0xFF3B2D60),
-              icon: const Icon(Icons.edit_rounded, color: Colors.white),
-              label: const Text(
-                'Publicar',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              tooltip: 'Crear publicación en el círculo',
-            )
-          : null,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            SliverToBoxAdapter(
-              child: _buildHeader(context, circle, state, notifier),
-            ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _CircleTabBarDelegate(
-                TabBar(
-                  controller: _tabController,
-                  indicatorColor: const Color(0xFFA594F9),
-                  indicatorWeight: 3,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: const Color(0xFF7A7A8A),
-                  labelStyle: const TextStyle(
-                    fontSize: 13,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/comunidades');
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0D0C15),
+        floatingActionButton: isMember
+            ? FloatingActionButton.extended(
+                onPressed: () => _createPost(context),
+                backgroundColor: const Color(0xFF3B2D60),
+                icon: const Icon(Icons.edit_rounded, color: Colors.white),
+                label: const Text(
+                  'Publicar',
+                  style: TextStyle(
+                    color: Colors.white,
                     fontWeight: FontWeight.w800,
                   ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                ),
+                tooltip: 'Crear publicación en el círculo',
+              )
+            : null,
+        body: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
+            return [
+              SliverAppBar(
+                pinned: true,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                backgroundColor: const Color(0xFF14121E),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/comunidades');
+                    }
+                  },
+                ),
+                title: innerBoxIsScrolled
+                    ? Text(
+                        circle.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    : null,
+                actions: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.share_outlined,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Enlace del Círculo copiado 🔗'),
+                        ),
+                      );
+                    },
                   ),
-                  tabs: const [
-                    Tab(text: 'Inicio'),
-                    Tab(text: 'Info'),
-                    Tab(text: 'Salas'),
-                    Tab(text: 'Normas'),
-                  ],
+                  IconButton(
+                    icon: const Icon(
+                      Icons.more_vert_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      _showCircleOptionsMenu(context, circle);
+                    },
+                  ),
+                ],
+              ),
+              SliverToBoxAdapter(
+                child: _buildHeader(context, circle, state, notifier),
+              ),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _CircleTabBarDelegate(
+                  TabBar(
+                    controller: _tabController,
+                    indicatorColor: const Color(0xFFA594F9),
+                    indicatorWeight: 3,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: const Color(0xFF7A7A8A),
+                    labelStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    tabs: const [
+                      Tab(text: 'Inicio'),
+                      Tab(text: 'Info'),
+                      Tab(text: 'Salas'),
+                      Tab(text: 'Normas'),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ];
-        },
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildTabInicio(context, circle, state, notifier),
-            _buildTabInfo(context, circle),
-            _buildTabSalas(context, circle, state, notifier),
-            _buildTabNormas(context, circle),
-          ],
+            ];
+          },
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildTabInicio(context, circle, state, notifier),
+              _buildTabInfo(context, circle),
+              _buildTabSalas(context, circle, state, notifier),
+              _buildTabNormas(context, circle),
+            ],
+          ),
         ),
       ),
     );
@@ -217,77 +322,6 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                 ),
               ),
 
-              // Barra de Acciones Superior (Regreso, Compartir, Ajustes)
-              SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => context.pop(),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Enlace del Círculo copiado 🔗'),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.share_outlined,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          _showCircleOptionsMenu(context, circle);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.more_vert_rounded,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
 
               // Avatar del Círculo superpuesto
               Positioned(
@@ -515,103 +549,61 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
                 const SizedBox(height: 12),
 
-                // Botones de Acción: [ Unirse / Salir ] + [ 💬 Sala del Círculo ]
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: isMember
-                            ? (isCreator
-                                  ? null
-                                  : () => _leave(context, notifier))
-                            : () => _join(context, notifier),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            gradient: isMember ? null : AppColors.nightGradient,
-                            color: isMember ? const Color(0xFF1E192D) : null,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
+                // Botón de Membresía a ancho completo: [ Unirse / Siguiendo / Eres el Creador ]
+                SizedBox(
+                  width: double.infinity,
+                  child: GestureDetector(
+                    onTap: isMember
+                        ? (isCreator
+                              ? null
+                              : () => _leave(context, notifier))
+                        : () => _join(context, notifier),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      decoration: BoxDecoration(
+                        gradient: isMember ? null : AppColors.nightGradient,
+                        color: isMember ? const Color(0xFF1E192D) : null,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isMember
+                              ? const Color(0xFF332B4F)
+                              : const Color(0xFF5B4A8C),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isMember
+                                ? (isCreator
+                                      ? Icons.verified_user_rounded
+                                      : Icons.check_circle_outline_rounded)
+                                : Icons.add_circle_outline_rounded,
+                            size: 16,
+                            color: isMember
+                                ? const Color(0xFF9E9EA8)
+                                : Colors.white,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isMember
+                                ? (isCreator
+                                      ? 'Eres el Creador'
+                                      : 'Siguiendo')
+                                : 'Unirse al Círculo',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
                               color: isMember
-                                  ? const Color(0xFF332B4F)
-                                  : const Color(0xFF5B4A8C),
-                              width: 1,
+                                  ? const Color(0xFF9E9EA8)
+                                  : Colors.white,
                             ),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                isMember
-                                    ? (isCreator
-                                          ? Icons.verified_user_rounded
-                                          : Icons.check_circle_outline_rounded)
-                                    : Icons.add_circle_outline_rounded,
-                                size: 16,
-                                color: isMember
-                                    ? const Color(0xFF9E9EA8)
-                                    : Colors.white,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                isMember
-                                    ? (isCreator
-                                          ? 'Eres el Creador'
-                                          : 'Siguiendo')
-                                    : 'Unirse al Círculo',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: isMember
-                                      ? const Color(0xFF9E9EA8)
-                                      : Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        _tabController.animateTo(2);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F2B36),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.accentCyan.withValues(alpha: 0.6),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(
-                              Icons.meeting_room_rounded,
-                              color: AppColors.accentCyan,
-                              size: 16,
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              'Salas',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.accentCyan,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),

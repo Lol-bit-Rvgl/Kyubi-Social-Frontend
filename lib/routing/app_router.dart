@@ -174,18 +174,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const CreatePostScreen(),
       ),
       GoRoute(path: '/circles', builder: (_, _) => const CirclesScreen()),
+      GoRoute(path: '/comunidades', redirect: (_, _) => '/circles'),
       GoRoute(
         path: '/circles/mine',
         builder: (_, _) => const CirclesScreen(initialTab: 1),
       ),
+      GoRoute(path: '/comunidades/mine', redirect: (_, _) => '/circles/mine'),
       GoRoute(
         path: '/circles/create',
         builder: (_, _) => const CreateCircleScreen(),
       ),
       GoRoute(
+        path: '/comunidades/create',
+        redirect: (_, _) => '/circles/create',
+      ),
+      GoRoute(
         path: '/circles/:circleId',
         builder: (_, state) =>
             CircleDetailScreen(circleId: state.pathParameters['circleId']!),
+      ),
+      GoRoute(
+        path: '/comunidades/:circleId',
+        redirect: (_, state) => '/circles/${state.pathParameters['circleId']}',
       ),
       GoRoute(
         path: '/circles/:circleId/create-post',
