@@ -2,18 +2,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/circle.dart';
 import '../../../models/post.dart';
+import '../../../models/room.dart';
 import '../../../repositories/circle_repository.dart';
 import '../../../services/providers.dart';
 
-/// Estado del detalle de un círculo: datos + posts paginados.
+/// Estado del detalle de un círculo: datos + posts paginados + salas activas.
 class CircleDetailState {
   const CircleDetailState({
     this.circle,
     this.posts = const [],
+    this.rooms = const [],
     this.loading = false,
     this.error,
     this.postsLoading = false,
     this.postsError,
+    this.roomsLoading = false,
+    this.roomsError,
     this.loadingMore = false,
     this.nextCursor,
     this.hasMore = false,
@@ -22,10 +26,13 @@ class CircleDetailState {
 
   final Circle? circle;
   final List<Post> posts;
+  final List<Room> rooms;
   final bool loading;
   final String? error;
   final bool postsLoading;
   final String? postsError;
+  final bool roomsLoading;
+  final String? roomsError;
   final bool loadingMore;
   final String? nextCursor;
   final bool hasMore;
@@ -34,10 +41,13 @@ class CircleDetailState {
   CircleDetailState copyWith({
     Circle? circle,
     List<Post>? posts,
+    List<Room>? rooms,
     bool? loading,
     String? error,
     bool? postsLoading,
     String? postsError,
+    bool? roomsLoading,
+    String? roomsError,
     bool? loadingMore,
     String? nextCursor,
     bool? hasMore,
@@ -46,10 +56,13 @@ class CircleDetailState {
     return CircleDetailState(
       circle: circle ?? this.circle,
       posts: posts ?? this.posts,
+      rooms: rooms ?? this.rooms,
       loading: loading ?? this.loading,
       error: error ?? this.error,
       postsLoading: postsLoading ?? this.postsLoading,
       postsError: postsError ?? this.postsError,
+      roomsLoading: roomsLoading ?? this.roomsLoading,
+      roomsError: roomsError ?? this.roomsError,
       loadingMore: loadingMore ?? this.loadingMore,
       nextCursor: nextCursor ?? this.nextCursor,
       hasMore: hasMore ?? this.hasMore,
@@ -85,6 +98,21 @@ class CircleDetailNotifier extends FamilyNotifier<CircleDetailState, String> {
       state = state.copyWith(loading: false, error: e.toString());
     }
     await _loadPosts();
+    await _loadRooms();
+  }
+
+  Future<void> _loadRooms() async {
+    if (_disposed) return;
+    state = state.copyWith(roomsLoading: true, roomsError: null);
+    try {
+      final roomRepo = ref.read(roomRepositoryProvider);
+      final rooms = await roomRepo.getSalas(circleId: _circleId);
+      if (_disposed) return;
+      state = state.copyWith(rooms: rooms, roomsLoading: false);
+    } catch (e) {
+      if (_disposed) return;
+      state = state.copyWith(roomsLoading: false, roomsError: e.toString());
+    }
   }
 
   Future<void> _loadPosts() async {

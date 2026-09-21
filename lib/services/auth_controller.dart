@@ -12,6 +12,7 @@ import '../models/user.dart';
 import '../repositories/auth_repository.dart';
 import '../features/messages/presentation/conversations_controller.dart';
 import '../features/messages/presentation/follow_requests_controller.dart';
+import '../features/notifications/presentation/notifications_controller.dart';
 import '../features/salas/presentation/room_invites_controller.dart';
 import '../features/salas/presentation/salas_controller.dart';
 import '../routing/router_refresh.dart';
@@ -90,6 +91,10 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       ConversationsCache.clear(userId: currentUserId);
       RoomsCache.clear(userId: currentUserId);
+      NotificationsCache.clear(userId: currentUserId);
+    } catch (_) {}
+    try {
+      ref.read(notificationsControllerProvider.notifier).clear();
     } catch (_) {}
 
     ref.invalidate(salasControllerProvider);
@@ -97,6 +102,7 @@ class AuthNotifier extends Notifier<AuthState> {
     ref.invalidate(unreadCountProvider);
     ref.invalidate(followRequestsControllerProvider);
     ref.invalidate(roomInvitesControllerProvider);
+    ref.invalidate(notificationsControllerProvider);
   }
 
   void _onUserSessionAuthenticated() {
@@ -115,6 +121,7 @@ class AuthNotifier extends Notifier<AuthState> {
     ref.invalidate(unreadCountProvider);
     ref.invalidate(followRequestsControllerProvider);
     ref.invalidate(roomInvitesControllerProvider);
+    ref.invalidate(notificationsControllerProvider);
   }
 
   Future<void> restoreSession() async {

@@ -43,6 +43,18 @@ class NotificationItem {
       createdAt: json['createdAt'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'type': type,
+    if (actor != null) 'actor': actor!.toJson(),
+    if (targetType != null) 'targetType': targetType,
+    if (targetId != null) 'targetId': targetId,
+    if (text != null) 'text': text,
+    if (readAt != null) 'readAt': readAt,
+    'timeAgo': timeAgo,
+    'createdAt': createdAt,
+  };
 }
 
 /// Respuesta paginada de notificaciones (GET /notifications).

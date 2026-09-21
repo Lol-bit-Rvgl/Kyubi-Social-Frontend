@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/storage/session_store.dart';
 import '../../../models/notification_item.dart';
 import '../../../models/post_author.dart';
 import '../../../repositories/notification_repository.dart';
+import '../../../services/auth_controller.dart';
 import '../../../services/providers.dart';
 
 /// Estado del centro de actividad con paginación.
@@ -51,6 +53,10 @@ class NotificationsNotifier extends Notifier<NotificationsState> {
 
   bool _disposed = false;
 
+  void clear() {
+    state = const NotificationsState();
+  }
+
   @override
   NotificationsState build() {
     ref.onDispose(() => _disposed = true);
@@ -61,7 +67,23 @@ class NotificationsNotifier extends Notifier<NotificationsState> {
   Future<void> _loadFirst() async {
     if (_disposed) return;
     if (state.loading) return;
-    state = state.copyWith(loading: true, error: null);
+
+    final authUser = ref.read(authControllerProvider).user;
+    if (authUser == null) {
+      state = const NotificationsState();
+      return;
+    }
+
+    // Hidratación en fotograma 0 estrictamente aislada por userId
+    try {
+      final cached = await NotificationsCache.read(userId: authUser.id);
+      if (!_disposed && cached.isNotEmpty && state.items.isEmpty) {
+        final cachedItems = cached.map(NotificationItem.fromJson).toList();
+        state = state.copyWith(items: cachedItems);
+      }
+    } catch (_) {}
+
+    state = state.copyWith(loading: state.items.isEmpty, error: null);
     try {
       final page = await _repo.getNotifications(page: 1, limit: 20);
       if (_disposed) return;
@@ -71,6 +93,7 @@ class NotificationsNotifier extends Notifier<NotificationsState> {
         hasMore: page.items.length < page.total && page.page < page.pages,
         loading: false,
       );
+      await NotificationsCache.save(page.items, userId: authUser.id);
       await _markAllReadIfNeeded(page.unread);
     } catch (e) {
       if (_disposed) return;
@@ -90,6 +113,10 @@ class NotificationsNotifier extends Notifier<NotificationsState> {
         hasMore: page.items.length < page.total && page.page < page.pages,
         refreshing: false,
       );
+      final authUser = ref.read(authControllerProvider).user;
+      if (authUser != null) {
+        await NotificationsCache.save(page.items, userId: authUser.id);
+      }
       await _markAllReadIfNeeded(page.unread);
     } catch (e) {
       if (_disposed) return;

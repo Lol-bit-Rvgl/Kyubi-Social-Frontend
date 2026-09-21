@@ -126,7 +126,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
           children: [
             _buildTabInicio(context, circle, state, notifier),
             _buildTabInfo(context, circle),
-            _buildTabSalas(context, circle),
+            _buildTabSalas(context, circle, state, notifier),
             _buildTabNormas(context, circle),
           ],
         ),
@@ -576,7 +576,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                     GestureDetector(
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        context.push('/salas/circle-${circle.id}');
+                        _tabController.animateTo(2);
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -859,60 +859,74 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
         .toList();
 
     if (moderators.isEmpty) {
-      return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF14121E),
+      final username = circle.creator.username;
+      final target = username.isNotEmpty ? username : circle.creator.id;
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: target.isNotEmpty
+              ? () {
+                  HapticFeedback.selectionClick();
+                  context.push('/profile/$target');
+                }
+              : null,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF221E32), width: 0.8),
-        ),
-        child: Row(
-          children: [
-            AppAvatar(
-              name: circle.creator.displayName,
-              imageUrl: circle.creator.avatarUrl,
-              radius: 18,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF14121E),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF221E32), width: 0.8),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    circle.creator.displayName,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Text(
-                    '@${circle.creator.username} · Creador Principal',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFB300).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Text(
-                'Líder',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFFFFB300),
+            child: Row(
+              children: [
+                AppAvatar(
+                  name: circle.creator.displayName,
+                  imageUrl: circle.creator.avatarUrl,
+                  radius: 18,
                 ),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        circle.creator.displayName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        '@${circle.creator.username} · Creador Principal',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFB300).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Líder',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFFFB300),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       );
     }
@@ -927,8 +941,21 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
       child: Column(
         children: moderators.map((m) {
           final isOwner = m.role == CircleRole.owner;
-          return ListTile(
-            dense: true,
+          final username = m.user.username;
+          final target = username.isNotEmpty ? username : m.user.id;
+          return Material(
+            color: Colors.transparent,
+            child: ListTile(
+              dense: true,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              onTap: target.isNotEmpty
+                  ? () {
+                      HapticFeedback.selectionClick();
+                      context.push('/profile/$target');
+                    }
+                  : null,
             leading: AppAvatar(
               name: m.user.displayName,
               imageUrl: m.user.avatarUrl,
@@ -970,8 +997,9 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                 ),
               ),
             ),
-          );
-        }).toList(),
+          ),
+        );
+      }).toList(),
       ),
     );
   }
@@ -1079,125 +1107,287 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
   // ── 5. PESTAÑA: SALAS (EN VIVO & VINCULADAS) ──────────────────────────────
 
-  Widget _buildTabSalas(BuildContext context, Circle circle) {
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 40),
-      children: [
-        _buildSectionTitle('Salas en Vivo del Círculo'),
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFF14121E),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF221E32), width: 0.8),
-          ),
-          child: Column(
-            children: [
-              Row(
+  Widget _buildTabSalas(
+    BuildContext context,
+    Circle circle,
+    CircleDetailState state,
+    CircleDetailNotifier notifier,
+  ) {
+    if (state.roomsLoading && state.rooms.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: AppColors.accentCyan,
+          strokeWidth: 2.5,
+        ),
+      );
+    }
+
+    if (state.rooms.isEmpty) {
+      return RefreshIndicator(
+        color: AppColors.accentCyan,
+        backgroundColor: const Color(0xFF14121E),
+        onRefresh: () async => notifier.refresh(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          children: [
+            _buildSectionTitle('Salas en Vivo del Círculo'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF14121E),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF221E32), width: 0.8),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E1A30),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppColors.accentCyan.withValues(alpha: 0.6),
-                        width: 1,
-                      ),
+                      color: AppColors.accentCyan.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
                     ),
                     child: const Icon(
-                      Icons.forum_rounded,
+                      Icons.meeting_room_outlined,
                       color: AppColors.accentCyan,
-                      size: 22,
+                      size: 28,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No hay salas en vivo en este círculo en este momento',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Crea una sala para conversar, debatir o rolear con los miembros.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      context.push('/salas/create/${circle.id}');
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text(
+                      'Crear sala',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accentCyan,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: AppColors.accentCyan,
+      backgroundColor: const Color(0xFF14121E),
+      onRefresh: () async => notifier.refresh(),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 40),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildSectionTitle('Salas en Vivo del Círculo'),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    context.push('/salas/create/${circle.id}');
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentCyan.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.accentCyan.withValues(alpha: 0.6),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFF5252),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'LIVE',
-                                style: TextStyle(
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                '${circle.name} Lounge',
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        Icon(
+                          Icons.add_rounded,
+                          size: 14,
+                          color: AppColors.accentCyan,
                         ),
-                        const SizedBox(height: 3),
-                        const Text(
-                          '🎙️ 6 en el stage · 🎭 Roleplay & Voice',
+                        SizedBox(width: 4),
+                        Text(
+                          'Crear sala',
                           style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.accentCyan,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      context.push('/salas/circle-${circle.id}');
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
+                ),
+              ],
+            ),
+          ),
+          for (final room in state.rooms)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF14121E),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF221E32), width: 0.8),
+              ),
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  context.push('/salas/${room.id}');
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
-                        color: AppColors.accentCyan.withValues(alpha: 0.15),
+                        color: const Color(0xFF1E1A30),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: AppColors.accentCyan,
-                          width: 0.8,
+                          color: AppColors.accentCyan.withValues(alpha: 0.6),
+                          width: 1,
                         ),
                       ),
-                      child: const Text(
-                        'Entrar',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.accentCyan,
+                      child: const Icon(
+                        Icons.forum_rounded,
+                        color: AppColors.accentCyan,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF5252),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'LIVE',
+                                  style: TextStyle(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  room.name,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Host: @${room.host.username} · ${room.participantCount} activos',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        context.push('/salas/${room.id}');
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentCyan.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.accentCyan,
+                            width: 0.8,
+                          ),
+                        ),
+                        child: const Text(
+                          'Entrar',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.accentCyan,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+        ],
+      ),
     );
   }
 

@@ -159,3 +159,41 @@ class RoomsCache {
     await SecureStorage.delete('rooms_cache_default');
   }
 }
+
+/// Cache local de notificaciones aislado por usuario (notifications_cache_${userId}).
+class NotificationsCache {
+  NotificationsCache._();
+
+  static String _key([String? userId]) =>
+      userId != null && userId.isNotEmpty
+          ? 'notifications_cache_$userId'
+          : 'notifications_cache_default';
+
+  static Future<void> save(List<dynamic> items, {String? userId}) async {
+    final jsonList = items.map((n) => n.toJson()).toList();
+    await SecureStorage.write(
+      _key(userId),
+      jsonEncode(jsonList),
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> read({String? userId}) async {
+    final raw = await SecureStorage.read(_key(userId));
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded.whereType<Map<String, dynamic>>().toList();
+      }
+    } on FormatException {
+      // ignore
+    }
+    return [];
+  }
+
+  static Future<void> clear({String? userId}) async {
+    await SecureStorage.delete(_key(userId));
+    await SecureStorage.delete('notifications_cache_default');
+  }
+}
+
