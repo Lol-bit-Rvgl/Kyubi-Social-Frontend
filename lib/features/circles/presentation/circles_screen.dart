@@ -16,7 +16,8 @@ import 'circles_controller.dart';
 
 /// Hub de Descubrimiento de Comunidades, Salas en Vivo y Personas Sugeridas (Project Z Aesthetic).
 class CirclesScreen extends ConsumerStatefulWidget {
-  const CirclesScreen({super.key});
+  final int initialTab;
+  const CirclesScreen({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<CirclesScreen> createState() => _CirclesScreenState();
@@ -34,6 +35,26 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
     '#Charla',
     '#Gaming',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialTab != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(circlesControllerProvider.notifier).setTab(widget.initialTab);
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CirclesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab) {
+      ref.read(circlesControllerProvider.notifier).setTab(widget.initialTab);
+    }
+  }
 
   @override
   void dispose() {
@@ -79,6 +100,16 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
       return inName || inDesc || inTags;
     }).toList();
 
+    // Filtrado de mis círculos según búsqueda
+    final filteredMyCircles = state.myCircles.where((circle) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      final inName = circle.name.toLowerCase().contains(query);
+      final inDesc = (circle.description ?? '').toLowerCase().contains(query);
+      final inTags = circle.tags.any((t) => t.toLowerCase().contains(query));
+      return inName || inDesc || inTags;
+    }).toList();
+
     // Filtrado de personas sugeridas
     final filteredUsers = state.suggestedUsers.where((user) {
       if (_searchQuery.isEmpty) return true;
@@ -104,30 +135,43 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
               ),
               slivers: [
                 // ── Header Superior ──
-                _buildTopBar(context, canPop),
+                _buildTopBar(context, state, canPop),
+
+                // ── Selector de Pestañas (Explorar / Mis Círculos) ──
+                _buildTabsSelector(context, state, notifier),
 
                 // ── Barra de Búsqueda Universal Estilizada ──
-                _buildUniversalSearchBar(),
+                _buildUniversalSearchBar(state),
 
-                // ── BLOQUE 1: COMUNIDADES DESTACADAS (Circles) ──
-                _buildBlock1Circles(context, filteredCircles),
+                if (state.currentTab == 0) ...[
+                  // ── BLOQUE 1: COMUNIDADES DESTACADAS (Circles) ──
+                  _buildBlock1Circles(context, filteredCircles),
 
-                // Separación estricta de 24px entre bloques
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  // Separación estricta de 24px entre bloques
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-                // ── BLOQUE 2: SALAS Y CHATS EN VIVO 🔴 LIVE (Rooms) ──
-                _buildBlock2LiveRooms(context, state, notifier, filteredRooms),
+                  // ── BLOQUE 2: SALAS Y CHATS EN VIVO 🔴 LIVE (Rooms) ──
+                  _buildBlock2LiveRooms(context, state, notifier, filteredRooms),
 
-                // Separación estricta de 24px entre bloques
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  // Separación estricta de 24px entre bloques
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-                // ── BLOQUE 3: PERSONAS SUGERIDAS (NO OCs) ──
-                _buildBlock3SuggestedUsers(
-                  context,
-                  state,
-                  notifier,
-                  filteredUsers,
-                ),
+                  // ── BLOQUE 3: PERSONAS SUGERIDAS (NO OCs) ──
+                  _buildBlock3SuggestedUsers(
+                    context,
+                    state,
+                    notifier,
+                    filteredUsers,
+                  ),
+                ] else ...[
+                  // ── PESTAÑA: MIS CÍRCULOS (Públicos y Privados) ──
+                  _buildMyCirclesSection(
+                    context,
+                    state,
+                    notifier,
+                    filteredMyCircles,
+                  ),
+                ],
 
                 // Espacio inferior para navegación flotante
                 const SliverPadding(
@@ -145,7 +189,11 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
 
   // ── Header Superior ──────────────────────────────────────────────────────
 
-  Widget _buildTopBar(BuildContext context, bool canPop) {
+  Widget _buildTopBar(
+    BuildContext context,
+    CirclesState state,
+    bool canPop,
+  ) {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
@@ -194,9 +242,9 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
                 ),
               ),
             const SizedBox(width: 12),
-            const Text(
-              'Explorar',
-              style: TextStyle(
+            Text(
+              state.currentTab == 0 ? 'Explorar' : 'Mis Círculos',
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
@@ -204,9 +252,11 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
               ),
             ),
             const Spacer(),
-            // Botón de Salas
+            // Botón Contextual (Crear en Mis Círculos / Salas Hub en Explorar)
             GestureDetector(
-              onTap: () => context.push('/salas'),
+              onTap: () => state.currentTab == 1
+                  ? context.push('/circles/create')
+                  : context.push('/salas'),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -220,17 +270,21 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
                     width: 0.8,
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(
-                      Icons.radio_button_checked_rounded,
+                      state.currentTab == 1
+                          ? Icons.add_rounded
+                          : Icons.radio_button_checked_rounded,
                       size: 14,
-                      color: Color(0xFF5BC8AF),
+                      color: state.currentTab == 1
+                          ? const Color(0xFFA594F9)
+                          : const Color(0xFF5BC8AF),
                     ),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Text(
-                      'Salas Hub',
-                      style: TextStyle(
+                      state.currentTab == 1 ? 'Crear' : 'Salas Hub',
+                      style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -246,14 +300,143 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
     );
   }
 
+  // ── Selector Segmentado de Pestañas (Explorar / Mis Círculos) ──────────────
+
+  Widget _buildTabsSelector(
+    BuildContext context,
+    CirclesState state,
+    CirclesNotifier notifier,
+  ) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: const Color(0xFF14141B).withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 0.8,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildTabItem(
+                  title: 'Explorar',
+                  icon: Icons.explore_rounded,
+                  isSelected: state.currentTab == 0,
+                  onTap: () => notifier.setTab(0),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: _buildTabItem(
+                  title: 'Mis Círculos',
+                  icon: Icons.groups_rounded,
+                  isSelected: state.currentTab == 1,
+                  badgeCount: state.myCircles.length,
+                  onTap: () => notifier.setTab(1),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabItem({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+    int? badgeCount,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF2A2440) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: isSelected
+              ? Border.all(
+                  color: const Color(0xFFA594F9).withValues(alpha: 0.6),
+                  width: 1,
+                )
+              : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFA594F9).withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? const Color(0xFFA594F9) : Colors.white60,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? Colors.white : Colors.white60,
+              ),
+            ),
+            if (badgeCount != null && badgeCount > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 1.5,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFFA594F9)
+                      : Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$badgeCount',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected
+                        ? const Color(0xFF14141B)
+                        : Colors.white70,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Barra de Búsqueda Universal Estilizada ────────────────────────────────
 
-  Widget _buildUniversalSearchBar() {
+  Widget _buildUniversalSearchBar(CirclesState state) {
     final hasQuery = _searchQuery.isNotEmpty;
     final scheme = Theme.of(context).colorScheme;
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
@@ -284,7 +467,9 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Buscar personas, comunidades, salas...',
+                    hintText: state.currentTab == 0
+                        ? 'Buscar personas, comunidades, salas...'
+                        : 'Buscar en mis círculos...',
                     hintStyle: TextStyle(
                       color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 13.5,
@@ -309,6 +494,368 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
                   ),
                 ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── PESTAÑA: MIS CÍRCULOS (Públicos y Privados) ───────────────────────────
+
+  Widget _buildMyCirclesSection(
+    BuildContext context,
+    CirclesState state,
+    CirclesNotifier notifier,
+    List<Circle> circles,
+  ) {
+    if (state.myCirclesLoading) {
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => _buildMyCircleSkeleton(),
+            childCount: 4,
+          ),
+        ),
+      );
+    }
+
+    if (circles.isEmpty) {
+      final searching = _searchQuery.trim().isNotEmpty;
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
+          child: EmptyView(
+            icon: Icons.groups_2_rounded,
+            title: searching ? 'Sin resultados' : 'Aún no tienes círculos',
+            message: searching
+                ? 'No se encontraron comunidades que coincidan con "$_searchQuery".'
+                : 'Explora y únete a comunidades afines o crea tu propio círculo.',
+            actionLabel: searching ? null : 'Explorar comunidades',
+            onAction: searching ? null : () => notifier.setTab(0),
+          ),
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final circle = circles[index];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildMyCircleCard(context, circle),
+            );
+          },
+          childCount: circles.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMyCircleCard(BuildContext context, Circle circle) {
+    final isOwner = circle.isCreator || circle.role == CircleRole.owner;
+    final isAdmin = circle.role == CircleRole.admin;
+
+    return GestureDetector(
+      onTap: () => context.push('/circles/${circle.id}'),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF14141B).withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: circle.isPrivate
+                ? const Color(0xFFA594F9).withValues(alpha: 0.25)
+                : Colors.white.withValues(alpha: 0.08),
+            width: 0.8,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Avatar squircle de la comunidad (58x58)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                width: 58,
+                height: 58,
+                child: circle.avatarUrl != null && circle.avatarUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: circle.avatarUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) => Container(
+                          color: const Color(0xFF1E1A2E),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFFA594F9),
+                              ),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (_, _, _) => _fallbackCircleAvatar(circle.name),
+                      )
+                    : _fallbackCircleAvatar(circle.name),
+              ),
+            ),
+            const SizedBox(width: 14),
+
+            // Contenido central
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Título y Badges
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          circle.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Badge Privado (si corresponde)
+                      if (circle.isPrivate) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2E2248),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFFA594F9).withValues(alpha: 0.6),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.lock_rounded,
+                                size: 10,
+                                color: Color(0xFFA594F9),
+                              ),
+                              SizedBox(width: 3.5),
+                              Text(
+                                'Privado',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFA594F9),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+
+                      // Badge de Rol: Creador / Admin / Miembro
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isOwner
+                              ? const Color(0xFF332612)
+                              : (isAdmin
+                                  ? const Color(0xFF1E2838)
+                                  : const Color(0xFF1C2230)),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isOwner
+                                ? const Color(0xFFFFB800).withValues(alpha: 0.6)
+                                : (isAdmin
+                                    ? const Color(0xFF4FA3E3).withValues(alpha: 0.6)
+                                    : const Color(0xFF5BC8AF).withValues(alpha: 0.6)),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Text(
+                          isOwner
+                              ? '👑 Creador'
+                              : (isAdmin ? '🛡️ Admin' : '🛡️ Miembro'),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: isOwner
+                                ? const Color(0xFFFFD166)
+                                : (isAdmin
+                                    ? const Color(0xFF70C2FF)
+                                    : const Color(0xFF5BC8AF)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Descripción corta
+                  if (circle.description != null &&
+                      circle.description!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      circle.description!.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.white.withValues(alpha: 0.65),
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 8),
+
+                  // Métricas / Tags
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.people_alt_rounded,
+                        size: 13,
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${circle.memberCount} ${circle.memberCount == 1 ? 'miembro' : 'miembros'}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      if (circle.roomCount > 0) ...[
+                        const SizedBox(width: 12),
+                        const Icon(
+                          Icons.radio_button_checked_rounded,
+                          size: 13,
+                          color: Color(0xFF5BC8AF),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${circle.roomCount} ${circle.roomCount == 1 ? 'sala' : 'salas'}',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF5BC8AF),
+                          ),
+                        ),
+                      ],
+                      if (circle.tags.isNotEmpty) ...[
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            circle.tags
+                                .map((t) => t.startsWith('#') ? t : '#$t')
+                                .take(2)
+                                .join(' '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFFA594F9).withValues(alpha: 0.8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMyCircleSkeleton() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        height: 90,
+        decoration: BoxDecoration(
+          color: const Color(0xFF14141B),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFF22222E), width: 0.8),
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            KyubiShimmer(
+              width: 58,
+              height: 58,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  KyubiShimmer(
+                    width: 140,
+                    height: 16,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  const SizedBox(height: 8),
+                  KyubiShimmer(
+                    width: 200,
+                    height: 12,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _fallbackCircleAvatar(String name) {
+    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'C';
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2E2850), Color(0xFF1B1730)],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFFA594F9),
           ),
         ),
       ),
@@ -526,12 +1073,16 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
                         color: Color(0xFF00E5FF),
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        '${circle.memberCount} miembros',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF9E9EA8),
+                      Expanded(
+                        child: Text(
+                          '${circle.memberCount} miembros',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF9E9EA8),
+                          ),
                         ),
                       ),
                     ],

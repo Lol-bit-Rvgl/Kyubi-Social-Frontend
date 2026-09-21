@@ -8,45 +8,57 @@ import '../../../repositories/room_repository.dart';
 import '../../../repositories/user_repository.dart';
 import '../../../services/providers.dart';
 
-/// Estado integral del Hub de Descubrimiento (Comunidades, Salas en Vivo y Personas Sugeridas).
+/// Estado integral del Hub de Descubrimiento (Comunidades, Mis Círculos, Salas en Vivo y Personas Sugeridas).
 class CirclesState {
   const CirclesState({
     this.circles = const [],
+    this.myCircles = const [],
     this.rooms = const [],
     this.suggestedUsers = const [],
     this.followedUserIds = const {},
     this.selectedTag = 'Todos',
+    this.currentTab = 0,
     this.loading = false,
+    this.myCirclesLoading = false,
     this.refreshing = false,
     this.error,
   });
 
   final List<Circle> circles;
+  final List<Circle> myCircles;
   final List<Room> rooms;
   final List<FollowItem> suggestedUsers;
   final Set<String> followedUserIds;
   final String selectedTag;
+  final int currentTab; // 0: Explorar, 1: Mis Círculos
   final bool loading;
+  final bool myCirclesLoading;
   final bool refreshing;
   final String? error;
 
   CirclesState copyWith({
     List<Circle>? circles,
+    List<Circle>? myCircles,
     List<Room>? rooms,
     List<FollowItem>? suggestedUsers,
     Set<String>? followedUserIds,
     String? selectedTag,
+    int? currentTab,
     bool? loading,
+    bool? myCirclesLoading,
     bool? refreshing,
     String? error,
   }) {
     return CirclesState(
       circles: circles ?? this.circles,
+      myCircles: myCircles ?? this.myCircles,
       rooms: rooms ?? this.rooms,
       suggestedUsers: suggestedUsers ?? this.suggestedUsers,
       followedUserIds: followedUserIds ?? this.followedUserIds,
       selectedTag: selectedTag ?? this.selectedTag,
+      currentTab: currentTab ?? this.currentTab,
       loading: loading ?? this.loading,
+      myCirclesLoading: myCirclesLoading ?? this.myCirclesLoading,
       refreshing: refreshing ?? this.refreshing,
       error: error ?? this.error,
     );
@@ -69,13 +81,15 @@ class CirclesNotifier extends Notifier<CirclesState> {
 
   Future<void> _loadAll() async {
     if (_disposed) return;
-    state = state.copyWith(loading: true, error: null);
+    state = state.copyWith(loading: true, myCirclesLoading: true, error: null);
     try {
       final circlesFuture = _circleRepo.getCircles(limit: 15);
+      final myCirclesFuture = _circleRepo.getMyCircles(limit: 50);
       final roomsFuture = _roomRepo.getSalas(limit: 15);
       final usersFuture = _userRepo.suggestPeople(limit: 15);
 
       final circles = await circlesFuture;
+      final myCircles = await myCirclesFuture;
       final allRooms = await roomsFuture;
       final users = await usersFuture;
 
@@ -86,6 +100,7 @@ class CirclesNotifier extends Notifier<CirclesState> {
       if (_disposed) return;
       state = state.copyWith(
         circles: circles,
+        myCircles: myCircles,
         rooms: activeRooms,
         suggestedUsers: users,
         followedUserIds: {
@@ -93,11 +108,12 @@ class CirclesNotifier extends Notifier<CirclesState> {
             if (u.isFollowing) u.id,
         },
         loading: false,
+        myCirclesLoading: false,
       );
     } catch (_) {
       if (_disposed) return;
       // En caso de fallo de red se conserva el estado real previo (nunca fakes).
-      state = state.copyWith(loading: false);
+      state = state.copyWith(loading: false, myCirclesLoading: false);
     }
   }
 
@@ -106,10 +122,12 @@ class CirclesNotifier extends Notifier<CirclesState> {
     state = state.copyWith(refreshing: true, error: null);
     try {
       final circlesFuture = _circleRepo.getCircles(limit: 15);
+      final myCirclesFuture = _circleRepo.getMyCircles(limit: 50);
       final roomsFuture = _roomRepo.getSalas(limit: 15);
       final usersFuture = _userRepo.suggestPeople(limit: 15);
 
       final circles = await circlesFuture;
+      final myCircles = await myCirclesFuture;
       final allRooms = await roomsFuture;
       final users = await usersFuture;
 
@@ -120,14 +138,21 @@ class CirclesNotifier extends Notifier<CirclesState> {
       if (_disposed) return;
       state = state.copyWith(
         circles: circles,
+        myCircles: myCircles,
         rooms: activeRooms,
         suggestedUsers: users,
         refreshing: false,
+        myCirclesLoading: false,
       );
     } catch (_) {
       if (_disposed) return;
-      state = state.copyWith(refreshing: false);
+      state = state.copyWith(refreshing: false, myCirclesLoading: false);
     }
+  }
+
+  void setTab(int tab) {
+    if (state.currentTab == tab) return;
+    state = state.copyWith(currentTab: tab);
   }
 
   void selectTag(String tag) {

@@ -11,7 +11,7 @@ class RoomRepository {
 
   /// Salas activas, opcionalmente filtradas por círculo o búsqueda.
   Future<List<Room>> getSalas({
-    int limit = 30,
+    int limit = 50,
     String? circleId,
     String? query,
     String? category,

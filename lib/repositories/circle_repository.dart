@@ -26,10 +26,10 @@ class CircleRepository {
     return _circleList(json);
   }
 
-  /// Círculos del usuario actual.
-  Future<List<Circle>> getMyCircles({int limit = 30}) async {
+  /// Círculos del usuario actual (públicos y privados).
+  Future<List<Circle>> getMyCircles({int limit = 50}) async {
     final json = await _api.getJson(
-      AppConfig.circlesMyCircles,
+      AppConfig.circlesMine,
       query: {'limit': limit},
     );
     return _circleList(json);

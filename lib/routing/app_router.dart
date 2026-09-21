@@ -174,7 +174,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const CreatePostScreen(),
       ),
       GoRoute(path: '/circles', builder: (_, _) => const CirclesScreen()),
-      GoRoute(path: '/circles/mine', redirect: (_, _) => '/circles'),
+      GoRoute(
+        path: '/circles/mine',
+        builder: (_, _) => const CirclesScreen(initialTab: 1),
+      ),
       GoRoute(
         path: '/circles/create',
         builder: (_, _) => const CreateCircleScreen(),

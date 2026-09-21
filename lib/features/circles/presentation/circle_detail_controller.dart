@@ -106,7 +106,7 @@ class CircleDetailNotifier extends FamilyNotifier<CircleDetailState, String> {
     state = state.copyWith(roomsLoading: true, roomsError: null);
     try {
       final roomRepo = ref.read(roomRepositoryProvider);
-      final rooms = await roomRepo.getSalas(circleId: _circleId);
+      final rooms = await roomRepo.getSalas(circleId: _circleId, limit: 50);
       if (_disposed) return;
       state = state.copyWith(rooms: rooms, roomsLoading: false);
     } catch (e) {

@@ -199,6 +199,7 @@ class AppConfig {
   static String storyDetail(String id) => '/stories/$id';
   static String storyView(String id) => '/stories/$id/view';
   static const String circlesBase = '/circles';
+  static const String circlesMine = '/circles/mine';
   static const String circlesMyCircles = '/circles/my-circles';
   static const String circlesSearch = '/circles/search';
   static String circleDetail(String id) => '/circles/$id';
