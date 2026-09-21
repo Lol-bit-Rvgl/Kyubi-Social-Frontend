@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../models/circle.dart';
 import '../../../../services/auth_controller.dart';
@@ -48,7 +50,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   // Circle discovery state
   List<Circle> _circles = [];
   bool _loadingCircles = false;
+  final Set<String> _selectedCircleIds = {};
   final Set<String> _joinedCircleIds = {};
+  final Set<String> _recommendedCircleIds = {};
 
   // Pulsing animation for tutorial hint
   late AnimationController _pulseController;
@@ -84,7 +88,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
       _goToStep(1);
     } else if (_step == 1) {
       _goToStep(2);
-      _loadCircles();
+      _loadCircles(force: true);
     } else {
       await _finish();
     }
@@ -94,43 +98,114 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     if (_step > 0) _goToStep(_step - 1);
   }
 
-  Future<void> _loadCircles() async {
-    if (_circles.isNotEmpty || _loadingCircles) return;
+  Future<void> _loadCircles({bool force = false}) async {
+    if (!force && (_circles.isNotEmpty || _loadingCircles)) return;
     setState(() => _loadingCircles = true);
     try {
       final circles = await ref
           .read(circleRepositoryProvider)
-          .getCircles(limit: 3);
-      if (mounted) setState(() => _circles = circles);
+          .getCircles(limit: 50);
+
+      final normalizedInterests = _interests
+          .map((i) => i.trim().toLowerCase())
+          .where((i) => i.isNotEmpty)
+          .toSet();
+
+      int scoreCircle(Circle c) {
+        if (normalizedInterests.isEmpty) return 0;
+        int score = 0;
+        final name = c.name.toLowerCase();
+        final desc = (c.description ?? '').toLowerCase();
+        final tags = c.tags.map((t) => t.toLowerCase()).toList();
+
+        for (final interest in normalizedInterests) {
+          if (tags.any((t) => t.contains(interest) || interest.contains(t))) {
+            score += 4;
+          } else if (name.contains(interest)) {
+            score += 3;
+          } else if (desc.contains(interest)) {
+            score += 1;
+          }
+        }
+        return score;
+      }
+
+      final matching = <Circle>[];
+      final others = <Circle>[];
+
+      for (final c in circles) {
+        if (scoreCircle(c) > 0) {
+          matching.add(c);
+        } else {
+          others.add(c);
+        }
+      }
+
+      matching.sort((a, b) {
+        final scoreDiff = scoreCircle(b).compareTo(scoreCircle(a));
+        if (scoreDiff != 0) return scoreDiff;
+        return b.memberCount.compareTo(a.memberCount);
+      });
+
+      others.sort((a, b) => b.memberCount.compareTo(a.memberCount));
+
+      final ranked = [...matching, ...others].take(20).toList();
+      final recommendedIds = matching.map((c) => c.id).toSet();
+
+      if (mounted) {
+        setState(() {
+          _circles = ranked;
+          _recommendedCircleIds.clear();
+          _recommendedCircleIds.addAll(recommendedIds);
+          // Pre-seleccionar recomendaciones directas (hasta 4)
+          final topRecommendations = matching.take(4).map((c) => c.id);
+          _selectedCircleIds.addAll(topRecommendations);
+        });
+      }
     } catch (_) {
-      // Silently fail – the user can skip this step
+      // Silently fail – el usuario puede continuar u omitir
     } finally {
       if (mounted) setState(() => _loadingCircles = false);
     }
   }
 
-  Future<void> _joinCircle(Circle circle) async {
-    if (_joinedCircleIds.contains(circle.id)) return;
-    try {
-      await ref.read(circleRepositoryProvider).joinCircle(circle.id);
-      if (mounted) {
-        setState(() {
-          _joinedCircleIds.add(circle.id);
-          _circles = _circles
-              .map((c) => c.id == circle.id ? c.copyWith(isMember: true) : c)
-              .toList();
-        });
+  void _toggleCircle(Circle circle) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_selectedCircleIds.contains(circle.id)) {
+        _selectedCircleIds.remove(circle.id);
+      } else {
+        _selectedCircleIds.add(circle.id);
       }
-    } catch (_) {
-      _snack('No se pudo unir al círculo');
-    }
+    });
   }
 
   Future<void> _finish() async {
     setState(() => _submitting = true);
     final authState = ref.read(authControllerProvider);
     final authNotifier = ref.read(authControllerProvider.notifier);
+    final circleRepo = ref.read(circleRepositoryProvider);
+
     try {
+      // Unirse en lote a los círculos seleccionados
+      final toJoin = _selectedCircleIds
+          .where((id) => !_joinedCircleIds.contains(id))
+          .toList();
+      if (toJoin.isNotEmpty) {
+        await Future.wait(
+          toJoin.map(
+            (id) => circleRepo
+                .joinCircle(id)
+                .then((_) {
+                  _joinedCircleIds.add(id);
+                })
+                .catchError((_) {
+                  // Tolerar fallas puntuales para no trabar el onboarding
+                }),
+          ),
+        );
+      }
+
       final user = await ref
           .read(userRepositoryProvider)
           .completeOnboarding(
@@ -148,6 +223,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  Future<void> _skipCirclesAndFinish() async {
+    _selectedCircleIds.clear();
+    await _finish();
   }
 
   void _goToStep(int step) {
@@ -346,21 +426,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
           else
             ...List.generate(_circles.length, (i) {
               final circle = _circles[i];
-              final joined =
-                  _joinedCircleIds.contains(circle.id) || circle.isMember;
+              final isSelected = _selectedCircleIds.contains(circle.id) ||
+                  _joinedCircleIds.contains(circle.id) ||
+                  circle.isMember;
+              final isRecommended = _recommendedCircleIds.contains(circle.id);
               return Padding(
                 padding: const EdgeInsets.only(bottom: AppDimens.sm),
                 child: _CircleDiscoveryCard(
                   circle: circle,
-                  joined: joined,
-                  onJoin: () => _joinCircle(circle),
+                  selected: isSelected,
+                  isRecommended: isRecommended,
+                  onToggle: () => _toggleCircle(circle),
                 ),
               );
             }),
           const SizedBox(height: 24),
           Center(
             child: TextButton(
-              onPressed: _finish,
+              onPressed: _skipCirclesAndFinish,
               child: Text(
                 'Omitir',
                 style: TextStyle(color: scheme.onSurfaceVariant),
@@ -413,99 +496,177 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 class _CircleDiscoveryCard extends StatelessWidget {
   const _CircleDiscoveryCard({
     required this.circle,
-    required this.joined,
-    required this.onJoin,
+    required this.selected,
+    required this.onToggle,
+    this.isRecommended = false,
   });
 
   final Circle circle;
-  final bool joined;
-  final VoidCallback onJoin;
+  final bool selected;
+  final VoidCallback onToggle;
+  final bool isRecommended;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeBorderColor = AppColors.accentTeal;
+    final idleBorderColor =
+        isDark ? const Color(0xFF2C2544) : const Color(0xFFE2E2EC);
+    final cardBgColor = selected
+        ? (isDark ? const Color(0xFF16242A) : const Color(0xFFE6F7F7))
+        : (isDark ? const Color(0xFF151124) : Colors.white);
+
+    final description = (circle.description?.trim().isNotEmpty == true)
+        ? circle.description!.trim()
+        : 'Comunidad para compartir y conectar en Kyubi.';
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppDimens.radiusMd),
-        gradient: AppColors.accentGradient,
-      ),
-      padding: const EdgeInsets.all(1.5),
-      child: Container(
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(AppDimens.radiusMd - 1),
+        color: cardBgColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: selected ? activeBorderColor : idleBorderColor,
+          width: selected ? 1.6 : 1.0,
         ),
-        padding: const EdgeInsets.all(AppDimens.md),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: AppColors.brandGradient,
-              ),
-              child: Center(
-                child: Text(
-                  circle.name.isNotEmpty ? circle.name[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: AppColors.accentTeal.withValues(alpha: 0.18),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onToggle,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                AppAvatar(
+                  imageUrl: circle.avatarUrl,
+                  name: circle.name,
+                  radius: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              circle.name,
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isRecommended) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentTeal.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: AppColors.accentTeal.withValues(alpha: 0.5),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: const Text(
+                                'Para ti',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.accentTeal,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFF9E9EA8)
+                              : const Color(0xFF6B6A78),
+                          height: 1.25,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.people_alt_rounded,
+                            size: 13,
+                            color: isDark
+                                ? const Color(0xFF7A788A)
+                                : const Color(0xFF8A889A),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${circle.memberCount} ${circle.memberCount == 1 ? 'miembro' : 'miembros'}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: isDark
+                                  ? const Color(0xFF7A788A)
+                                  : const Color(0xFF8A889A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              ),
+                const SizedBox(width: 10),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? AppColors.accentTeal : Colors.transparent,
+                    border: Border.all(
+                      color: selected
+                          ? AppColors.accentTeal
+                          : (isDark
+                              ? const Color(0xFF534C69)
+                              : const Color(0xFFB0AFC0)),
+                      width: selected ? 0 : 1.8,
+                    ),
+                  ),
+                  child: selected
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 16,
+                          color: Color(0xFF0F1A1E),
+                        )
+                      : null,
+                ),
+              ],
             ),
-            const SizedBox(width: AppDimens.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    circle.name,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Flexible(
-                    child: Text(
-                      '${circle.memberCount} miembros',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppDimens.sm),
-            joined
-                ? Icon(
-                    Icons.check_circle_rounded,
-                    color: AppColors.success,
-                    size: 28,
-                  )
-                : FilledButton.tonal(
-                    onPressed: onJoin,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary.withValues(
-                        alpha: 0.12,
-                      ),
-                      foregroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimens.md,
-                        vertical: AppDimens.xs,
-                      ),
-                    ),
-                    child: const Text('Unirse'),
-                  ),
-          ],
+          ),
         ),
       ),
     );

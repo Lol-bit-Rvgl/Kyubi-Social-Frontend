@@ -3818,6 +3818,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }
 
   void _startReply(Map<String, dynamic> msg) {
+    if (!_isJoined) {
+      _showSendError('Debes unirte a la sala para responder a un mensaje');
+      return;
+    }
     HapticFeedback.lightImpact();
     setState(() {
       _replyingToMessage = msg;
@@ -4183,10 +4187,29 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                 ),
               ),
             ListTile(
-              leading: const Icon(Icons.reply_rounded, color: AppColors.accentCyan),
-              title: const Text('Responder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              leading: Icon(
+                Icons.reply_rounded,
+                color: _isJoined ? AppColors.accentCyan : const Color(0xFF6B687A),
+              ),
+              title: Text(
+                'Responder',
+                style: TextStyle(
+                  color: _isJoined ? Colors.white : const Color(0xFF6B687A),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: !_isJoined
+                  ? const Text(
+                      'Únete a la sala para responder',
+                      style: TextStyle(color: Color(0xFF8A8A9A), fontSize: 11),
+                    )
+                  : null,
               onTap: () {
                 Navigator.pop(ctx);
+                if (!_isJoined) {
+                  _showSendError('Debes unirte a la sala para responder a un mensaje');
+                  return;
+                }
                 _startReply(msg);
               },
             ),
@@ -4971,8 +4994,6 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                   ),
                 ),
 
-                // ── Barra de Saludos Rápidos: se oculta por completo a no participantes ──
-                if (_isJoined && !_isConnected && _canSendMessage) _buildQuickGreetings(),
 
                 // ── Banner de moderación / sanción activa ──
                 if (_isConnected && !_canSendMessage)
@@ -5603,51 +5624,6 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
     );
   }
 
-  // ── Saludos Rápidos ──────────────────────────────────────────────────────
-
-  Widget _buildQuickGreetings() {
-    if (!_isJoined) return const SizedBox.shrink();
-    const greetings = ['Hi', 'Hello, 👋', 'Invite me, 🥳', 'How are you doing'];
-
-    return Container(
-      height: 36,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        itemCount: greetings.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final text = greetings[index];
-          return GestureDetector(
-            onTap: () {
-              if (!_isJoined) {
-                _showSendError('Debes unirte a la sala para poder participar en el chat');
-                return;
-              }
-              _sendMessage(text);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF181428),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF2C2544), width: 0.8),
-              ),
-              child: Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFFC0C0D4),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 
   // ── Barra Inferior Modo Pre-Join ─────────────────────────────────────────
 
