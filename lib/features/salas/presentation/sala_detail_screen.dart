@@ -3040,6 +3040,29 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       takenByUsername: displayName,
     );
 
+    // Verificar que el usuario no supere el límite de 2 slots (solo al añadir uno nuevo)
+    final alreadyOccupiedByMe = _stageRoles.where((r) =>
+        r.isTaken &&
+        r.id != role.id && // no contar el slot que se va a mover
+        (r.takenByUserId == myId || r.occupiedBy == myId)).length;
+
+    // targetSlotIndex explícito = el usuario toca un slot vacante → siempre permitido
+    // Sin targetSlotIndex = acción "+ Unirse" → verificar límite
+    if (targetSlotIndex == null && alreadyOccupiedByMe >= 2) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Has alcanzado el límite máximo de 2 roles en el Stage',
+            ),
+            backgroundColor: Color(0xFF2A121E),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _currentActiveRole = updatedRole;
 
@@ -3063,13 +3086,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           destIndex = vacantIndex;
           _stageRoles[vacantIndex] = updatedRole;
         } else {
-          while (_stageRoles.length < destIndex) {
-            final idx = _stageRoles.length + 1;
-            _stageRoles.add(RoleCharacter.vacant(
-              id: 'slot-$idx',
-              name: 'Slot $idx',
-            ));
-          }
+          // No hay slots vacantes y no se especificó índice: añadir al final
           destIndex = _stageRoles.length;
           _stageRoles.add(updatedRole);
         }

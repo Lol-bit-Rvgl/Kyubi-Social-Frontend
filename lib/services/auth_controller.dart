@@ -8,6 +8,7 @@ import '../core/errors/api_exception.dart';
 import '../core/network/api_client.dart';
 import '../core/services/notification_service.dart';
 import '../core/storage/session_store.dart';
+import '../models/character.dart';
 import '../models/user.dart';
 import '../repositories/auth_repository.dart';
 import '../features/messages/presentation/conversations_controller.dart';
@@ -103,6 +104,9 @@ class AuthNotifier extends Notifier<AuthState> {
     ref.invalidate(followRequestsControllerProvider);
     ref.invalidate(roomInvitesControllerProvider);
     ref.invalidate(notificationsControllerProvider);
+    // Purgar fichas de personaje de la sesión anterior para evitar cross-user leaks
+    ref.invalidate(myCharactersProvider);
+    ref.invalidate(userCharactersProvider);
   }
 
   void _onUserSessionAuthenticated() {

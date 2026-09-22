@@ -433,6 +433,17 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
       );
     }
 
+    // Contar cuántos slots ocupa el usuario actual
+    final mySlotCount = widget.currentUserId != null
+        ? validRoles
+            .where((r) =>
+                r.isTaken &&
+                (r.takenByUserId == widget.currentUserId ||
+                    r.occupiedBy == widget.currentUserId))
+            .length
+        : 0;
+    final hasReachedSlotLimit = mySlotCount >= 2;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -469,42 +480,82 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
           ),
         ),
         const SizedBox(width: 8),
-        GestureDetector(
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            if (widget.onVacantSlotTap != null) {
-              widget.onVacantSlotTap!(null);
-            } else {
-              widget.onAddRoleTap?.call();
-            }
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        if (hasReachedSlotLimit)
+          Container(
+            // Key estable para tests/QA: indicador de límite en la barra inferior.
+            key: const Key('stage_control_slot_limit_indicator'),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.10),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: AppColors.accentCyan.withValues(alpha: 0.5),
+                color: Colors.white.withValues(alpha: 0.15),
                 width: 1,
               ),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.add_rounded, color: AppColors.accentCyan, size: 16),
-                SizedBox(width: 6),
+                Icon(
+                  Icons.block_rounded,
+                  color: Colors.white.withValues(alpha: 0.35),
+                  size: 14,
+                ),
+                const SizedBox(width: 6),
                 Text(
-                  '+ Unirse',
+                  'Límite: 2 roles',
                   style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.accentCyan,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white.withValues(alpha: 0.35),
                   ),
                 ),
               ],
             ),
+          )
+        else
+          GestureDetector(
+            // Key estable para tests/QA: identifica el botón "+ Unirse" de la barra
+            // de controles inferior (y no las casillas vacantes del grid).
+            key: const Key('stage_control_join_button'),
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              // Calcular el primer slot verdaderamente vacante antes de invocar el callback
+              final firstVacant = widget.roles
+                  .indexWhere((r) => !r.isTaken && !r.isOccupied);
+              if (widget.onVacantSlotTap != null) {
+                widget.onVacantSlotTap!(firstVacant >= 0 ? firstVacant : null);
+              } else {
+                widget.onAddRoleTap?.call();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColors.accentCyan.withValues(alpha: 0.5),
+                  width: 1,
+                ),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_rounded, color: AppColors.accentCyan, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    '+ Unirse',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.accentCyan,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
         const SizedBox(width: 8),
         GestureDetector(
           onTap: () {

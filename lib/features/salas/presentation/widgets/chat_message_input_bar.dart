@@ -1333,11 +1333,14 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
       return false;
     }).toList();
 
-    // Asegurar que si hay un rol seleccionado actualmente, figure en la lista sólo si es válido y está asignado
-    if (_selectedRole != null) {
-      if (!_selectedRole!.isValid || !userRoles.any((r) => r.id == _selectedRole!.id)) {
-        _selectedRole = null;
-      }
+    // Guard: si el rol seleccionado actualmente no figura en los roles del usuario,
+    // resetearlo de inmediato para evitar que un rol fantasma de otro usuario
+    // aparezca marcado con checkmark en el selector.
+    if (_selectedRole != null &&
+        !userRoles.any((r) => r.id == _selectedRole!.id)) {
+      setState(() => _selectedRole = null);
+      widget.onRoleChanged?.call(null);
+      widget.onIdentityChanged?.call(null);
     }
 
     showModalBottomSheet<void>(
