@@ -66,13 +66,7 @@ class RoleLibraryScreen extends ConsumerWidget {
             color: Colors.white,
           ),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Nueva Ficha',
-            icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.accentCyan),
-            onPressed: navigateToCreate,
-          ),
-        ],
+        actions: const [],
       ),
       body: charactersAsync.when(
         loading: () => const Center(
@@ -183,13 +177,15 @@ class RoleLibraryScreen extends ConsumerWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Crear Ficha', style: TextStyle(fontWeight: FontWeight.w700)),
-        onPressed: navigateToCreate,
-      ),
+      floatingActionButton: charactersAsync.asData?.value.isNotEmpty == true
+          ? FloatingActionButton.extended(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Crear Ficha', style: TextStyle(fontWeight: FontWeight.w700)),
+              onPressed: navigateToCreate,
+            )
+          : null,
     );
   }
 }

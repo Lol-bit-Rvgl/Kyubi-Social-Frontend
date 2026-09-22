@@ -439,7 +439,7 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
         GestureDetector(
           onTap: widget.onPlayTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
               gradient: AppColors.mintTurquoise,
               borderRadius: BorderRadius.circular(14),
@@ -455,7 +455,7 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.casino_rounded, color: Colors.white, size: 16),
-                SizedBox(width: 8),
+                SizedBox(width: 6),
                 Text(
                   'Tu Turno',
                   style: TextStyle(
@@ -468,14 +468,51 @@ class _RoleplayStageViewState extends State<RoleplayStageView> {
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            if (widget.onVacantSlotTap != null) {
+              widget.onVacantSlotTap!(null);
+            } else {
+              widget.onAddRoleTap?.call();
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.accentCyan.withValues(alpha: 0.5),
+                width: 1,
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_rounded, color: AppColors.accentCyan, size: 16),
+                SizedBox(width: 6),
+                Text(
+                  '+ Unirse',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.accentCyan,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
         GestureDetector(
           onTap: () {
             HapticFeedback.lightImpact();
             widget.onLeaveStageTap?.call();
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: AppColors.accentCrimson.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(14),

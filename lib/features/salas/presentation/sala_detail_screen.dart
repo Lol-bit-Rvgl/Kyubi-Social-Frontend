@@ -2854,6 +2854,12 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                       );
                     } else {
                       // Tomar rol vacante
+                      if (!_isJoined) {
+                        Navigator.pop(modalCtx);
+                        _showSendError(
+                            'Debes unirte a la sala para poder participar en el Stage de Roleplay');
+                        return;
+                      }
                       final user = ref.read(authControllerProvider).user;
                       final taken = liveRole.copyWith(
                         isTaken: true,
@@ -3001,6 +3007,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
   /// Abre el selector de fichas de rol (OC) y ocupa el slot correspondiente en el stage.
   Future<void> _handleSelectRoleForStage({int? targetSlotIndex}) async {
+    if (!_isJoined) {
+      _showSendError(
+          'Debes unirte a la sala para poder participar en el Stage de Roleplay');
+      return;
+    }
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     if (myId.isEmpty) return;
 
@@ -3052,6 +3063,13 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           destIndex = vacantIndex;
           _stageRoles[vacantIndex] = updatedRole;
         } else {
+          while (_stageRoles.length < destIndex) {
+            final idx = _stageRoles.length + 1;
+            _stageRoles.add(RoleCharacter.vacant(
+              id: 'slot-$idx',
+              name: 'Slot $idx',
+            ));
+          }
           destIndex = _stageRoles.length;
           _stageRoles.add(updatedRole);
         }
@@ -3092,6 +3110,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }
 
   void _openRoleCreatorOrSelector() async {
+    if (!_isJoined) {
+      _showSendError(
+          'Debes unirte a la sala para poder participar en el Stage de Roleplay');
+      return;
+    }
     if (!_canManageRoles()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -4554,9 +4577,22 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                       });
                     },
                     onRoleTap: _openRoleInfo,
-                    onVacantSlotTap: (slotIndex) =>
-                        _handleSelectRoleForStage(targetSlotIndex: slotIndex),
-                    onAddRoleTap: () => _handleSelectRoleForStage(),
+                    onVacantSlotTap: (slotIndex) {
+                      if (!_isJoined) {
+                        _showSendError(
+                            'Debes unirte a la sala para poder participar en el Stage de Roleplay');
+                        return;
+                      }
+                      _handleSelectRoleForStage(targetSlotIndex: slotIndex);
+                    },
+                    onAddRoleTap: () {
+                      if (!_isJoined) {
+                        _showSendError(
+                            'Debes unirte a la sala para poder participar en el Stage de Roleplay');
+                        return;
+                      }
+                      _handleSelectRoleForStage();
+                    },
                     currentUserId: ref.read(authControllerProvider).user?.id,
                     canPowerOff: _canManageRoles(),
                     onPowerOff: _turnOffActivity,
