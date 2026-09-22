@@ -31,6 +31,7 @@ class ChatMessageInputBar extends StatefulWidget {
     required this.onSendPoll,
     this.onSendSticker,
     this.onOpenModesTap,
+    this.onInviteFriends,
     this.hideQuickImageButton = false,
     this.isRoleplay = true,
     this.userName = 'Usuario',
@@ -64,6 +65,10 @@ class ChatMessageInputBar extends StatefulWidget {
   final Function(String question, List<String> options) onSendPoll;
   final Function(StickerItem sticker)? onSendSticker;
   final VoidCallback? onOpenModesTap;
+
+  /// Abre el sheet de "Invitar amigos" desde el panel de adjuntos (+).
+  /// Opcional: si la pantalla no lo cablea, la opción no se muestra.
+  final VoidCallback? onInviteFriends;
   final bool isRoleplay;
 
   /// Oculta el botón rápido de imagen (galería directa). Útil cuando el
@@ -943,23 +948,6 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
     );
   }
 
-  void _insertMention() {
-    HapticFeedback.lightImpact();
-    final text = _textController.text;
-    final selection = _textController.selection;
-    final pos = selection.isValid && selection.baseOffset >= 0
-        ? selection.baseOffset
-        : text.length;
-    final prefix = (pos > 0 && !text[pos - 1].contains(RegExp(r'\s'))) ? ' @' : '@';
-    final newText = text.replaceRange(pos, pos, prefix);
-    _textController.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(offset: pos + prefix.length),
-    );
-    _fieldFocusNode.requestFocus();
-    setState(() {});
-  }
-
   Widget _buildReplyPreviewBanner() {
     final reply = widget.replyingToMessage!;
     final author = (reply['senderName'] ?? reply['username'] ?? 'Usuario').toString();
@@ -1694,20 +1682,6 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
               ),
               ListTile(
                 leading: const Icon(
-                  Icons.alternate_email_rounded,
-                  color: Color(0xFFA594F9),
-                ),
-                title: const Text(
-                  'Mencionar usuario (@)',
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _insertMention();
-                },
-              ),
-              ListTile(
-                leading: const Icon(
                   Icons.bar_chart_rounded,
                   color: AppColors.accentTeal,
                 ),
@@ -1720,20 +1694,22 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                   _showPollModal();
                 },
               ),
-              ListTile(
-                leading: const Icon(
-                  Icons.casino_rounded,
-                  color: Color(0xFFFFB300),
+              // Opción social opcional: sólo si la pantalla la cablea.
+              if (widget.onInviteFriends != null)
+                ListTile(
+                  leading: const Icon(
+                    Icons.person_add_alt_1_rounded,
+                    color: Color(0xFFA594F9),
+                  ),
+                  title: const Text(
+                    'Invitar amigos',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    widget.onInviteFriends!();
+                  },
                 ),
-                title: const Text(
-                  'Lanzar Dados',
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showDiceModal();
-                },
-              ),
             ],
           ),
         ),

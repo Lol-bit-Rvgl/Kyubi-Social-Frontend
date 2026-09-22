@@ -4852,46 +4852,92 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                                 displayText = rawBody;
                               }
 
-                              return Center(
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(
-                                    vertical: 6,
-                                    horizontal: 16,
+                              // ── Evento de unión clicable ──
+                              // Extrae handle/ID del nuevo participante para
+                              // abrir su tarjeta de usuario con un solo toque.
+                              final joinHandle =
+                                  (metadata['username'] as String? ??
+                                          msg['username'] as String? ??
+                                          '')
+                                      .replaceAll('@', '')
+                                      .trim();
+                              final isSelfJoin = msgUserId == myId ||
+                                  displayText == '— Te has unido —';
+                              final canOpenJoinProfile = isJoin &&
+                                  !isSelfJoin &&
+                                  (msgUserId.isNotEmpty ||
+                                      joinHandle.isNotEmpty);
+
+                              final capsule = Container(
+                                margin: const EdgeInsets.symmetric(
+                                  vertical: 6,
+                                  horizontal: 16,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0x80141022),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFF2C2542),
+                                    width: 0.8,
                                   ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0x80141022),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: const Color(0xFF2C2542),
-                                      width: 0.8,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.info_outline_rounded,
+                                      size: 13,
+                                      color: AppColors.accentCyan,
                                     ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.info_outline_rounded,
-                                        size: 13,
-                                        color: AppColors.accentCyan,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Flexible(
-                                        child: Text(
-                                          displayText,
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFFC8C8DC),
-                                          ),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        displayText,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFFC8C8DC),
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (!canOpenJoinProfile) {
+                                return Center(child: capsule);
+                              }
+
+                              return Center(
+                                child: InkWell(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    if (msgUserId.isNotEmpty) {
+                                      // Tarjeta de usuario de la sala con
+                                      // perfil, chat directo y moderación.
+                                      _openParticipantSheet(
+                                        userId: msgUserId,
+                                        username: joinHandle.isNotEmpty
+                                            ? joinHandle
+                                            : null,
+                                        displayName: userName.isNotEmpty
+                                            ? userName
+                                            : 'Usuario',
+                                        avatarUrl:
+                                            msg['userAvatar'] as String?,
+                                      );
+                                    } else {
+                                      // Fallback: perfil social directo.
+                                      context.push('/profile/$joinHandle');
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: capsule,
                                 ),
                               );
                             }
@@ -5135,6 +5181,15 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                     onSendSticker: _sendSticker,
                     onOpenModesTap:
                         _canManageRoles() ? _openRoomModesSelector : null,
+                    onInviteFriends: () {
+                      final currentRoom = _currentRoom;
+                      if (currentRoom != null) {
+                        RoomInviteFriendsSheet.show(
+                          context,
+                          room: currentRoom,
+                        );
+                      }
+                    },
                     isRoleplay: _currentRoomMode == 'roleplay',
                     userName:
                         ref
