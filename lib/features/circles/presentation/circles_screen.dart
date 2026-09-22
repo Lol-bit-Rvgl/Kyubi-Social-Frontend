@@ -123,6 +123,12 @@ class _CirclesScreenState extends ConsumerState<CirclesScreen> {
       assetPath: 'assets/images/bg_fluid_ambient.webp',
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        // La vista de Comunidades NO usa FloatingActionButton: el acceso a
+        // crear vive en la cabecera superior (`_buildTopBar` → "+ Crear" /
+        // "Salas Hub"). Se declara `null` de forma fija e incondicional para
+        // que este Scaffold nunca herede, monte ni anime un FAB (evita el FAB
+        // morado fantasma al volver desde `circle_detail_screen.dart`).
+        floatingActionButton: null,
         body: SafeArea(
           bottom: false,
           child: RefreshIndicator(

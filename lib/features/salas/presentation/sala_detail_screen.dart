@@ -2564,6 +2564,24 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     );
   }
 
+  /// Garantiza que el socket esté suscrito al canal `sala:<roomId>` antes de
+  /// publicar un mensaje. `joinRoom` es idempotente (el servicio guarda el set
+  /// de salas unidas) y re-emite `room:join`; si el socket aún no está
+  /// conectado, `RoomSocketService.onConnected()` reconecta y reúne todas las
+  /// salas registradas vía `_rejoin()`. Sin esta suscripción el cliente no
+  /// recibiría el eco `room:message` de la sala.
+  void _ensureRoomSocketJoined() {
+    try {
+      final socket = ref.read(roomSocketProvider);
+      socket.joinRoom(widget.roomId);
+      if (!socket.isConnected) {
+        unawaited(socket.connect());
+      }
+    } catch (_) {
+      // Sin socket disponible: el envío REST y su manejo de error siguen vigentes.
+    }
+  }
+
   /// Alterna silenciar/desilenciar un participante de la sala.
   ///
   /// El guard `_mutePending` absorbe dobles taps (evita alternar dos veces y
@@ -2655,6 +2673,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           ? contentUrl
           : (finalMetadata['mediaUrl'] as String? ?? '');
 
+      // Re-asegura el enlace del socket al canal de la sala antes de publicar.
+      _ensureRoomSocketJoined();
+
       _salas.addRoomMessage(widget.roomId, {
         'type': wiredType,
         'body': content,
@@ -2702,6 +2723,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     required String localId,
     required RoleCharacter? role,
   }) async {
+    // Se captura el notifier antes del await: sigue siendo válido aunque la
+    // pantalla se desmonte durante el envío (ProviderScope global).
+    final salas = _salas;
     try {
       final sent = await ref
           .read(roomRepositoryProvider)
@@ -2718,15 +2742,25 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
             replyToId: metadata?['replyToId'] as String?,
             replyTo: metadata?['replyTo'] as Map<String, dynamic>?,
           );
-      if (!mounted) return;
-      _salas.replaceLocalRoomMessage(
+      salas.replaceLocalRoomMessage(
         widget.roomId,
         localId: localId,
         server: sent,
       );
+      if (!mounted) return;
       setState(() {});
-    } catch (_) {
-      // Sin conexión: se conserva el mensaje optimista con estado local.
+    } catch (e) {
+      // Si el backend no persistió el mensaje (403/401 sin participación real,
+      // 400 de validación, 429 rate limit, red caída…) no puede existir en la
+      // sala: se retira el optimista para no dejar "mensajes fantasma" que
+      // desaparecían al reabrir la app, y se avisa al usuario.
+      debugPrint(
+        '[ROOM_CHAT] Error al persistir mensaje en sala ${widget.roomId}: $e',
+      );
+      salas.deleteRoomMessage(widget.roomId, localId);
+      if (!mounted) return;
+      setState(() {});
+      _showSendError('Error al enviar mensaje');
     }
   }
 

@@ -28,6 +28,13 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  /// El FAB de "Publicar" pertenece únicamente a esta pantalla. Al iniciar el
+  /// pop de regreso a Comunidades se oculta en el primer fotograma para que no
+  /// quede flotando (FAB fantasma) sobre la vista anterior mientras la
+  /// transición se reproduce.
+  bool _hidePublishFab = false;
+  Animation<double>? _routeAnimation;
+
   @override
   void initState() {
     super.initState();
@@ -35,7 +42,31 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _bindRouteAnimation();
+  }
+
+  /// Escucha el ciclo de vida de la ruta (`ModalRoute.animation`): en cuanto la
+  /// ruta entra en `reverse` (pop/atrás) el FAB se retira de inmediato y solo
+  /// reaparece si la transición se cancela y la ruta vuelve a estar activa.
+  void _bindRouteAnimation() {
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation == null || identical(animation, _routeAnimation)) return;
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    _routeAnimation = animation..addStatusListener(_onRouteAnimationStatus);
+    _hidePublishFab = animation.status == AnimationStatus.reverse;
+  }
+
+  void _onRouteAnimationStatus(AnimationStatus status) {
+    final shouldHide = status == AnimationStatus.reverse;
+    if (!mounted || shouldHide == _hidePublishFab) return;
+    setState(() => _hidePublishFab = shouldHide);
+  }
+
+  @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
     _tabController.dispose();
     super.dispose();
   }
@@ -121,18 +152,25 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
       child: Scaffold(
         backgroundColor: const Color(0xFF0D0C15),
         floatingActionButton: isMember
-            ? FloatingActionButton.extended(
-                onPressed: () => _createPost(context),
-                backgroundColor: const Color(0xFF3B2D60),
-                icon: const Icon(Icons.edit_rounded, color: Colors.white),
-                label: const Text(
-                  'Publicar',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
+            ? Visibility(
+                // El slot del FAB se mantiene montado (tipo de widget estable)
+                // para que el Scaffold NO ejecute su animación de salida: al
+                // iniciar el pop el botón desaparece en el mismo fotograma y
+                // no queda flotando sobre la vista de Comunidades.
+                visible: !_hidePublishFab,
+                child: FloatingActionButton.extended(
+                  onPressed: () => _createPost(context),
+                  backgroundColor: const Color(0xFF3B2D60),
+                  icon: const Icon(Icons.edit_rounded, color: Colors.white),
+                  label: const Text(
+                    'Publicar',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
+                  tooltip: 'Crear publicación en el círculo',
                 ),
-                tooltip: 'Crear publicación en el círculo',
               )
             : null,
         body: NestedScrollView(
