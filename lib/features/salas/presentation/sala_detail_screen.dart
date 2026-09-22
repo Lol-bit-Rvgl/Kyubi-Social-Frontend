@@ -2805,7 +2805,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
               'id': replyToId,
               'authorName': replyToName,
               'content': replyToBody,
-              if (replyToMediaUrl != null) 'mediaUrl': replyToMediaUrl,
+              'mediaUrl': ?replyToMediaUrl,
               if (replyingType != null && replyingType.isNotEmpty)
                 'type': replyingType,
             }
@@ -2819,7 +2819,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           'replyToId': replyToId,
           'replyToName': replyToName,
           'replyToBody': replyToBody,
-          if (replyToMediaUrl != null) 'replyToMediaUrl': replyToMediaUrl,
+          'replyToMediaUrl': ?replyToMediaUrl,
           if (replyingType != null && replyingType.isNotEmpty)
             'replyToType': replyingType,
           'replyTo': replyTo,
