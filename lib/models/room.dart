@@ -68,10 +68,12 @@ class RoomParticipant {
       user: PostAuthor.fromJson(json),
       role: json['role'] as String? ?? 'PARTICIPANT',
       joinedAt: json['joinedAt'] as String? ?? '',
-      activeCharacter: json['activeCharacter'] != null &&
+      activeCharacter:
+          json['activeCharacter'] != null &&
               json['activeCharacter'] is Map<String, dynamic>
           ? RoleCharacter.fromJson(
-              json['activeCharacter'] as Map<String, dynamic>)
+              json['activeCharacter'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
@@ -196,7 +198,9 @@ class Room {
     final cat = category.toLowerCase().trim();
     if (cat.isEmpty) return true;
     if (cat.contains('voice') || cat.contains('voz')) return isVoice;
-    if (cat.contains('screening') || cat.contains('cinema') || cat.contains('cine')) {
+    if (cat.contains('screening') ||
+        cat.contains('cinema') ||
+        cat.contains('cine')) {
       return isScreening;
     }
     if (cat.contains('roleplay') || cat.contains('rol') || cat.contains('rp')) {
@@ -221,7 +225,8 @@ class Room {
       cinemaState: json['cinemaState'] as String? ?? 'STOPPED',
       cinemaCurrentTime: (json['cinemaCurrentTime'] as num?)?.toDouble() ?? 0.0,
       cinemaUpdatedAt: _parseDateTime(json['cinemaUpdatedAt']),
-      currentMode: (json['currentMode'] as String?) ??
+      currentMode:
+          (json['currentMode'] as String?) ??
           (json['mode'] as String?) ??
           'standard',
       host: PostAuthor.fromJson(
@@ -239,12 +244,16 @@ class Room {
       rules: _strings(json['rules']),
       activeCharacter: json['activeCharacter'] is Map
           ? RoleCharacter.fromJson(
-              Map<String, dynamic>.from(json['activeCharacter'] as Map))
+              Map<String, dynamic>.from(json['activeCharacter'] as Map),
+            )
           : null,
-      stageRoles: (json['stageRoles'] as List<dynamic>?)
-              ?.map((e) => e is Map
-                  ? RoleCharacter.fromJson(Map<String, dynamic>.from(e))
-                  : null)
+      stageRoles:
+          (json['stageRoles'] as List<dynamic>?)
+              ?.map(
+                (e) => e is Map
+                    ? RoleCharacter.fromJson(Map<String, dynamic>.from(e))
+                    : null,
+              )
               .whereType<RoleCharacter>()
               .where((r) => r.id.trim().isNotEmpty && r.name.trim().isNotEmpty)
               .toList() ??
@@ -309,8 +318,9 @@ class Room {
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
       chatBackgroundUrl: chatBackgroundUrl ?? this.chatBackgroundUrl,
-      cinemaVideoId:
-          clearCinemaVideo ? null : (cinemaVideoId ?? this.cinemaVideoId),
+      cinemaVideoId: clearCinemaVideo
+          ? null
+          : (cinemaVideoId ?? this.cinemaVideoId),
       cinemaState: cinemaState ?? this.cinemaState,
       cinemaCurrentTime: cinemaCurrentTime ?? this.cinemaCurrentTime,
       cinemaUpdatedAt: cinemaUpdatedAt ?? this.cinemaUpdatedAt,
@@ -385,6 +395,8 @@ class RoomChatMessage {
     this.replyToId,
     this.replyToName,
     this.replyToBody,
+    this.replyToMediaUrl,
+    this.replyToType,
     this.isEdited = false,
     this.editedAt,
     this.editCount = 0,
@@ -434,6 +446,14 @@ class RoomChatMessage {
   final String? replyToName;
   final String? replyToBody;
 
+  /// URL del medio citado (imagen): permite renderizar la miniatura de la cita
+  /// sin exponer la URL cruda como texto.
+  final String? replyToMediaUrl;
+
+  /// Tipo wire del mensaje citado (`image`, `voice`, `text`…): clasifica la
+  /// previsualización de la cita (`📷 Foto`, `🎤 Nota de voz`…).
+  final String? replyToType;
+
   /// Estado de edición (máximo 1 vez).
   final bool isEdited;
   final String? editedAt;
@@ -464,6 +484,8 @@ class RoomChatMessage {
     String? replyToId,
     String? replyToName,
     String? replyToBody,
+    String? replyToMediaUrl,
+    String? replyToType,
     bool? isEdited,
     String? editedAt,
     int? editCount,
@@ -493,6 +515,8 @@ class RoomChatMessage {
       replyToId: replyToId ?? this.replyToId,
       replyToName: replyToName ?? this.replyToName,
       replyToBody: replyToBody ?? this.replyToBody,
+      replyToMediaUrl: replyToMediaUrl ?? this.replyToMediaUrl,
+      replyToType: replyToType ?? this.replyToType,
       isEdited: isEdited ?? this.isEdited,
       editedAt: editedAt ?? this.editedAt,
       editCount: editCount ?? this.editCount,
@@ -501,8 +525,9 @@ class RoomChatMessage {
 
   factory RoomChatMessage.fromJson(Map<String, dynamic> json) {
     final metadata = json['metadata'] ?? json['extensions'];
-    final metaMap =
-        metadata is Map ? Map<String, dynamic>.from(metadata) : <String, dynamic>{};
+    final metaMap = metadata is Map
+        ? Map<String, dynamic>.from(metadata)
+        : <String, dynamic>{};
     if (json['userVotedOptionId'] != null) {
       metaMap['userVotedOptionId'] = json['userVotedOptionId'];
     }
@@ -515,56 +540,95 @@ class RoomChatMessage {
     if (json['voteCounts'] != null) {
       metaMap['voteCounts'] = json['voteCounts'];
     }
-    final roleColor = json['roleColor'] as String? ??
+    final roleColor =
+        json['roleColor'] as String? ??
         json['characterColor'] as String? ??
         (json['role'] is Map
-            ? (json['role']['colorHex'] ?? json['role']['color'])
-            : null) as String? ??
+                ? (json['role']['colorHex'] ?? json['role']['color'])
+                : null)
+            as String? ??
         metaMap['roleColor'] as String? ??
         metaMap['roleColorHex'] as String? ??
         metaMap['colorHex'] as String?;
-    final clientTempId = json['clientTempId'] as String? ??
+    final clientTempId =
+        json['clientTempId'] as String? ??
         metaMap['clientTempId'] as String? ??
         metaMap['nonce'] as String?;
     final rawType = (json['type'] as String? ?? 'TEXT').toUpperCase();
     final body = json['body'] as String? ?? json['content'] as String? ?? '';
-    final rawMedia = json['mediaUrl'] as String? ??
+    final rawMedia =
+        json['mediaUrl'] as String? ??
         metaMap['mediaUrl'] as String? ??
         metaMap['imageUrl'] as String? ??
-        (rawType == 'IMAGE' || rawType == 'VOICE' ? (body.startsWith('http') ? body : null) : null);
+        (rawType == 'IMAGE' || rawType == 'VOICE'
+            ? (body.startsWith('http') ? body : null)
+            : null);
     final rawAttach = json['attachments'] ?? metaMap['attachments'];
     final attachList = rawAttach is List
         ? rawAttach.map((e) => e.toString()).toList()
-        : (rawMedia != null && rawMedia.isNotEmpty ? [rawMedia] : const <String>[]);
-    final diceResult = json['diceResult'] as String? ??
-        metaMap['diceResult'] as String?;
-    final diceEmoji = json['diceEmoji'] as String? ??
-        metaMap['diceEmoji'] as String?;
-    final diceName = json['diceName'] as String? ??
-        metaMap['diceName'] as String?;
+        : (rawMedia != null && rawMedia.isNotEmpty
+              ? [rawMedia]
+              : const <String>[]);
+    final diceResult =
+        json['diceResult'] as String? ?? metaMap['diceResult'] as String?;
+    final diceEmoji =
+        json['diceEmoji'] as String? ?? metaMap['diceEmoji'] as String?;
+    final diceName =
+        json['diceName'] as String? ?? metaMap['diceName'] as String?;
 
-    final rawReply = json['replyTo'] is Map ? json['replyTo'] as Map<String, dynamic> : null;
-    final replyToId = json['replyToId'] as String? ??
+    final rawReply = json['replyTo'] is Map
+        ? json['replyTo'] as Map<String, dynamic>
+        : null;
+    final replyToId =
+        json['replyToId'] as String? ??
         rawReply?['id'] as String? ??
         metaMap['replyToId'] as String? ??
-        (metaMap['replyTo'] is Map ? metaMap['replyTo']['id'] as String? : null);
-    final replyToName = json['replyToName'] as String? ??
+        (metaMap['replyTo'] is Map
+            ? metaMap['replyTo']['id'] as String?
+            : null);
+    final replyToName =
+        json['replyToName'] as String? ??
         rawReply?['authorName'] as String? ??
         rawReply?['senderName'] as String? ??
         metaMap['replyToName'] as String? ??
-        (metaMap['replyTo'] is Map ? (metaMap['replyTo']['authorName'] ?? metaMap['replyTo']['senderName']) as String? : null);
-    final replyToBody = json['replyToBody'] as String? ??
+        (metaMap['replyTo'] is Map
+            ? (metaMap['replyTo']['authorName'] ??
+                      metaMap['replyTo']['senderName'])
+                  as String?
+            : null);
+    final replyToBody =
+        json['replyToBody'] as String? ??
         rawReply?['content'] as String? ??
         rawReply?['body'] as String? ??
         metaMap['replyToBody'] as String? ??
-        (metaMap['replyTo'] is Map ? (metaMap['replyTo']['content'] ?? metaMap['replyTo']['body']) as String? : null);
+        (metaMap['replyTo'] is Map
+            ? (metaMap['replyTo']['content'] ?? metaMap['replyTo']['body'])
+                  as String?
+            : null);
+    final replyToMediaUrl =
+        json['replyToMediaUrl'] as String? ??
+        rawReply?['mediaUrl'] as String? ??
+        metaMap['replyToMediaUrl'] as String? ??
+        (metaMap['replyTo'] is Map
+            ? metaMap['replyTo']['mediaUrl'] as String?
+            : null);
+    final replyToType =
+        json['replyToType'] as String? ??
+        rawReply?['type'] as String? ??
+        metaMap['replyToType'] as String? ??
+        (metaMap['replyTo'] is Map
+            ? metaMap['replyTo']['type'] as String?
+            : null);
 
-    final isEdited = json['isEdited'] == true ||
+    final isEdited =
+        json['isEdited'] == true ||
         metaMap['isEdited'] == true ||
         (json['editCount'] != null && (json['editCount'] as num) > 0) ||
         (metaMap['editCount'] != null && (metaMap['editCount'] as num) > 0);
-    final editedAt = json['editedAt']?.toString() ?? metaMap['editedAt']?.toString();
-    final editCount = (json['editCount'] as num?)?.toInt() ??
+    final editedAt =
+        json['editedAt']?.toString() ?? metaMap['editedAt']?.toString();
+    final editCount =
+        (json['editCount'] as num?)?.toInt() ??
         (metaMap['editCount'] as num?)?.toInt() ??
         (isEdited ? 1 : 0);
 
@@ -599,6 +663,8 @@ class RoomChatMessage {
       replyToId: replyToId,
       replyToName: replyToName,
       replyToBody: replyToBody,
+      replyToMediaUrl: replyToMediaUrl,
+      replyToType: replyToType,
       isEdited: isEdited,
       editedAt: editedAt,
       editCount: editCount,

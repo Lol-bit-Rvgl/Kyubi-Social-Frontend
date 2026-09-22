@@ -36,6 +36,7 @@ import 'salas_controller.dart';
 import 'widgets/chat_message_input_bar.dart';
 import 'widgets/cinema_player_view.dart';
 import 'widgets/live_voice_bar.dart';
+import 'widgets/reply_preview.dart';
 import 'widgets/role_chat_bubble.dart';
 import 'widgets/roleplay_stage_view.dart';
 import 'widgets/room_invite_friends_sheet.dart';
@@ -83,8 +84,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       _roomBgUrl ?? _currentRoom?.chatBackgroundUrl ?? _defaultBgUrl;
 
   /// Portada efectiva: la editada localmente o la persistida (`room.imageUrl`).
-  String? get _effectiveCoverUrl =>
-      _roomCoverUrl ?? _currentRoom?.imageUrl;
+  String? get _effectiveCoverUrl => _roomCoverUrl ?? _currentRoom?.imageUrl;
 
   // Rol activo del usuario local
   RoleCharacter? _currentActiveRole;
@@ -187,14 +187,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     // El socket de sala SIEMPRE debe conectarse y unirse a la sala al entrar,
     // independientemente de quién sea (host o espectador). Sin esto, los
     // cambios de modo/mensajes no se propagan entre clientes.
-    debugPrint('[SOCKET_DEBUG] Intentando conectar e ingresar a sala: ${widget.roomId}');
+    debugPrint(
+      '[SOCKET_DEBUG] Intentando conectar e ingresar a sala: ${widget.roomId}',
+    );
     Future.microtask(_startRoomChat);
 
     // Sincronización inicial declarativa desde el estado ya disponible en memoria/cache
     Future.microtask(() {
       if (!mounted) return;
-      final currentRoom =
-          ref.read(salaDetailControllerProvider(widget.roomId)).room;
+      final currentRoom = ref
+          .read(salaDetailControllerProvider(widget.roomId))
+          .room;
       if (currentRoom != null) {
         _syncStageFromRoom(currentRoom);
         if (currentRoom.currentMode != _currentRoomMode) {
@@ -226,7 +229,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     if (_chatStarted || !mounted) return;
     _chatStarted = true;
     final socket = ref.read(roomSocketProvider);
-    debugPrint('[SOCKET_DEBUG] Estado actual de conexión: ${socket.isConnected}');
+    debugPrint(
+      '[SOCKET_DEBUG] Estado actual de conexión: ${socket.isConnected}',
+    );
     try {
       await socket.connect();
     } catch (_) {
@@ -280,10 +285,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return;
     }
     if (event is RoomMessageDeleted && event.roomId == widget.roomId) {
-      _salas.deleteRoomMessage(
-        widget.roomId,
-        event.messageId,
-      );
+      _salas.deleteRoomMessage(widget.roomId, event.messageId);
       setState(() {});
       return;
     }
@@ -291,19 +293,24 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       final currentRoom = _currentRoom;
       if (currentRoom != null) {
         final action = event.action.toUpperCase();
-        final isClear = action == 'CLEAR' ||
+        final isClear =
+            action == 'CLEAR' ||
             action == 'REMOVE' ||
             (event.videoId == null && action == 'STOP');
         final updatedRoom = currentRoom.copyWith(
           clearCinemaVideo: isClear,
-          cinemaVideoId: isClear ? null : (event.videoId ?? currentRoom.cinemaVideoId),
+          cinemaVideoId: isClear
+              ? null
+              : (event.videoId ?? currentRoom.cinemaVideoId),
           cinemaState: isClear
               ? 'STOPPED'
               : (action == 'LOAD' || action == 'PLAY'
-                  ? 'PLAYING'
-                  : (action == 'PAUSE'
-                      ? 'PAUSED'
-                      : (action == 'STOP' ? 'STOPPED' : currentRoom.cinemaState))),
+                    ? 'PLAYING'
+                    : (action == 'PAUSE'
+                          ? 'PAUSED'
+                          : (action == 'STOP'
+                                ? 'STOPPED'
+                                : currentRoom.cinemaState))),
           cinemaCurrentTime: isClear ? 0 : event.currentTime,
         );
         ref
@@ -313,7 +320,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return;
     }
     if (event is RoomModeChanged && event.roomId == widget.roomId) {
-      debugPrint('[MODE_DEBUG_FRONT] Recibido room:mode_changed: ${event.payload}');
+      debugPrint(
+        '[MODE_DEBUG_FRONT] Recibido room:mode_changed: ${event.payload}',
+      );
       _handleRemoteModeChanged(event);
       return;
     }
@@ -321,9 +330,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(event.reason.isNotEmpty
-                ? event.reason
-                : 'Debes finalizar la actividad actual antes de iniciar otra'),
+            content: Text(
+              event.reason.isNotEmpty
+                  ? event.reason
+                  : 'Debes finalizar la actividad actual antes de iniciar otra',
+            ),
             backgroundColor: const Color(0xFF2A121E),
           ),
         );
@@ -336,21 +347,32 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.timer_outlined, color: Colors.amberAccent, size: 20),
+                const Icon(
+                  Icons.timer_outlined,
+                  color: Colors.amberAccent,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     event.message,
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],
             ),
             backgroundColor: const Color(0xFF2A121E),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             duration: Duration(
-              milliseconds: event.retryAfterMs > 0 ? event.retryAfterMs + 1000 : 2500,
+              milliseconds: event.retryAfterMs > 0
+                  ? event.retryAfterMs + 1000
+                  : 2500,
             ),
           ),
         );
@@ -384,9 +406,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       final myId = ref.read(authControllerProvider).user?.id;
       if (event.stageRoles != null) {
         final roles = event.stageRoles!
-            .map((e) => e is Map
-                ? RoleCharacter.fromJson(Map<String, dynamic>.from(e))
-                : null)
+            .map(
+              (e) => e is Map
+                  ? RoleCharacter.fromJson(Map<String, dynamic>.from(e))
+                  : null,
+            )
             .whereType<RoleCharacter>()
             .where((r) => r.isValid)
             .toList();
@@ -397,10 +421,12 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         for (final r in roles) {
           if (r.isTaken) {
             if (seenCharIds.contains(r.id)) {
-              dedupedRoles.add(RoleCharacter.vacant(
-                id: 'slot-${dedupedRoles.length + 1}',
-                name: 'Slot ${dedupedRoles.length + 1}',
-              ));
+              dedupedRoles.add(
+                RoleCharacter.vacant(
+                  id: 'slot-${dedupedRoles.length + 1}',
+                  name: 'Slot ${dedupedRoles.length + 1}',
+                ),
+              );
               continue;
             }
             seenCharIds.add(r.id);
@@ -418,25 +444,34 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
             }
             if (_currentActiveRole != null &&
                 (_currentActiveRole!.id.toString().trim() == deletedId ||
-                    !_stageRoles.any((r) =>
-                        r.id.toString().trim() ==
-                        _currentActiveRole!.id.toString().trim()))) {
+                    !_stageRoles.any(
+                      (r) =>
+                          r.id.toString().trim() ==
+                          _currentActiveRole!.id.toString().trim(),
+                    ))) {
               _currentActiveRole = null;
             }
           } else if (event.action == 'leave') {
             final freedRoleId = event.roleId?.toString().trim();
-            final isFreedActiveRole = _currentActiveRole != null &&
+            final isFreedActiveRole =
+                _currentActiveRole != null &&
                 (_currentActiveRole!.id.toString().trim() == freedRoleId ||
                     event.role?['id'] == _currentActiveRole!.id);
             if (isFreedActiveRole ||
-                !_stageRoles.any((r) =>
-                    r.isTaken &&
-                    (r.takenByUserId == myId || r.occupiedBy == myId))) {
+                !_stageRoles.any(
+                  (r) =>
+                      r.isTaken &&
+                      (r.takenByUserId == myId || r.occupiedBy == myId),
+                )) {
               // Si el rol liberado era el activo, reasignar a otro rol que aún posea el usuario
-              final remaining = _stageRoles.where((r) =>
-                  r.isTaken &&
-                  r.isValid &&
-                  (r.takenByUserId == myId || r.occupiedBy == myId)).firstOrNull;
+              final remaining = _stageRoles
+                  .where(
+                    (r) =>
+                        r.isTaken &&
+                        r.isValid &&
+                        (r.takenByUserId == myId || r.occupiedBy == myId),
+                  )
+                  .firstOrNull;
               _currentActiveRole = remaining;
             }
           } else if (event.action == 'take' || event.action == 'occupy') {
@@ -451,7 +486,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           if (event.action == 'occupy' || event.action == 'take') {
             if (event.role != null) {
               final newRole = RoleCharacter.fromJson(event.role!);
-              if (slotIdx != null && slotIdx >= 0 && slotIdx < _stageRoles.length) {
+              if (slotIdx != null &&
+                  slotIdx >= 0 &&
+                  slotIdx < _stageRoles.length) {
                 _stageRoles[slotIdx] = newRole;
               } else {
                 final idx = _stageRoles.indexWhere((r) => r.id == newRole.id);
@@ -464,7 +501,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
               }
             }
           } else if (event.action == 'leave') {
-            if (slotIdx != null && slotIdx >= 0 && slotIdx < _stageRoles.length) {
+            if (slotIdx != null &&
+                slotIdx >= 0 &&
+                slotIdx < _stageRoles.length) {
               _stageRoles[slotIdx] = RoleCharacter.vacant(
                 id: 'slot-${slotIdx + 1}',
                 name: 'Slot ${slotIdx + 1}',
@@ -525,7 +564,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         setState(() {
           if (event.action == 'MUTE') {
             _canSendMessage = false;
-            _sanctionBannerText = 'Tu cuenta ha sido silenciada por moderación.';
+            _sanctionBannerText =
+                'Tu cuenta ha sido silenciada por moderación.';
           }
         });
         _salas.clearLocalRoomMessages(widget.roomId);
@@ -564,10 +604,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     }
     if (event is RoomForceDisconnect) {
       final isBan = event.reason.toLowerCase().contains('ban');
-      _handleForcedSanctionExit(
-        reason: event.reason,
-        isBan: isBan,
-      );
+      _handleForcedSanctionExit(reason: event.reason, isBan: isBan);
       return;
     }
   }
@@ -612,9 +649,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                isBan
-                    ? 'Cuenta suspendida'
-                    : 'Cuenta temporalmente suspendida',
+                isBan ? 'Cuenta suspendida' : 'Cuenta temporalmente suspendida',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -637,7 +672,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
             if (suspendedUntil != null) ...[
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0x14FF4D6D),
                   borderRadius: BorderRadius.circular(8),
@@ -677,7 +715,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   /// la transición (activación o fin de voice / roleplay / cine).
   void _handleRemoteModeChanged(RoomModeChanged event) {
     final myId = ref.read(authControllerProvider).user?.id ?? '';
-    final isMyChange = event.actorId != null &&
+    final isMyChange =
+        event.actorId != null &&
         event.actorId!.isNotEmpty &&
         event.actorId == myId;
     final normalized = RoomSocketService.normalizeMode(event.mode);
@@ -752,8 +791,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       final updatedRoom = currentRoom.copyWith(
         currentMode: normalized,
         clearCinemaVideo: isClearCinema,
-        cinemaVideoId:
-            isClearCinema ? null : (cinemaVideoId ?? currentRoom.cinemaVideoId),
+        cinemaVideoId: isClearCinema
+            ? null
+            : (cinemaVideoId ?? currentRoom.cinemaVideoId),
         cinemaState: isClearCinema
             ? 'STOPPED'
             : (cinemaState ?? currentRoom.cinemaState),
@@ -831,8 +871,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
     final isScreening = normalized == 'screening';
     final currentRoom = _currentRoom;
-    final nextVideoId =
-        isScreening ? (cinemaVideoId ?? currentRoom?.cinemaVideoId) : null;
+    final nextVideoId = isScreening
+        ? (cinemaVideoId ?? currentRoom?.cinemaVideoId)
+        : null;
     final nextCinemaState = isScreening
         ? (cinemaState ?? currentRoom?.cinemaState ?? 'STOPPED')
         : 'STOPPED';
@@ -854,7 +895,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     );
 
     try {
-      final updated = await ref.read(roomRepositoryProvider).updateRoomMode(
+      final updated = await ref
+          .read(roomRepositoryProvider)
+          .updateRoomMode(
             widget.roomId,
             normalized,
             videoId: nextVideoId,
@@ -961,8 +1004,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           message: isStaffOnly
               ? 'Chat de voz restringido: Solo Staff y oradores autorizados'
               : 'Chat de voz abierto a todos los participantes',
-          accentColor:
-              isStaffOnly ? const Color(0xFFFFB300) : AppColors.accentTeal,
+          accentColor: isStaffOnly
+              ? const Color(0xFFFFB300)
+              : AppColors.accentTeal,
         );
         break;
       case 'allow_speaker':
@@ -1043,8 +1087,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
             accentColor: AppColors.danger,
           );
         } else {
-          final name =
-              (event.targetName?.isNotEmpty ?? false) ? event.targetName! : 'Un usuario';
+          final name = (event.targetName?.isNotEmpty ?? false)
+              ? event.targetName!
+              : 'Un usuario';
           showSystemToast(
             context,
             emoji: '🚪',
@@ -1058,8 +1103,14 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
   /// Aplica una acción de moderación local (el Host/Co-Host toca el sheet):
   /// emite al servidor de salas para el mute remoto y refleja el estado.
-  void _moderateVoice(String targetUserId, String targetUsername, String action) {
-    ref.read(roomSocketProvider).emitVoiceModeration(
+  void _moderateVoice(
+    String targetUserId,
+    String targetUsername,
+    String action,
+  ) {
+    ref
+        .read(roomSocketProvider)
+        .emitVoiceModeration(
           roomId: widget.roomId,
           action: action,
           targetUserId: targetUserId,
@@ -1172,11 +1223,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
                 // Switch Solo Staff
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1B1728),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF2C2542), width: 0.8),
+                    border: Border.all(
+                      color: const Color(0xFF2C2542),
+                      width: 0.8,
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -1206,14 +1263,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                       Switch(
                         value: _voiceStaffOnly,
                         activeThumbColor: AppColors.accentTeal,
-                        activeTrackColor:
-                            AppColors.accentTeal.withValues(alpha: 0.4),
+                        activeTrackColor: AppColors.accentTeal.withValues(
+                          alpha: 0.4,
+                        ),
                         inactiveThumbColor: const Color(0xFF8A8A9A),
                         inactiveTrackColor: const Color(0xFF28223C),
                         onChanged: (val) {
                           setSheetState(() => _voiceStaffOnly = val);
                           setState(() => _voiceStaffOnly = val);
-                          ref.read(roomSocketProvider).emitVoiceModeration(
+                          ref
+                              .read(roomSocketProvider)
+                              .emitVoiceModeration(
                                 roomId: widget.roomId,
                                 action: 'staff_only',
                                 staffOnly: val,
@@ -1261,21 +1321,23 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (ctx, i) {
                         final p = nonStaffParticipants[i];
-                        final isAllowed =
-                            _allowedVoiceSpeakerIds.contains(p.user.id);
+                        final isAllowed = _allowedVoiceSpeakerIds.contains(
+                          p.user.id,
+                        );
                         final displayName = p.user.displayName.isNotEmpty
                             ? p.user.displayName
                             : p.user.username;
                         return Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF181424),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: isAllowed
-                                  ? AppColors.accentTeal
-                                      .withValues(alpha: 0.5)
+                                  ? AppColors.accentTeal.withValues(alpha: 0.5)
                                   : const Color(0xFF262038),
                               width: 0.8,
                             ),
@@ -1317,8 +1379,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                                     if (newAllowed) {
                                       _allowedVoiceSpeakerIds.add(p.user.id);
                                     } else {
-                                      _allowedVoiceSpeakerIds
-                                          .remove(p.user.id);
+                                      _allowedVoiceSpeakerIds.remove(p.user.id);
                                     }
                                   });
                                   setState(() {});
@@ -1340,8 +1401,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: isAllowed
-                                        ? AppColors.accentTeal
-                                            .withValues(alpha: 0.15)
+                                        ? AppColors.accentTeal.withValues(
+                                            alpha: 0.15,
+                                          )
                                         : const Color(0xFF221C34),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
@@ -1437,8 +1499,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         ),
         title: const Row(
           children: [
-            Icon(Icons.video_library_rounded,
-                color: AppColors.accentPurple, size: 22),
+            Icon(
+              Icons.video_library_rounded,
+              color: AppColors.accentPurple,
+              size: 22,
+            ),
             SizedBox(width: 8),
             Text(
               'Cargar Video',
@@ -1464,12 +1529,16 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
               style: const TextStyle(color: Colors.white, fontSize: 13.5),
               decoration: InputDecoration(
                 hintText: 'https://www.youtube.com/watch?v=...',
-                hintStyle:
-                    const TextStyle(color: Color(0xFF5A5570), fontSize: 12.5),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF5A5570),
+                  fontSize: 12.5,
+                ),
                 filled: true,
                 fillColor: const Color(0xFF1F1A30),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Color(0xFF332A50)),
@@ -1481,7 +1550,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(
-                      color: AppColors.accentPurple, width: 1.2),
+                    color: AppColors.accentPurple,
+                    width: 1.2,
+                  ),
                 ),
               ),
             ),
@@ -1490,15 +1561,18 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accentPurple,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () {
               final videoId = _extractYoutubeVideoId(controller.text);
@@ -1512,7 +1586,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                 return;
               }
               Navigator.pop(dialogCtx);
-              ref.read(roomSocketProvider).emitCinemaAction(
+              ref
+                  .read(roomSocketProvider)
+                  .emitCinemaAction(
                     roomId: widget.roomId,
                     action: 'LOAD',
                     videoId: videoId,
@@ -1535,8 +1611,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                 accentColor: AppColors.accentPurple,
               );
             },
-            child: const Text('Cargar',
-                style: TextStyle(fontWeight: FontWeight.w800)),
+            child: const Text(
+              'Cargar',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         ],
       ),
@@ -1614,10 +1692,13 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
               // Opción 1: Cargar / Cambiar Video
               ListTile(
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 tileColor: const Color(0xFF1B1728),
                 leading: Container(
                   padding: const EdgeInsets.all(8),
@@ -1625,8 +1706,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     color: AppColors.accentPurple.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.video_library_rounded,
-                      color: AppColors.accentPurple, size: 20),
+                  child: const Icon(
+                    Icons.video_library_rounded,
+                    color: AppColors.accentPurple,
+                    size: 20,
+                  ),
                 ),
                 title: const Text(
                   'Cambiar / Añadir Video',
@@ -1638,11 +1722,15 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                 ),
                 subtitle: const Text(
                   'Carga un video de YouTube para reproducir a la sala',
-                  style:
-                      TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                  ),
                 ),
-                trailing: const Icon(Icons.chevron_right_rounded,
-                    color: Color(0xFF5A5A6A)),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF5A5A6A),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _openCinemaLoadDialog();
@@ -1652,10 +1740,13 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
               // Opción 2: Quitar Video Actual
               ListTile(
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 tileColor: const Color(0xFF1B1728),
                 leading: Container(
                   padding: const EdgeInsets.all(8),
@@ -1663,8 +1754,11 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     color: AppColors.accentCrimson.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.highlight_off_rounded,
-                      color: AppColors.accentCrimson, size: 20),
+                  child: const Icon(
+                    Icons.highlight_off_rounded,
+                    color: AppColors.accentCrimson,
+                    size: 20,
+                  ),
                 ),
                 title: const Text(
                   'Quitar Video Actual',
@@ -1676,17 +1770,20 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                 ),
                 subtitle: const Text(
                   'Detiene la reproducción y limpia el reproductor',
-                  style:
-                      TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                  ),
                 ),
-                trailing: const Icon(Icons.chevron_right_rounded,
-                    color: Color(0xFF5A5A6A)),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF5A5A6A),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
-                  ref.read(roomSocketProvider).emitCinemaAction(
-                        roomId: widget.roomId,
-                        action: 'CLEAR',
-                      );
+                  ref
+                      .read(roomSocketProvider)
+                      .emitCinemaAction(roomId: widget.roomId, action: 'CLEAR');
                   final currentRoom = _currentRoom;
                   if (currentRoom != null) {
                     final updatedRoom = currentRoom.copyWith(
@@ -1697,7 +1794,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     );
                     ref
                         .read(
-                            salaDetailControllerProvider(widget.roomId).notifier)
+                          salaDetailControllerProvider(widget.roomId).notifier,
+                        )
                         .applyRoom(updatedRoom);
                   }
                   showSystemToast(
@@ -1756,8 +1854,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color:
-                            const Color(0xFFFFD600).withValues(alpha: 0.15),
+                        color: const Color(0xFFFFD600).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
@@ -1796,16 +1893,18 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
                 // Opción Crear / Añadir Personaje
                 ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   tileColor: const Color(0xFF1B1728),
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color:
-                          const Color(0xFFFFD600).withValues(alpha: 0.2),
+                      color: const Color(0xFFFFD600).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
@@ -1825,10 +1924,14 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                   subtitle: const Text(
                     'Crea una nueva ficha de rol disponible para la sala',
                     style: TextStyle(
-                        color: AppColors.textSecondary, fontSize: 11),
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded,
-                      color: Color(0xFF5A5A6A)),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Color(0xFF5A5A6A),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _openRoleCreatorOrSelector();
@@ -1870,13 +1973,14 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: occupiedRoles.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(height: 8),
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (ctx, i) {
                         final role = occupiedRoles[i];
                         return Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF181424),
                             borderRadius: BorderRadius.circular(12),
@@ -1895,8 +1999,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       role.name,
@@ -1920,16 +2023,18 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.accentCrimson
                                       .withValues(alpha: 0.15),
-                                  foregroundColor:
-                                      AppColors.accentCrimson,
+                                  foregroundColor: AppColors.accentCrimson,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 6),
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                     side: const BorderSide(
-                                        color: AppColors.accentCrimson,
-                                        width: 0.8),
+                                      color: AppColors.accentCrimson,
+                                      width: 0.8,
+                                    ),
                                   ),
                                 ),
                                 onPressed: () {
@@ -1946,8 +2051,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                                   showSystemToast(
                                     context,
                                     emoji: '🎭',
-                                    message:
-                                        'Rol "${role.name}" desasignado',
+                                    message: 'Rol "${role.name}" desasignado',
                                     accentColor: const Color(0xFFFFD600),
                                   );
                                 },
@@ -2005,8 +2109,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     final isSelf = userId == myId;
     final canManage = !isSelf && _canManageRoles();
-    final isVoiceMuted =
-        ref.read(voiceRoomProvider).mutedIds.contains(userId);
+    final isVoiceMuted = ref.read(voiceRoomProvider).mutedIds.contains(userId);
     final cleanUsername = username?.replaceAll('@', '').trim() ?? '';
     RoomUserProfileSheet.show(
       context,
@@ -2028,21 +2131,20 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
               context.push('/profile/$cleanUsername');
             }
           : null,
-      onStartDirectChat: () =>
-          _startDirectChatWith(userId, cleanUsername),
+      onStartDirectChat: () => _startDirectChatWith(userId, cleanUsername),
       onMute: canManage
           ? () => _moderateVoice(
-                userId,
-                cleanUsername.isNotEmpty ? cleanUsername : displayName,
-                isVoiceMuted ? 'unmute' : 'mute',
-              )
+              userId,
+              cleanUsername.isNotEmpty ? cleanUsername : displayName,
+              isVoiceMuted ? 'unmute' : 'mute',
+            )
           : null,
       onKick: canManage
           ? () => _moderateVoice(
-                userId,
-                cleanUsername.isNotEmpty ? cleanUsername : displayName,
-                'kick',
-              )
+              userId,
+              cleanUsername.isNotEmpty ? cleanUsername : displayName,
+              'kick',
+            )
           : null,
     );
   }
@@ -2082,8 +2184,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     }
 
     // Si es participante activo (no solo invitado), acceso permitido.
-    final isParticipant =
-        room.participants.any((p) => p.user.id == myId && p.role != 'INVITED');
+    final isParticipant = room.participants.any(
+      (p) => p.user.id == myId && p.role != 'INVITED',
+    );
     if (isParticipant) {
       _accessChecked = true;
       return;
@@ -2251,10 +2354,12 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       if (!r.isValid) continue;
       if (r.isTaken) {
         if (seenCharacterIds.contains(r.id)) {
-          deduplicatedRoles.add(RoleCharacter.vacant(
-            id: 'slot-${deduplicatedRoles.length + 1}',
-            name: 'Slot ${deduplicatedRoles.length + 1}',
-          ));
+          deduplicatedRoles.add(
+            RoleCharacter.vacant(
+              id: 'slot-${deduplicatedRoles.length + 1}',
+              name: 'Slot ${deduplicatedRoles.length + 1}',
+            ),
+          );
           continue;
         }
         seenCharacterIds.add(r.id);
@@ -2276,16 +2381,19 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         confirmedRole = room.activeCharacter;
       } else {
         confirmedRole = _stageRoles
-            .where((r) =>
-                r.isTaken &&
-                (r.takenByUserId == myId || r.occupiedBy == myId))
+            .where(
+              (r) =>
+                  r.isTaken &&
+                  (r.takenByUserId == myId || r.occupiedBy == myId),
+            )
             .firstOrNull;
       }
     }
     _currentActiveRole = confirmedRole;
 
     // Auto-join: el creador o un miembro activo existente entra conectado directo.
-    final isHostOrActiveParticipant = (myId.isNotEmpty && room.host.id == myId) ||
+    final isHostOrActiveParticipant =
+        (myId.isNotEmpty && room.host.id == myId) ||
         room.participants.any((p) => p.user.id == myId && p.role != 'INVITED');
     if (isHostOrActiveParticipant) _isConnected = true;
   }
@@ -2297,8 +2405,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     if (room != null) {
       final isCreator = myId.isNotEmpty && room.host.id == myId;
-      final isParticipant =
-          room.participants.any((p) => p.user.id == myId && p.role != 'INVITED');
+      final isParticipant = room.participants.any(
+        (p) => p.user.id == myId && p.role != 'INVITED',
+      );
       if (isCreator || isParticipant) {
         // Ya es miembro o es el anfitrión: no reenviar petición de join para evitar
         // spam de mensajes 'Te has unido' en reconexiones o reingresos.
@@ -2332,7 +2441,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return;
     }
     if (!_canSendMessage) {
-      _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
+      _showSendError(
+        'Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.',
+      );
       return;
     }
     final trimmed = text.trim();
@@ -2346,10 +2457,13 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return;
     }
     if (!_canSendMessage) {
-      _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
+      _showSendError(
+        'Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.',
+      );
       return;
     }
-    final isRps = diceName.toLowerCase().contains('morra') ||
+    final isRps =
+        diceName.toLowerCase().contains('morra') ||
         result.contains('Piedra') ||
         result.contains('Papel') ||
         result.contains('Tijeras');
@@ -2372,7 +2486,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return;
     }
     if (!_canSendMessage) {
-      _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
+      _showSendError(
+        'Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.',
+      );
       return;
     }
     final trimmedQuestion = question.trim();
@@ -2404,7 +2520,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return;
     }
     if (!_canSendMessage) {
-      _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
+      _showSendError(
+        'Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.',
+      );
       return;
     }
     final user = ref.read(authControllerProvider).user;
@@ -2437,9 +2555,14 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return;
     }
     if (!_canSendMessage) {
-      _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
+      _showSendError(
+        'Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.',
+      );
       return;
     }
+    // Capturamos la respuesta activa ANTES del `await` de subida a Supabase:
+    // si el usuario reply + adjunta imagen, el reply no se pierde.
+    final reply = _replyingToMessage;
     try {
       final file = File(path);
       if (!await file.exists()) {
@@ -2455,7 +2578,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         _contentTypeForFilename(path),
       );
       if (url == null) return;
-      _sendMediaMessage(
+      final dispatched = _sendMediaMessage(
         type: 'IMAGE',
         content: url,
         contentUrl: url,
@@ -2465,7 +2588,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           if (dims != null) 'width': dims.$1,
           if (dims != null) 'height': dims.$2,
         },
+        replyMessage: reply,
       );
+      // La imagen se despachó: se limpia la cita activa.
+      if (dispatched && reply != null && mounted) _cancelReply();
     } catch (_) {
       _showSendError('No se pudo subir la imagen');
     }
@@ -2481,13 +2607,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return;
     }
     if (!_canSendMessage) {
-      _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
+      _showSendError(
+        'Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.',
+      );
       return;
     }
     if (audioBytes.isEmpty) {
       _showSendError('No se pudo grabar la nota de voz');
       return;
     }
+    // Capturamos el reply antes del `await` (mismo patrón que imágenes).
+    final reply = _replyingToMessage;
     try {
       final url = await _uploadMedia(
         audioBytes,
@@ -2495,15 +2625,14 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         _contentTypeForFilename(filename),
       );
       if (url == null) return;
-      _sendMediaMessage(
+      final dispatched = _sendMediaMessage(
         type: 'VOICE',
         content: url,
         contentUrl: url,
-        metadata: {
-          'mediaUrl': url,
-          'durationMs': durationMs,
-        },
+        metadata: {'mediaUrl': url, 'durationMs': durationMs},
+        replyMessage: reply,
       );
+      if (dispatched && reply != null && mounted) _cancelReply();
     } catch (_) {
       _showSendError('No se pudo subir la nota de voz');
     }
@@ -2609,21 +2738,24 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     });
   }
 
-  void _sendMediaMessage({
+  bool _sendMediaMessage({
     required String type,
     required String content,
     String contentUrl = '',
     Map<String, dynamic>? metadata,
+    Map<String, dynamic>? replyMessage,
   }) {
     if (!_isJoined) {
       _showSendError('Debes unirte a la sala para poder participar en el chat');
-      return;
+      return false;
     }
     if (!_canSendMessage) {
-      _showSendError('Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.');
-      return;
+      _showSendError(
+        'Tu cuenta está sancionada/silenciada. No puedes enviar mensajes.',
+      );
+      return false;
     }
-    if (_sendingMedia) return;
+    if (_sendingMedia) return false;
     _sendingMedia = true;
     try {
       final user = ref.read(authControllerProvider).user;
@@ -2641,15 +2773,41 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       };
       final localId = 'local-${DateTime.now().microsecondsSinceEpoch}';
 
-      final replyingMsg = _replyingToMessage;
+      final replyingMsg = replyMessage ?? _replyingToMessage;
       final replyToId = replyingMsg?['id']?.toString();
-      final replyToName = (replyingMsg?['senderName'] ?? replyingMsg?['username'])?.toString();
-      final replyToBody = (replyingMsg?['body'] ?? replyingMsg?['content'] ?? replyingMsg?['text'])?.toString();
+      final replyToName =
+          (replyingMsg?['senderName'] ?? replyingMsg?['username'])?.toString();
+      final replyingType = replyingMsg?['type']?.toString();
+      final replyingMetaRaw = replyingMsg?['metadata'];
+      final replyingMeta = replyingMetaRaw is Map
+          ? Map<String, dynamic>.from(replyingMetaRaw)
+          : null;
+      // Previsualización limpia: la cita nunca propaga una URL cruda de
+      // Supabase como texto; se guarda `📷 Foto` + la URL en `replyToMediaUrl`
+      // para poder renderizar la miniatura de la cita.
+      final replyingPreview = resolveReplyPreview(
+        body:
+            (replyingMsg?['body'] ??
+                    replyingMsg?['content'] ??
+                    replyingMsg?['text'])
+                ?.toString(),
+        mediaUrl:
+            (replyingMsg?['mediaUrl'] ??
+                    replyingMsg?['contentUrl'] ??
+                    replyingMeta?['mediaUrl'])
+                ?.toString(),
+        messageType: replyingType,
+      );
+      final replyToBody = replyingPreview.text;
+      final replyToMediaUrl = replyingPreview.thumbnailUrl;
       final replyTo = (replyToId != null && replyToId.isNotEmpty)
           ? <String, dynamic>{
               'id': replyToId,
               'authorName': replyToName,
               'content': replyToBody,
+              if (replyToMediaUrl != null) 'mediaUrl': replyToMediaUrl,
+              if (replyingType != null && replyingType.isNotEmpty)
+                'type': replyingType,
             }
           : null;
       _replyingToMessage = null;
@@ -2661,6 +2819,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           'replyToId': replyToId,
           'replyToName': replyToName,
           'replyToBody': replyToBody,
+          if (replyToMediaUrl != null) 'replyToMediaUrl': replyToMediaUrl,
+          if (replyingType != null && replyingType.isNotEmpty)
+            'replyToType': replyingType,
           'replyTo': replyTo,
         },
       };
@@ -2697,6 +2858,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         'replyToId': replyToId,
         'replyToName': replyToName,
         'replyToBody': replyToBody,
+        'replyToMediaUrl': replyToMediaUrl,
+        'replyToType': replyingType,
         'replyTo': replyTo,
       });
       setState(() {});
@@ -2714,6 +2877,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     } finally {
       _sendingMedia = false;
     }
+    return true;
   }
 
   Future<void> _sendPersisted({
@@ -2770,15 +2934,20 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   void _leaveRole(RoleCharacter role, {int? slotIndex}) {
     final myId = ref.read(authControllerProvider).user?.id ?? '';
 
-    final targetIndex = slotIndex ??
+    final targetIndex =
+        slotIndex ??
         _stageRoles.indexWhere((r) => r.id.trim() == role.id.trim());
 
     final effectiveIndex = targetIndex >= 0
         ? targetIndex
         : _stageRoles.indexWhere((r) => r.id == role.id);
 
-    final resetId = effectiveIndex >= 0 ? 'slot-${effectiveIndex + 1}' : 'slot-1';
-    final resetName = effectiveIndex >= 0 ? 'Slot ${effectiveIndex + 1}' : 'Slot 1';
+    final resetId = effectiveIndex >= 0
+        ? 'slot-${effectiveIndex + 1}'
+        : 'slot-1';
+    final resetName = effectiveIndex >= 0
+        ? 'Slot ${effectiveIndex + 1}'
+        : 'Slot 1';
     final freed = RoleCharacter.vacant(id: resetId, name: resetName);
     _salas.updateRoomRole(widget.roomId, freed);
 
@@ -2810,8 +2979,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     });
 
     // Actualizar optimistamente la sala en el controlador
-    final currentRoom =
-        ref.read(salaDetailControllerProvider(widget.roomId)).room;
+    final currentRoom = ref
+        .read(salaDetailControllerProvider(widget.roomId))
+        .room;
     if (currentRoom != null) {
       final updatedRoles = currentRoom.stageRoles.map((r) {
         if (r.id == role.id) {
@@ -2822,10 +2992,12 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       final updatedActiveChar = _currentActiveRole;
       ref
           .read(salaDetailControllerProvider(widget.roomId).notifier)
-          .applyRoom(currentRoom.copyWith(
-            stageRoles: updatedRoles,
-            activeCharacter: updatedActiveChar,
-          ));
+          .applyRoom(
+            currentRoom.copyWith(
+              stageRoles: updatedRoles,
+              activeCharacter: updatedActiveChar,
+            ),
+          );
     }
 
     // Persistir liberación en el backend con slotIndex puntual
@@ -2837,9 +3009,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           roleId: role.id,
         )
         .catchError((err) {
-      debugPrint('[STAGE_ROLE] Error al liberar rol en backend: $err');
-      return <String, dynamic>{};
-    });
+          debugPrint('[STAGE_ROLE] Error al liberar rol en backend: $err');
+          return <String, dynamic>{};
+        });
   }
 
   void _openRoleInfo(RoleCharacter role) {
@@ -2856,12 +3028,14 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
             (r) => r.id == role.id,
             orElse: () => role,
           );
-          final isMyRole = liveRole.isTaken &&
+          final isMyRole =
+              liveRole.isTaken &&
               (_currentActiveRole?.id == liveRole.id ||
                   (myId.isNotEmpty &&
                       (liveRole.takenByUserId == myId ||
                           liveRole.occupiedBy == myId)));
-          final isOccupied = liveRole.isTaken &&
+          final isOccupied =
+              liveRole.isTaken &&
               (liveRole.takenByUserId != null || liveRole.occupiedBy != null);
 
           return RoleInfoModal(
@@ -2875,14 +3049,19 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     if (isMyRole) {
                       // Cerrar el modal de inmediato para dar retroalimentación instantánea
                       Navigator.pop(modalCtx);
-                      final slotIdx =
-                          _stageRoles.indexWhere((r) => r.id == liveRole.id);
+                      final slotIdx = _stageRoles.indexWhere(
+                        (r) => r.id == liveRole.id,
+                      );
                       // Dejar rol: liberar el slot puntual y actualizar la identidad.
-                      _leaveRole(liveRole,
-                          slotIndex: slotIdx >= 0 ? slotIdx : null);
+                      _leaveRole(
+                        liveRole,
+                        slotIndex: slotIdx >= 0 ? slotIdx : null,
+                      );
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Has liberado el rol: ${liveRole.name}'),
+                          content: Text(
+                            'Has liberado el rol: ${liveRole.name}',
+                          ),
                           backgroundColor: const Color(0xFF2A121E),
                         ),
                       );
@@ -2891,7 +3070,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                       if (!_isJoined) {
                         Navigator.pop(modalCtx);
                         _showSendError(
-                            'Debes unirte a la sala para poder participar en el Stage de Roleplay');
+                          'Debes unirte a la sala para poder participar en el Stage de Roleplay',
+                        );
                         return;
                       }
                       final user = ref.read(authControllerProvider).user;
@@ -2904,8 +3084,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                       );
                       _salas.updateRoomRole(widget.roomId, taken);
                       setState(() {
-                        final idx =
-                            _stageRoles.indexWhere((r) => r.id == liveRole.id);
+                        final idx = _stageRoles.indexWhere(
+                          (r) => r.id == liveRole.id,
+                        );
                         if (idx >= 0 && idx < _stageRoles.length) {
                           _stageRoles[idx] = taken;
                         }
@@ -2921,27 +3102,38 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                           return r;
                         }).toList();
                         ref
-                            .read(salaDetailControllerProvider(widget.roomId)
-                                .notifier)
-                            .applyRoom(currentRoom.copyWith(
-                              stageRoles: updatedRoles,
-                              activeCharacter: taken,
-                            ));
+                            .read(
+                              salaDetailControllerProvider(
+                                widget.roomId,
+                              ).notifier,
+                            )
+                            .applyRoom(
+                              currentRoom.copyWith(
+                                stageRoles: updatedRoles,
+                                activeCharacter: taken,
+                              ),
+                            );
                       }
 
                       // Persistir adopción de rol en el backend (best-effort)
                       ref
                           .read(roomRepositoryProvider)
-                          .updateStageRole(widget.roomId,
-                              role: taken, isTake: true)
+                          .updateStageRole(
+                            widget.roomId,
+                            role: taken,
+                            isTake: true,
+                          )
                           .catchError((err) {
-                        debugPrint(
-                            '[STAGE_ROLE] Error al adoptar rol en backend: $err');
-                      });
+                            debugPrint(
+                              '[STAGE_ROLE] Error al adoptar rol en backend: $err',
+                            );
+                          });
                       Navigator.pop(modalCtx);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Has adoptado el rol: ${liveRole.name}'),
+                          content: Text(
+                            'Has adoptado el rol: ${liveRole.name}',
+                          ),
                           backgroundColor: const Color(0xFF1E1A2E),
                         ),
                       );
@@ -2986,24 +3178,30 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                           return r;
                         }).toList();
                         ref
-                            .read(salaDetailControllerProvider(widget.roomId)
-                                .notifier)
-                            .applyRoom(currentRoom.copyWith(
-                              stageRoles: updatedRoles,
-                              activeCharacter:
-                                  _currentActiveRole?.id == liveRole.id
-                                      ? merged
-                                      : currentRoom.activeCharacter,
-                            ));
+                            .read(
+                              salaDetailControllerProvider(
+                                widget.roomId,
+                              ).notifier,
+                            )
+                            .applyRoom(
+                              currentRoom.copyWith(
+                                stageRoles: updatedRoles,
+                                activeCharacter:
+                                    _currentActiveRole?.id == liveRole.id
+                                    ? merged
+                                    : currentRoom.activeCharacter,
+                              ),
+                            );
                       }
 
                       ref
                           .read(roomRepositoryProvider)
                           .saveStageRole(widget.roomId, merged)
                           .catchError((err) {
-                        debugPrint(
-                            '[STAGE_ROLE] Error al persistir edición de rol: $err');
-                      });
+                            debugPrint(
+                              '[STAGE_ROLE] Error al persistir edición de rol: $err',
+                            );
+                          });
                     }
                   }
                 : null,
@@ -3025,9 +3223,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                         .read(roomRepositoryProvider)
                         .deleteStageRole(widget.roomId, roleIdStr)
                         .catchError((err) {
-                      debugPrint(
-                          '[STAGE_ROLE] Error al eliminar rol en backend: $err');
-                    });
+                          debugPrint(
+                            '[STAGE_ROLE] Error al eliminar rol en backend: $err',
+                          );
+                        });
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Ficha de rol eliminada')),
                     );
@@ -3043,7 +3242,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   Future<void> _handleSelectRoleForStage({int? targetSlotIndex}) async {
     if (!_isJoined) {
       _showSendError(
-          'Debes unirte a la sala para poder participar en el Stage de Roleplay');
+        'Debes unirte a la sala para poder participar en el Stage de Roleplay',
+      );
       return;
     }
     final myId = ref.read(authControllerProvider).user?.id ?? '';
@@ -3075,10 +3275,14 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     );
 
     // Verificar que el usuario no supere el límite de 2 slots (solo al añadir uno nuevo)
-    final alreadyOccupiedByMe = _stageRoles.where((r) =>
-        r.isTaken &&
-        r.id != role.id && // no contar el slot que se va a mover
-        (r.takenByUserId == myId || r.occupiedBy == myId)).length;
+    final alreadyOccupiedByMe = _stageRoles
+        .where(
+          (r) =>
+              r.isTaken &&
+              r.id != role.id && // no contar el slot que se va a mover
+              (r.takenByUserId == myId || r.occupiedBy == myId),
+        )
+        .length;
 
     // targetSlotIndex explícito = el usuario toca un slot vacante → siempre permitido
     // Sin targetSlotIndex = acción "+ Unirse" → verificar límite
@@ -3114,8 +3318,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       if (destIndex >= 0 && destIndex < _stageRoles.length) {
         _stageRoles[destIndex] = updatedRole;
       } else {
-        final vacantIndex =
-            _stageRoles.indexWhere((r) => !r.isTaken && !r.isOccupied);
+        final vacantIndex = _stageRoles.indexWhere(
+          (r) => !r.isTaken && !r.isOccupied,
+        );
         if (vacantIndex >= 0) {
           destIndex = vacantIndex;
           _stageRoles[vacantIndex] = updatedRole;
@@ -3129,10 +3334,13 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
     _salas.updateRoomRole(widget.roomId, updatedRole);
 
-    final currentRoom =
-        ref.read(salaDetailControllerProvider(widget.roomId)).room;
+    final currentRoom = ref
+        .read(salaDetailControllerProvider(widget.roomId))
+        .room;
     if (currentRoom != null) {
-      ref.read(salaDetailControllerProvider(widget.roomId).notifier).applyRoom(
+      ref
+          .read(salaDetailControllerProvider(widget.roomId).notifier)
+          .applyRoom(
             currentRoom.copyWith(
               stageRoles: _stageRoles,
               activeCharacter: updatedRole,
@@ -3141,7 +3349,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     }
 
     try {
-      await ref.read(roomRepositoryProvider).occupyStageRole(
+      await ref
+          .read(roomRepositoryProvider)
+          .occupyStageRole(
             widget.roomId,
             roleSheetId: role.id,
             slotIndex: targetSlotIndex,
@@ -3163,7 +3373,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   void _openRoleCreatorOrSelector() async {
     if (!_isJoined) {
       _showSendError(
-          'Debes unirte a la sala para poder participar en el Stage de Roleplay');
+        'Debes unirte a la sala para poder participar en el Stage de Roleplay',
+      );
       return;
     }
     if (!_canManageRoles()) {
@@ -3191,9 +3402,10 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           .read(roomRepositoryProvider)
           .saveStageRole(widget.roomId, vacantRole)
           .catchError((err) {
-        debugPrint(
-            '[STAGE_ROLE] Error al persistir nuevo rol en backend: $err');
-      });
+            debugPrint(
+              '[STAGE_ROLE] Error al persistir nuevo rol en backend: $err',
+            );
+          });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -3438,7 +3650,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       final rules = (result['rules'] as List?)?.cast<String>();
       final tags = (result['tags'] as List?)?.cast<String>();
       try {
-        final updatedRoom = await ref.read(roomRepositoryProvider).updateSala(
+        final updatedRoom = await ref
+            .read(roomRepositoryProvider)
+            .updateSala(
               widget.roomId,
               name: name,
               description: desc,
@@ -3448,9 +3662,13 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
               tags: tags,
             );
         if (!mounted) return;
-        ref.read(salaDetailControllerProvider(widget.roomId).notifier).applyRoom(updatedRoom);
+        ref
+            .read(salaDetailControllerProvider(widget.roomId).notifier)
+            .applyRoom(updatedRoom);
         ref.read(salasControllerProvider.notifier).applyRoom(updatedRoom);
-        await ref.read(salaDetailControllerProvider(widget.roomId).notifier).refresh();
+        await ref
+            .read(salaDetailControllerProvider(widget.roomId).notifier)
+            .refresh();
         setState(() {});
       } catch (_) {
         if (mounted) {
@@ -3563,8 +3781,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       return const SizedBox.shrink();
     }
 
-    final followNotifier =
-        ref.read(userFollowNotifierProvider(host.id).notifier);
+    final followNotifier = ref.read(
+      userFollowNotifierProvider(host.id).notifier,
+    );
     if (!followNotifier.isInitialized) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -3572,8 +3791,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       });
     }
     final followState = ref.watch(userFollowNotifierProvider(host.id));
-    final following =
-        followNotifier.isInitialized ? followState.isFollowing : host.isFollowing;
+    final following = followNotifier.isInitialized
+        ? followState.isFollowing
+        : host.isFollowing;
     final isBusy = followState.isBusy;
 
     return GestureDetector(
@@ -3934,11 +4154,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
     if (!messageId.startsWith('local-')) {
       try {
-        await ref.read(roomRepositoryProvider).editRoomMessage(
-          widget.roomId,
-          messageId,
-          content: trimmed,
-        );
+        await ref
+            .read(roomRepositoryProvider)
+            .editRoomMessage(widget.roomId, messageId, content: trimmed);
       } catch (err) {
         debugPrint('[EDIT_MSG] Error editando mensaje: $err');
         if (mounted) {
@@ -3978,12 +4196,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancelar', style: TextStyle(color: Color(0xFF8E889D))),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Color(0xFF8E889D)),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accentCrimson,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () async {
               Navigator.pop(dialogCtx);
@@ -3991,13 +4214,23 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
               setState(() {});
               if (!msgId.startsWith('local-')) {
                 try {
-                  await ref.read(roomRepositoryProvider).deleteRoomMessage(widget.roomId, msgId);
+                  await ref
+                      .read(roomRepositoryProvider)
+                      .deleteRoomMessage(widget.roomId, msgId);
                 } catch (err) {
-                  debugPrint('[DELETE_MSG] Error eliminando mensaje HTTP: $err');
+                  debugPrint(
+                    '[DELETE_MSG] Error eliminando mensaje HTTP: $err',
+                  );
                 }
               }
             },
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -4038,7 +4271,12 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     for (final containerKey in const ['metadata', 'extensions']) {
       final raw = m[containerKey];
       if (raw is Map) {
-        for (final key in const ['id', 'messageId', 'clientMessageId', 'message_id']) {
+        for (final key in const [
+          'id',
+          'messageId',
+          'clientMessageId',
+          'message_id',
+        ]) {
           ids.add(_normalizeMessageId(raw[key]));
         }
       }
@@ -4052,7 +4290,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   int _indexOfMessageById(String targetId) {
     final target = _normalizeMessageId(targetId);
     if (target.isEmpty) return -1;
-    return _messages.indexWhere((m) => _messageIdCandidates(m).contains(target));
+    return _messages.indexWhere(
+      (m) => _messageIdCandidates(m).contains(target),
+    );
   }
 
   /// Claves de montaje por id de mensaje (candidatos normalizados) para
@@ -4063,14 +4303,15 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   List<String> _keysForMessage(Map<String, dynamic> m) =>
       _messageIdCandidates(m).map((id) => 'msg_$id').toList();
 
-    void _scrollToMessage(String targetMessageId) {
+  void _scrollToMessage(String targetMessageId) {
     if (targetMessageId.isEmpty) return;
     final index = _indexOfMessageById(targetMessageId);
     if (index < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content:
-              Text('El mensaje citado no se encuentra en el historial actual.'),
+          content: Text(
+            'El mensaje citado no se encuentra en el historial actual.',
+          ),
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 2),
         ),
@@ -4096,7 +4337,7 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           );
           flash();
           return;
-       }
+        }
       }
 
       // 2) Fuera de la ventana montada: salto proporcional al índice en la
@@ -4132,26 +4373,35 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
 
     reveal();
   }
-void _showMessageContextMenu(Map<String, dynamic> msg) {
+
+  void _showMessageContextMenu(Map<String, dynamic> msg) {
     HapticFeedback.mediumImpact();
     final myId = ref.read(authControllerProvider).user?.id ?? '';
     final senderId = msg['senderId']?.toString() ?? '';
     final isMine = senderId.isNotEmpty && senderId == myId;
-    final isHost = _currentRoom != null && myId.isNotEmpty && _currentRoom!.host.id == myId;
+    final isHost =
+        _currentRoom != null &&
+        myId.isNotEmpty &&
+        _currentRoom!.host.id == myId;
     final canManage = isHost || _canManageRoles();
-    final isEdited = msg['isEdited'] == true || (msg['editCount'] != null && (msg['editCount'] as num) > 0);
-    final text = (msg['body'] ?? msg['content'] ?? msg['text'] ?? '').toString();
+    final isEdited =
+        msg['isEdited'] == true ||
+        (msg['editCount'] != null && (msg['editCount'] as num) > 0);
+    final text = (msg['body'] ?? msg['content'] ?? msg['text'] ?? '')
+        .toString();
     final rawType = (msg['type'] as String? ?? '').toLowerCase();
-    final isTextMessage = rawType == 'message' || rawType == 'text' || rawType.isEmpty;
+    final isTextMessage =
+        rawType == 'message' || rawType == 'text' || rawType.isEmpty;
 
     final meta = msg['metadata'] is Map
         ? Map<String, dynamic>.from(msg['metadata'] as Map)
         : <String, dynamic>{};
-    final mediaUrl = (msg['mediaUrl'] ??
-            msg['contentUrl'] ??
-            meta['mediaUrl'] ??
-            meta['url'])
-        ?.toString();
+    final mediaUrl =
+        (msg['mediaUrl'] ??
+                msg['contentUrl'] ??
+                meta['mediaUrl'] ??
+                meta['url'])
+            ?.toString();
 
     bool isImageUrl(String? s) {
       if (s == null || s.trim().isEmpty) return false;
@@ -4166,7 +4416,8 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
           clean.contains('supabase.co/storage/v1/object/public/');
     }
 
-    final isImage = rawType == 'image' ||
+    final isImage =
+        rawType == 'image' ||
         meta['attachmentType'] == 'image' ||
         isImageUrl(mediaUrl) ||
         isImageUrl(text);
@@ -4182,7 +4433,8 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
     } else if (createdAtRaw is String && createdAtRaw.isNotEmpty) {
       createdAtDt = DateTime.tryParse(createdAtRaw);
     }
-    final isWithin15Minutes = createdAtDt == null ||
+    final isWithin15Minutes =
+        createdAtDt == null ||
         DateTime.now().difference(createdAtDt).inMinutes < 15;
 
     Future<void> saveImageToGallery(String imageUrl) async {
@@ -4263,7 +4515,9 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
             ListTile(
               leading: Icon(
                 Icons.reply_rounded,
-                color: _isJoined ? AppColors.accentCyan : const Color(0xFF6B687A),
+                color: _isJoined
+                    ? AppColors.accentCyan
+                    : const Color(0xFF6B687A),
               ),
               title: Text(
                 'Responder',
@@ -4281,7 +4535,9 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
               onTap: () {
                 Navigator.pop(ctx);
                 if (!_isJoined) {
-                  _showSendError('Debes unirte a la sala para responder a un mensaje');
+                  _showSendError(
+                    'Debes unirte a la sala para responder a un mensaje',
+                  );
                   return;
                 }
                 _startReply(msg);
@@ -4289,17 +4545,38 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
             ),
             if (isImage && effectiveImageUrl.isNotEmpty) ...[
               ListTile(
-                leading: const Icon(Icons.download_rounded, color: AppColors.accentTeal),
-                title: const Text('Guardar imagen', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Descargar a la galería del dispositivo', style: TextStyle(color: Color(0xFF8A8A9A), fontSize: 11)),
+                leading: const Icon(
+                  Icons.download_rounded,
+                  color: AppColors.accentTeal,
+                ),
+                title: const Text(
+                  'Guardar imagen',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Descargar a la galería del dispositivo',
+                  style: TextStyle(color: Color(0xFF8A8A9A), fontSize: 11),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   saveImageToGallery(effectiveImageUrl);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.link_rounded, color: Color(0xFF9E9EA8)),
-                title: const Text('Copiar enlace de imagen', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                leading: const Icon(
+                  Icons.link_rounded,
+                  color: Color(0xFF9E9EA8),
+                ),
+                title: const Text(
+                  'Copiar enlace de imagen',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   Clipboard.setData(ClipboardData(text: effectiveImageUrl));
@@ -4314,8 +4591,17 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
               ),
             ] else if (text.isNotEmpty) ...[
               ListTile(
-                leading: const Icon(Icons.copy_rounded, color: Color(0xFF9E9EA8)),
-                title: const Text('Copiar texto', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                leading: const Icon(
+                  Icons.copy_rounded,
+                  color: Color(0xFF9E9EA8),
+                ),
+                title: const Text(
+                  'Copiar texto',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   Clipboard.setData(ClipboardData(text: text));
@@ -4331,9 +4617,21 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
             ],
             if (isMine && !isEdited && isTextMessage && isWithin15Minutes)
               ListTile(
-                leading: const Icon(Icons.edit_rounded, color: Color(0xFFFFB300)),
-                title: const Text('Editar mensaje', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Solo puedes editar tu mensaje dentro de los primeros 15 minutos', style: TextStyle(color: Color(0xFF8A8A9A), fontSize: 11)),
+                leading: const Icon(
+                  Icons.edit_rounded,
+                  color: Color(0xFFFFB300),
+                ),
+                title: const Text(
+                  'Editar mensaje',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Solo puedes editar tu mensaje dentro de los primeros 15 minutos',
+                  style: TextStyle(color: Color(0xFF8A8A9A), fontSize: 11),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _startEdit(msg);
@@ -4341,8 +4639,17 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
               ),
             if (isMine || canManage)
               ListTile(
-                leading: const Icon(Icons.delete_outline_rounded, color: AppColors.accentCrimson),
-                title: const Text('Eliminar mensaje', style: TextStyle(color: AppColors.accentCrimson, fontWeight: FontWeight.w600)),
+                leading: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppColors.accentCrimson,
+                ),
+                title: const Text(
+                  'Eliminar mensaje',
+                  style: TextStyle(
+                    color: AppColors.accentCrimson,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _confirmDeleteMessage(msg);
@@ -4454,32 +4761,35 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
   Widget build(BuildContext context) {
     // ── Escucha declarativa de cambios de estado en la sala ───────────────────
     // Se aíslan todas las mutaciones fuera del frame de renderizado.
-    ref.listen<SalaDetailState>(
-      salaDetailControllerProvider(widget.roomId),
-      (previous, next) {
-        final prevRoom = previous?.room;
-        final nextRoom = next.room;
-        if (nextRoom == null) return;
+    ref.listen<SalaDetailState>(salaDetailControllerProvider(widget.roomId), (
+      previous,
+      next,
+    ) {
+      final prevRoom = previous?.room;
+      final nextRoom = next.room;
+      if (nextRoom == null) return;
 
-        final rolesChanged = prevRoom?.stageRoles != nextRoom.stageRoles;
-        final participantsChanged =
-            prevRoom?.participants.length != nextRoom.participants.length;
-        final roomChanged = prevRoom?.id != nextRoom.id;
+      final rolesChanged = prevRoom?.stageRoles != nextRoom.stageRoles;
+      final participantsChanged =
+          prevRoom?.participants.length != nextRoom.participants.length;
+      final roomChanged = prevRoom?.id != nextRoom.id;
 
-        if (roomChanged || rolesChanged || participantsChanged) {
-          _syncStageFromRoom(nextRoom, force: rolesChanged || participantsChanged);
-        }
+      if (roomChanged || rolesChanged || participantsChanged) {
+        _syncStageFromRoom(
+          nextRoom,
+          force: rolesChanged || participantsChanged,
+        );
+      }
 
-        if (prevRoom?.currentMode != nextRoom.currentMode &&
-            nextRoom.currentMode != _currentRoomMode) {
-          _applyRoomMode(nextRoom.currentMode, notifyToast: false);
-        }
+      if (prevRoom?.currentMode != nextRoom.currentMode &&
+          nextRoom.currentMode != _currentRoomMode) {
+        _applyRoomMode(nextRoom.currentMode, notifyToast: false);
+      }
 
-        if (_isConnected && !_chatStarted) {
-          _startRoomChat();
-        }
-      },
-    );
+      if (_isConnected && !_chatStarted) {
+        _startRoomChat();
+      }
+    });
 
     final state = ref.watch(salaDetailControllerProvider(widget.roomId));
     final room = state.room;
@@ -4522,715 +4832,784 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
         resizeToAvoidBottomInset: true,
         backgroundColor: const Color(0xFF0A0912),
         body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // ── 1. Fondo de Pantalla Completo (Background Wallpaper con opacidad) ──
-          if (_effectiveBgUrl != null && _effectiveBgUrl!.isNotEmpty)
-            Positioned.fill(
-              child: _effectiveBgUrl!.startsWith('assets/')
-                  ? Image.asset(
-                      _effectiveBgUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                    )
-                  : CachedNetworkImage(
-                      imageUrl: _effectiveBgUrl!,
-                      fit: BoxFit.cover,
-                      errorWidget: (_, _, _) => const SizedBox.shrink(),
-                    ),
-            ),
+          fit: StackFit.expand,
+          children: [
+            // ── 1. Fondo de Pantalla Completo (Background Wallpaper con opacidad) ──
+            if (_effectiveBgUrl != null && _effectiveBgUrl!.isNotEmpty)
+              Positioned.fill(
+                child: _effectiveBgUrl!.startsWith('assets/')
+                    ? Image.asset(
+                        _effectiveBgUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: _effectiveBgUrl!,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, _, _) => const SizedBox.shrink(),
+                      ),
+              ),
 
-          // Capa oscura translúcida
-          Positioned.fill(child: Container(color: const Color(0xE60A0912))),
+            // Capa oscura translúcida
+            Positioned.fill(child: Container(color: const Color(0xE60A0912))),
 
-          // ── 2. Estructura Principal ──
-          SafeArea(
-            child: Column(
-              children: [
-                // ── Header Superior Inmersivo (Ref: image_992c3c.jpg) ──
-                _buildTopHeader(roomName, room),
+            // ── 2. Estructura Principal ──
+            SafeArea(
+              child: Column(
+                children: [
+                  // ── Header Superior Inmersivo (Ref: image_992c3c.jpg) ──
+                  _buildTopHeader(roomName, room),
 
-                // ── Barra de Anuncios: 📢 Announcement ──
-                _buildAnnouncementBar(),
+                  // ── Barra de Anuncios: 📢 Announcement ──
+                  _buildAnnouncementBar(),
 
-                // ── Contador de participantes (debajo del anuncio, anclado
-                //    a la esquina superior derecha del área de chat) ──
-                if (room != null) _buildMemberPill(room),
+                  // ── Contador de participantes (debajo del anuncio, anclado
+                  //    a la esquina superior derecha del área de chat) ──
+                  if (room != null) _buildMemberPill(room),
 
-                // ── Stage de Voz en Vivo (LiveKit) ──
-                // Único panel de voz del top: debajo de anuncios y miembros.
-                // Aislado dentro de un Consumer local para evitar que los decibelios
-                // y eventos de audio de participantes redibujen todo el Scaffold.
-                Consumer(
-                  builder: (context, ref, _) {
-                    final isVoiceConnected = ref.watch(
-                      voiceRoomProvider.select((s) => s.isConnected),
-                    );
-                    final activeRoomId = ref.watch(
-                      voiceRoomProvider.select((s) => s.activeRoomId),
-                    );
-                    final isVoiceActiveInThisRoom =
-                        activeRoomId == widget.roomId && isVoiceConnected;
-                    final isVoiceActiveElsewhere = isVoiceConnected &&
-                        activeRoomId != null &&
-                        activeRoomId != widget.roomId;
-
-                    if (isVoiceActiveInThisRoom ||
-                        (_currentRoomMode == 'voice' &&
-                            !isVoiceActiveElsewhere)) {
-                      return LiveVoiceBar(
-                        roomId: widget.roomId,
-                        isMinimized: _isVoiceMinimized,
-                        onToggleMinimize: () {
-                          if (_isSwitchingActivity) return;
-                          _triggerActivityDebounce();
-                          setState(() {
-                            _isVoiceMinimized = !_isVoiceMinimized;
-                            if (!_isVoiceMinimized) {
-                              _isRoleplayMinimized = true;
-                            }
-                          });
-                        },
-                        onParticipantTap: _openVoiceParticipantSheet,
-                        canPowerOff: _canManageRoles(),
-                        onPowerOff: _turnOffActivity,
-                        canManage: _canManageRoles(),
-                        onOpenSettings: _openVoiceSettingsSheet,
-                        isStaffOnly: _voiceStaffOnly,
-                        canJoinVoice: !_voiceStaffOnly ||
-                            _canManageRoles() ||
-                            _allowedVoiceSpeakerIds.contains(
-                                ref.read(authControllerProvider).user?.id),
+                  // ── Stage de Voz en Vivo (LiveKit) ──
+                  // Único panel de voz del top: debajo de anuncios y miembros.
+                  // Aislado dentro de un Consumer local para evitar que los decibelios
+                  // y eventos de audio de participantes redibujen todo el Scaffold.
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final isVoiceConnected = ref.watch(
+                        voiceRoomProvider.select((s) => s.isConnected),
                       );
-                    }
-
-                    if (isVoiceActiveElsewhere) {
-                      return _buildVoiceActiveElsewhereBanner(activeRoomId);
-                    }
-
-                    return const SizedBox.shrink();
-                  },
-                ),
-
-                // ── Panel de Actividad Superior Dinámico (Condicional Top-Down Flow) ──
-                if (_currentRoomMode == 'roleplay')
-                  RoleplayStageView(
-                    roles: _stageRoles,
-                    isExpanded: !_isRoleplayMinimized && !isKeyboardOpen,
-                    onToggleExpanded: (expanded) {
-                      if (_isSwitchingActivity) return;
-                      _triggerActivityDebounce();
-                      setState(() {
-                        _isRoleplayMinimized = !expanded;
-                        if (expanded) {
-                          _isVoiceMinimized = true;
-                        }
-                      });
-                    },
-                    onRoleTap: _openRoleInfo,
-                    onVacantSlotTap: (slotIndex) {
-                      if (!_isJoined) {
-                        _showSendError(
-                            'Debes unirte a la sala para poder participar en el Stage de Roleplay');
-                        return;
-                      }
-                      _handleSelectRoleForStage(targetSlotIndex: slotIndex);
-                    },
-                    onAddRoleTap: () {
-                      if (!_isJoined) {
-                        _showSendError(
-                            'Debes unirte a la sala para poder participar en el Stage de Roleplay');
-                        return;
-                      }
-                      _handleSelectRoleForStage();
-                    },
-                    currentUserId: ref.read(authControllerProvider).user?.id,
-                    canPowerOff: _canManageRoles(),
-                    onPowerOff: _turnOffActivity,
-                    canManage: _canManageRoles(),
-                    onOpenSettings: _openRoleplaySettingsSheet,
-                    onPlayTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('¡Turno de Rol solicitado! 🎲'),
-                        ),
+                      final activeRoomId = ref.watch(
+                        voiceRoomProvider.select((s) => s.activeRoomId),
                       );
-                    },
-                    onLeaveStageTap: () {
-                      final myId =
-                          ref.read(authControllerProvider).user?.id ?? '';
-                      RoleCharacter? targetRole = _currentActiveRole;
-                      int? targetSlotIndex;
+                      final isVoiceActiveInThisRoom =
+                          activeRoomId == widget.roomId && isVoiceConnected;
+                      final isVoiceActiveElsewhere =
+                          isVoiceConnected &&
+                          activeRoomId != null &&
+                          activeRoomId != widget.roomId;
 
-                      if (targetRole != null) {
-                        final idx = _stageRoles
-                            .indexWhere((r) => r.id == targetRole!.id);
-                        if (idx >= 0) targetSlotIndex = idx;
-                      } else if (myId.isNotEmpty) {
-                        final idx = _stageRoles.indexWhere(
-                          (r) =>
-                              r.isTaken &&
-                              (r.takenByUserId == myId ||
-                                  r.occupiedBy == myId),
-                        );
-                        if (idx >= 0) {
-                          targetSlotIndex = idx;
-                          targetRole = _stageRoles[idx];
-                        }
-                      }
-
-                      if (targetRole != null) {
-                        _leaveRole(targetRole, slotIndex: targetSlotIndex);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content:
-                                Text('Has bajado del stage: ${targetRole.name}'),
-                            backgroundColor: const Color(0xFF2A121E),
-                          ),
+                      if (isVoiceActiveInThisRoom ||
+                          (_currentRoomMode == 'voice' &&
+                              !isVoiceActiveElsewhere)) {
+                        return LiveVoiceBar(
+                          roomId: widget.roomId,
+                          isMinimized: _isVoiceMinimized,
+                          onToggleMinimize: () {
+                            if (_isSwitchingActivity) return;
+                            _triggerActivityDebounce();
+                            setState(() {
+                              _isVoiceMinimized = !_isVoiceMinimized;
+                              if (!_isVoiceMinimized) {
+                                _isRoleplayMinimized = true;
+                              }
+                            });
+                          },
+                          onParticipantTap: _openVoiceParticipantSheet,
+                          canPowerOff: _canManageRoles(),
+                          onPowerOff: _turnOffActivity,
+                          canManage: _canManageRoles(),
+                          onOpenSettings: _openVoiceSettingsSheet,
+                          isStaffOnly: _voiceStaffOnly,
+                          canJoinVoice:
+                              !_voiceStaffOnly ||
+                              _canManageRoles() ||
+                              _allowedVoiceSpeakerIds.contains(
+                                ref.read(authControllerProvider).user?.id,
+                              ),
                         );
                       }
+
+                      if (isVoiceActiveElsewhere) {
+                        return _buildVoiceActiveElsewhereBanner(activeRoomId);
+                      }
+
+                      return const SizedBox.shrink();
                     },
-                  )
-                else if (_currentRoomMode == 'screening')
-                  CinemaPlayerView(
-                    roomId: widget.roomId,
-                    initialVideoId: room?.cinemaVideoId,
-                    initialState: room?.cinemaState ?? 'STOPPED',
-                    initialPosition: room?.cinemaEstimatedPosition ?? 0,
-                    isHost: _canManageRoles(),
-                    isMinimized: _isStageMinimized,
-                    onToggleMinimize: () {
-                      if (_isSwitchingActivity) return;
-                      _triggerActivityDebounce();
-                      setState(() {
-                        _isStageMinimized = !_isStageMinimized;
-                        if (!_isStageMinimized) {
-                          _isVoiceMinimized = true;
-                          _isRoleplayMinimized = true;
-                        }
-                      });
-                    },
-                    canManage: _canManageRoles(),
-                    onOpenSettings: _openCinemaSettingsSheet,
-                    onToggleOff: _turnOffActivity,
                   ),
 
-                // ── Botón de redimensión / colapso de la actividad activa ──
-                if (!isKeyboardOpen &&
-                    (_currentRoomMode == 'voice' ||
-                        ref.watch(
-                            voiceRoomProvider.select((s) => s.isConnected)) ||
-                        _currentRoomMode == 'roleplay' ||
-                        _currentRoomMode == 'screening'))
-                  _buildStageResizeButton(),
+                  // ── Panel de Actividad Superior Dinámico (Condicional Top-Down Flow) ──
+                  if (_currentRoomMode == 'roleplay')
+                    RoleplayStageView(
+                      roles: _stageRoles,
+                      isExpanded: !_isRoleplayMinimized && !isKeyboardOpen,
+                      onToggleExpanded: (expanded) {
+                        if (_isSwitchingActivity) return;
+                        _triggerActivityDebounce();
+                        setState(() {
+                          _isRoleplayMinimized = !expanded;
+                          if (expanded) {
+                            _isVoiceMinimized = true;
+                          }
+                        });
+                      },
+                      onRoleTap: _openRoleInfo,
+                      onVacantSlotTap: (slotIndex) {
+                        if (!_isJoined) {
+                          _showSendError(
+                            'Debes unirte a la sala para poder participar en el Stage de Roleplay',
+                          );
+                          return;
+                        }
+                        _handleSelectRoleForStage(targetSlotIndex: slotIndex);
+                      },
+                      onAddRoleTap: () {
+                        if (!_isJoined) {
+                          _showSendError(
+                            'Debes unirte a la sala para poder participar en el Stage de Roleplay',
+                          );
+                          return;
+                        }
+                        _handleSelectRoleForStage();
+                      },
+                      currentUserId: ref.read(authControllerProvider).user?.id,
+                      canPowerOff: _canManageRoles(),
+                      onPowerOff: _turnOffActivity,
+                      canManage: _canManageRoles(),
+                      onOpenSettings: _openRoleplaySettingsSheet,
+                      onPlayTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('¡Turno de Rol solicitado! 🎲'),
+                          ),
+                        );
+                      },
+                      onLeaveStageTap: () {
+                        final myId =
+                            ref.read(authControllerProvider).user?.id ?? '';
+                        RoleCharacter? targetRole = _currentActiveRole;
+                        int? targetSlotIndex;
 
-                // ── Feed de Mensajes / Chat Flow (Ref: Imagen 1, 2, 3, 5) ──
-                // Las animaciones de emojis/stickers se pausan cuando el
-                // usuario está escribiendo o el chat pierde el foco.
-                ChatAnimationScope(
-                  animationsEnabled: _chatAnimationsEnabled,
-                  child: Expanded(
-                    child: _messages.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.chat_bubble_outline_rounded,
-                                  size: 32,
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Sé el primero en enviar un mensaje...',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF7A7A8A),
-                                  ),
-                                ),
-                              ],
+                        if (targetRole != null) {
+                          final idx = _stageRoles.indexWhere(
+                            (r) => r.id == targetRole!.id,
+                          );
+                          if (idx >= 0) targetSlotIndex = idx;
+                        } else if (myId.isNotEmpty) {
+                          final idx = _stageRoles.indexWhere(
+                            (r) =>
+                                r.isTaken &&
+                                (r.takenByUserId == myId ||
+                                    r.occupiedBy == myId),
+                          );
+                          if (idx >= 0) {
+                            targetSlotIndex = idx;
+                            targetRole = _stageRoles[idx];
+                          }
+                        }
+
+                        if (targetRole != null) {
+                          _leaveRole(targetRole, slotIndex: targetSlotIndex);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Has bajado del stage: ${targetRole.name}',
+                              ),
+                              backgroundColor: const Color(0xFF2A121E),
                             ),
-                          ),
-                        )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          reverse: true,
-                          physics: const AlwaysScrollableScrollPhysics(
-                            parent: BouncingScrollPhysics(),
-                          ),
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 10,
-                          ),
-                          itemCount: _messages.length,
-                          itemBuilder: (context, index) {
-                            final msg = _messages[_messages.length - 1 - index];
-                            final rawType =
-                                (msg['type'] as String? ?? 'message')
-                                    .toLowerCase();
-                            final isSystem = rawType == 'system' ||
-                                msg['isSystem'] == true ||
-                                (msg['type'] as String?)?.toUpperCase() ==
-                                    'SYSTEM';
+                          );
+                        }
+                      },
+                    )
+                  else if (_currentRoomMode == 'screening')
+                    CinemaPlayerView(
+                      roomId: widget.roomId,
+                      initialVideoId: room?.cinemaVideoId,
+                      initialState: room?.cinemaState ?? 'STOPPED',
+                      initialPosition: room?.cinemaEstimatedPosition ?? 0,
+                      isHost: _canManageRoles(),
+                      isMinimized: _isStageMinimized,
+                      onToggleMinimize: () {
+                        if (_isSwitchingActivity) return;
+                        _triggerActivityDebounce();
+                        setState(() {
+                          _isStageMinimized = !_isStageMinimized;
+                          if (!_isStageMinimized) {
+                            _isVoiceMinimized = true;
+                            _isRoleplayMinimized = true;
+                          }
+                        });
+                      },
+                      canManage: _canManageRoles(),
+                      onOpenSettings: _openCinemaSettingsSheet,
+                      onToggleOff: _turnOffActivity,
+                    ),
 
-                            if (rawType == 'time') {
-                              return Center(
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.4),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    (msg['text'] ?? msg['body'] ?? '')
-                                        as String,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF7A7A8A),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
+                  // ── Botón de redimensión / colapso de la actividad activa ──
+                  if (!isKeyboardOpen &&
+                      (_currentRoomMode == 'voice' ||
+                          ref.watch(
+                            voiceRoomProvider.select((s) => s.isConnected),
+                          ) ||
+                          _currentRoomMode == 'roleplay' ||
+                          _currentRoomMode == 'screening'))
+                    _buildStageResizeButton(),
 
-                            if (isSystem) {
-                              final metadata =
-                                  msg['metadata'] as Map<String, dynamic>? ??
-                                      {};
-                              final subType =
-                                  metadata['subType'] as String? ??
-                                      msg['subType'] as String?;
-                              final msgUserId =
-                                  metadata['userId'] as String? ??
-                                      msg['senderId'] as String? ??
-                                      msg['userId'] as String? ??
-                                      '';
-                              final userName =
-                                  metadata['userName'] as String? ??
-                                      msg['senderName'] as String? ??
-                                      msg['userName'] as String? ??
-                                      '';
-                              final myId = ref
-                                      .read(authControllerProvider)
-                                      .user
-                                      ?.id ??
-                                  '';
-                              final rawBody = (msg['text'] ??
-                                      msg['body'] ??
-                                      msg['content'] ??
-                                      '')
-                                  .toString();
-
-                              final isJoin = subType == 'USER_JOIN' ||
-                                  rawBody.contains('se ha unido');
-
-                              final String displayText;
-                              if (isJoin) {
-                                if (msgUserId.isNotEmpty && msgUserId == myId) {
-                                  displayText = '— Te has unido —';
-                                } else if (userName.isNotEmpty) {
-                                  displayText = '— $userName se ha unido —';
-                                } else {
-                                  displayText = rawBody.isNotEmpty
-                                      ? '— $rawBody —'
-                                      : '— Un usuario se ha unido —';
-                                }
-                              } else {
-                                displayText = rawBody;
-                              }
-
-                              // ── Evento de unión clicable ──
-                              // Extrae handle/ID del nuevo participante para
-                              // abrir su tarjeta de usuario con un solo toque.
-                              final joinHandle =
-                                  (metadata['username'] as String? ??
-                                          msg['username'] as String? ??
-                                          '')
-                                      .replaceAll('@', '')
-                                      .trim();
-                              final isSelfJoin = msgUserId == myId ||
-                                  displayText == '— Te has unido —';
-                              final canOpenJoinProfile = isJoin &&
-                                  !isSelfJoin &&
-                                  (msgUserId.isNotEmpty ||
-                                      joinHandle.isNotEmpty);
-
-                              final capsule = Container(
-                                margin: const EdgeInsets.symmetric(
-                                  vertical: 6,
-                                  horizontal: 16,
-                                ),
+                  // ── Feed de Mensajes / Chat Flow (Ref: Imagen 1, 2, 3, 5) ──
+                  // Las animaciones de emojis/stickers se pausan cuando el
+                  // usuario está escribiendo o el chat pierde el foco.
+                  ChatAnimationScope(
+                    animationsEnabled: _chatAnimationsEnabled,
+                    child: Expanded(
+                      child: _messages.isEmpty
+                          ? Center(
+                              child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 6,
+                                  horizontal: 24,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0x80141022),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: const Color(0xFF2C2542),
-                                    width: 0.8,
-                                  ),
-                                ),
-                                child: Row(
+                                child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(
-                                      Icons.info_outline_rounded,
-                                      size: 13,
-                                      color: AppColors.accentCyan,
+                                    Icon(
+                                      Icons.chat_bubble_outline_rounded,
+                                      size: 32,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.2,
+                                      ),
                                     ),
-                                    const SizedBox(width: 6),
-                                    Flexible(
-                                      child: Text(
-                                        displayText,
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFFC8C8DC),
-                                        ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Sé el primero en enviar un mensaje...',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF7A7A8A),
                                       ),
                                     ),
                                   ],
                                 ),
-                              );
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: _scrollController,
+                              reverse: true,
+                              physics: const AlwaysScrollableScrollPhysics(
+                                parent: BouncingScrollPhysics(),
+                              ),
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 10,
+                              ),
+                              itemCount: _messages.length,
+                              itemBuilder: (context, index) {
+                                final msg =
+                                    _messages[_messages.length - 1 - index];
+                                final rawType =
+                                    (msg['type'] as String? ?? 'message')
+                                        .toLowerCase();
+                                final isSystem =
+                                    rawType == 'system' ||
+                                    msg['isSystem'] == true ||
+                                    (msg['type'] as String?)?.toUpperCase() ==
+                                        'SYSTEM';
 
-                              if (!canOpenJoinProfile) {
-                                return Center(child: capsule);
-                              }
+                                if (rawType == 'time') {
+                                  return Center(
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.4,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        (msg['text'] ?? msg['body'] ?? '')
+                                            as String,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF7A7A8A),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
 
-                              return Center(
-                                child: InkWell(
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    if (msgUserId.isNotEmpty) {
-                                      // Tarjeta de usuario de la sala con
-                                      // perfil, chat directo y moderación.
-                                      _openParticipantSheet(
-                                        userId: msgUserId,
-                                        username: joinHandle.isNotEmpty
-                                            ? joinHandle
-                                            : null,
-                                        displayName: userName.isNotEmpty
-                                            ? userName
-                                            : 'Usuario',
-                                        avatarUrl:
-                                            msg['userAvatar'] as String?,
-                                      );
+                                if (isSystem) {
+                                  final metadata =
+                                      msg['metadata']
+                                          as Map<String, dynamic>? ??
+                                      {};
+                                  final subType =
+                                      metadata['subType'] as String? ??
+                                      msg['subType'] as String?;
+                                  final msgUserId =
+                                      metadata['userId'] as String? ??
+                                      msg['senderId'] as String? ??
+                                      msg['userId'] as String? ??
+                                      '';
+                                  final userName =
+                                      metadata['userName'] as String? ??
+                                      msg['senderName'] as String? ??
+                                      msg['userName'] as String? ??
+                                      '';
+                                  final myId =
+                                      ref
+                                          .read(authControllerProvider)
+                                          .user
+                                          ?.id ??
+                                      '';
+                                  final rawBody =
+                                      (msg['text'] ??
+                                              msg['body'] ??
+                                              msg['content'] ??
+                                              '')
+                                          .toString();
+
+                                  final isJoin =
+                                      subType == 'USER_JOIN' ||
+                                      rawBody.contains('se ha unido');
+
+                                  final String displayText;
+                                  if (isJoin) {
+                                    if (msgUserId.isNotEmpty &&
+                                        msgUserId == myId) {
+                                      displayText = '— Te has unido —';
+                                    } else if (userName.isNotEmpty) {
+                                      displayText = '— $userName se ha unido —';
                                     } else {
-                                      // Fallback: perfil social directo.
-                                      context.push('/profile/$joinHandle');
+                                      displayText = rawBody.isNotEmpty
+                                          ? '— $rawBody —'
+                                          : '— Un usuario se ha unido —';
                                     }
-                                  },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: capsule,
-                                ),
-                              );
-                            }
+                                  } else {
+                                    displayText = rawBody;
+                                  }
 
-                            final metaMap = msg['metadata'] is Map<String, dynamic>
-                                ? msg['metadata'] as Map<String, dynamic>
-                                : (msg['metadata'] is Map
-                                    ? Map<String, dynamic>.from(msg['metadata'] as Map)
-                                    : null);
-                            final msgTypeUpper =
-                                (msg['type'] as String? ?? '').toUpperCase();
-                            final isDice = rawType == 'dice' ||
-                                msgTypeUpper == 'DICE' ||
-                                msgTypeUpper == 'RPS' ||
-                                msg['diceResult'] != null ||
-                                metaMap?['diceResult'] != null;
-                            final isSticker = rawType == 'sticker';
-                            // Render inmutable: el rol del mensaje sale de sus
-                            // propios datos (roleName != null en el wire),
-                            // NUNCA del modo actual de la sala. Así el historial
-                            // de Roleplay conserva su hexágono y tag de rol
-                            // aunque el host cambie a voz / chat estándar.
-                            final role = msg['role'] as RoleCharacter?;
-                            final senderName =
-                                msg['senderName'] as String? ?? 'Usuario';
-                            final myId =
-                                ref.read(authControllerProvider).user?.id ?? '';
-                            final senderId = msg['senderId'] as String? ?? '';
-                            final effectiveContentUrl =
-                                (msg['contentUrl'] as String?)?.isNotEmpty ==
+                                  // ── Evento de unión clicable ──
+                                  // Extrae handle/ID del nuevo participante para
+                                  // abrir su tarjeta de usuario con un solo toque.
+                                  final joinHandle =
+                                      (metadata['username'] as String? ??
+                                              msg['username'] as String? ??
+                                              '')
+                                          .replaceAll('@', '')
+                                          .trim();
+                                  final isSelfJoin =
+                                      msgUserId == myId ||
+                                      displayText == '— Te has unido —';
+                                  final canOpenJoinProfile =
+                                      isJoin &&
+                                      !isSelfJoin &&
+                                      (msgUserId.isNotEmpty ||
+                                          joinHandle.isNotEmpty);
+
+                                  final capsule = Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      vertical: 6,
+                                      horizontal: 16,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0x80141022),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: const Color(0xFF2C2542),
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.info_outline_rounded,
+                                          size: 13,
+                                          color: AppColors.accentCyan,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Flexible(
+                                          child: Text(
+                                            displayText,
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFFC8C8DC),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (!canOpenJoinProfile) {
+                                    return Center(child: capsule);
+                                  }
+
+                                  return Center(
+                                    child: InkWell(
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        if (msgUserId.isNotEmpty) {
+                                          // Tarjeta de usuario de la sala con
+                                          // perfil, chat directo y moderación.
+                                          _openParticipantSheet(
+                                            userId: msgUserId,
+                                            username: joinHandle.isNotEmpty
+                                                ? joinHandle
+                                                : null,
+                                            displayName: userName.isNotEmpty
+                                                ? userName
+                                                : 'Usuario',
+                                            avatarUrl:
+                                                msg['userAvatar'] as String?,
+                                          );
+                                        } else {
+                                          // Fallback: perfil social directo.
+                                          context.push('/profile/$joinHandle');
+                                        }
+                                      },
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: capsule,
+                                    ),
+                                  );
+                                }
+
+                                final metaMap =
+                                    msg['metadata'] is Map<String, dynamic>
+                                    ? msg['metadata'] as Map<String, dynamic>
+                                    : (msg['metadata'] is Map
+                                          ? Map<String, dynamic>.from(
+                                              msg['metadata'] as Map,
+                                            )
+                                          : null);
+                                final msgTypeUpper =
+                                    (msg['type'] as String? ?? '')
+                                        .toUpperCase();
+                                final isDice =
+                                    rawType == 'dice' ||
+                                    msgTypeUpper == 'DICE' ||
+                                    msgTypeUpper == 'RPS' ||
+                                    msg['diceResult'] != null ||
+                                    metaMap?['diceResult'] != null;
+                                final isSticker = rawType == 'sticker';
+                                // Render inmutable: el rol del mensaje sale de sus
+                                // propios datos (roleName != null en el wire),
+                                // NUNCA del modo actual de la sala. Así el historial
+                                // de Roleplay conserva su hexágono y tag de rol
+                                // aunque el host cambie a voz / chat estándar.
+                                final role = msg['role'] as RoleCharacter?;
+                                final senderName =
+                                    msg['senderName'] as String? ?? 'Usuario';
+                                final myId =
+                                    ref.read(authControllerProvider).user?.id ??
+                                    '';
+                                final senderId =
+                                    msg['senderId'] as String? ?? '';
+                                final effectiveContentUrl =
+                                    (msg['contentUrl'] as String?)
+                                            ?.isNotEmpty ==
                                         true
                                     ? msg['contentUrl'] as String
                                     : ((msg['mediaUrl'] as String?)
-                                                ?.isNotEmpty ==
-                                            true
-                                        ? msg['mediaUrl'] as String
-                                        : (metaMap?['mediaUrl'] as String?));
+                                                  ?.isNotEmpty ==
+                                              true
+                                          ? msg['mediaUrl'] as String
+                                          : (metaMap?['mediaUrl'] as String?));
 
-                            final isMsgMine = senderId.isNotEmpty && senderId == myId;
-                            // ── Registro de GlobalKeys + resaltado ──
-                            // Asocia una GlobalKey por id (candidatos
-                            // normalizados) para el scroll al mensaje citado
-                            // y calcula si esta burbuja está resaltada.
-                            final keyNames = _keysForMessage(msg);
-                            for (final kn in keyNames) {
-                              _messageKeys.putIfAbsent(kn, GlobalKey.new);
-                            }
-                            final isHighlighted =
-                                _highlightedMessageId != null &&
+                                final isMsgMine =
+                                    senderId.isNotEmpty && senderId == myId;
+                                // ── Registro de GlobalKeys + resaltado ──
+                                // Asocia una GlobalKey por id (candidatos
+                                // normalizados) para el scroll al mensaje citado
+                                // y calcula si esta burbuja está resaltada.
+                                final keyNames = _keysForMessage(msg);
+                                for (final kn in keyNames) {
+                                  _messageKeys.putIfAbsent(kn, GlobalKey.new);
+                                }
+                                final isHighlighted =
+                                    _highlightedMessageId != null &&
                                     _highlightedMessageId ==
                                         _normalizeMessageId(msg['id']);
-                            final bubble = RoleChatBubble(
-                              isMine: isMsgMine,
-                              isHighlighted: isHighlighted,
-                              body: msg['body'] as String? ?? '',
-                              senderName: senderName,
-                              userName: msg['username'] as String?,
-                              role: role,
-                              userAvatarUrl: msg['userAvatar'] as String?,
-                              adminBadge: msg['adminBadge'] as String?,
-                              timestamp: _formatMessageTime(msg),
-                              messageType: msg['type'] as String? ?? 'message',
-                              contentUrl: effectiveContentUrl,
-                              metadata: metaMap,
-                              isDiceRoll: isDice,
-                              diceResult: msg['diceResult'] as String? ??
-                                  metaMap?['diceResult'] as String?,
-                              diceEmoji: msg['diceEmoji'] as String? ??
-                                  metaMap?['diceEmoji'] as String?,
-                              isSticker: isSticker,
-                              stickerAsset: msg['stickerAsset'] as String?,
-                              stickerEmoji: msg['stickerEmoji'] as String?,
-                              replyToId: msg['replyToId']?.toString(),
-                              replyToName: msg['replyToName'] as String?,
-                              replyToBody: msg['replyToBody'] as String?,
-                              onReplyTap: msg['replyToId'] != null
-                                  ? () => _scrollToMessage(msg['replyToId']!.toString())
-                                  : null,
-                              isEdited: msg['isEdited'] == true,
-                              editedAt: msg['editedAt']?.toString(),
-                              onPollVote: (optionId) {
-                                final msgId = '${msg['id'] ?? ''}';
-                                _salas.markPollVoted(
-                                  widget.roomId,
-                                  msgId,
-                                  optionId,
-                                );
-                                setState(() {});
-                                if (!msgId.startsWith('local-')) {
-                                  ref
-                                      .read(roomRepositoryProvider)
-                                      .voteRoomPoll(
-                                        widget.roomId,
-                                        msgId,
-                                        optionId: optionId,
+                                final replyToMeta = msg['replyTo'];
+                                final replyToMap = msg['replyTo'] is Map
+                                    ? Map<String, dynamic>.from(
+                                        msg['replyTo'] as Map,
                                       )
-                                      .catchError((err) {
-                                    debugPrint('[POLL_VOTE] Error: $err');
-                                    return <String, dynamic>{};
-                                  });
-                                }
-                              },
-                              onUserTap: () {
-                                final realUsername =
-                                    (msg['username'] as String?) ?? '';
-                                RoomUserProfileSheet.show(
-                                  context,
-                                  displayName: senderName,
-                                  username: realUsername,
-                                  userId: senderId.isEmpty ? null : senderId,
-                                  avatarUrl: msg['userAvatar'] as String?,
+                                    : (replyToMeta is Map
+                                          ? Map<String, dynamic>.from(
+                                              replyToMeta,
+                                            )
+                                          : null);
+                                final replyToMediaUrl =
+                                    (msg['replyToMediaUrl'] ??
+                                            metaMap?['replyToMediaUrl'] ??
+                                            replyToMap?['mediaUrl'])
+                                        ?.toString();
+                                final replyToType =
+                                    (msg['replyToType'] ??
+                                            metaMap?['replyToType'] ??
+                                            replyToMap?['type'])
+                                        ?.toString();
+                                final bubble = RoleChatBubble(
+                                  isMine: isMsgMine,
+                                  isHighlighted: isHighlighted,
+                                  body: msg['body'] as String? ?? '',
+                                  senderName: senderName,
+                                  userName: msg['username'] as String?,
                                   role: role,
+                                  userAvatarUrl: msg['userAvatar'] as String?,
                                   adminBadge: msg['adminBadge'] as String?,
-                                  isHost:
-                                      room != null &&
-                                      (senderId == room.host.id ||
-                                          (senderId.isEmpty &&
-                                              room.host.displayName ==
-                                                  senderName)),
-                                  isSelf:
-                                      senderId == myId ||
-                                      senderName ==
-                                          (ref
-                                                  .read(authControllerProvider)
-                                                  .user
-                                                  ?.displayName ??
-                                              ''),
-                                  canManage: _canManageRoles(),
-                                  onViewProfile: () {
-                                    if (realUsername
-                                        .replaceAll('@', '')
-                                        .trim()
-                                        .isNotEmpty) {
-                                      final cleanU = realUsername
-                                          .replaceAll('@', '')
-                                          .trim();
-                                      Navigator.pop(context);
-                                      context.push('/profile/$cleanU');
+                                  timestamp: _formatMessageTime(msg),
+                                  messageType:
+                                      msg['type'] as String? ?? 'message',
+                                  contentUrl: effectiveContentUrl,
+                                  metadata: metaMap,
+                                  isDiceRoll: isDice,
+                                  diceResult:
+                                      msg['diceResult'] as String? ??
+                                      metaMap?['diceResult'] as String?,
+                                  diceEmoji:
+                                      msg['diceEmoji'] as String? ??
+                                      metaMap?['diceEmoji'] as String?,
+                                  isSticker: isSticker,
+                                  stickerAsset: msg['stickerAsset'] as String?,
+                                  stickerEmoji: msg['stickerEmoji'] as String?,
+                                  replyToId: msg['replyToId']?.toString(),
+                                  replyToName: msg['replyToName'] as String?,
+                                  replyToBody: msg['replyToBody'] as String?,
+                                  replyToMediaUrl: replyToMediaUrl,
+                                  replyToType: replyToType,
+                                  onReplyTap: msg['replyToId'] != null
+                                      ? () => _scrollToMessage(
+                                          msg['replyToId']!.toString(),
+                                        )
+                                      : null,
+                                  isEdited: msg['isEdited'] == true,
+                                  editedAt: msg['editedAt']?.toString(),
+                                  onPollVote: (optionId) {
+                                    final msgId = '${msg['id'] ?? ''}';
+                                    _salas.markPollVoted(
+                                      widget.roomId,
+                                      msgId,
+                                      optionId,
+                                    );
+                                    setState(() {});
+                                    if (!msgId.startsWith('local-')) {
+                                      ref
+                                          .read(roomRepositoryProvider)
+                                          .voteRoomPoll(
+                                            widget.roomId,
+                                            msgId,
+                                            optionId: optionId,
+                                          )
+                                          .catchError((err) {
+                                            debugPrint(
+                                              '[POLL_VOTE] Error: $err',
+                                            );
+                                            return <String, dynamic>{};
+                                          });
                                     }
                                   },
-                                  onStartDirectChat: () {
-                                    _startDirectChatWith(
-                                      senderId,
-                                      realUsername,
+                                  onUserTap: () {
+                                    final realUsername =
+                                        (msg['username'] as String?) ?? '';
+                                    RoomUserProfileSheet.show(
+                                      context,
+                                      displayName: senderName,
+                                      username: realUsername,
+                                      userId: senderId.isEmpty
+                                          ? null
+                                          : senderId,
+                                      avatarUrl: msg['userAvatar'] as String?,
+                                      role: role,
+                                      adminBadge: msg['adminBadge'] as String?,
+                                      isHost:
+                                          room != null &&
+                                          (senderId == room.host.id ||
+                                              (senderId.isEmpty &&
+                                                  room.host.displayName ==
+                                                      senderName)),
+                                      isSelf:
+                                          senderId == myId ||
+                                          senderName ==
+                                              (ref
+                                                      .read(
+                                                        authControllerProvider,
+                                                      )
+                                                      .user
+                                                      ?.displayName ??
+                                                  ''),
+                                      canManage: _canManageRoles(),
+                                      onViewProfile: () {
+                                        if (realUsername
+                                            .replaceAll('@', '')
+                                            .trim()
+                                            .isNotEmpty) {
+                                          final cleanU = realUsername
+                                              .replaceAll('@', '')
+                                              .trim();
+                                          Navigator.pop(context);
+                                          context.push('/profile/$cleanU');
+                                        }
+                                      },
+                                      onStartDirectChat: () {
+                                        _startDirectChatWith(
+                                          senderId,
+                                          realUsername,
+                                        );
+                                      },
+                                      isMuted: _mutedUserIds.contains(senderId),
+                                      onMute: () =>
+                                          _toggleMuteUser(senderId, senderName),
+                                      onKick: () {
+                                        _salas.addRoomMessage(widget.roomId, {
+                                          'type': 'system',
+                                          'text':
+                                              '🚫 $senderName ha sido expulsado/a de la sala',
+                                        });
+                                        setState(() {});
+                                      },
                                     );
                                   },
-                                  isMuted: _mutedUserIds.contains(senderId),
-                                  onMute: () =>
-                                      _toggleMuteUser(senderId, senderName),
-                                  onKick: () {
-                                    _salas.addRoomMessage(widget.roomId, {
-                                      'type': 'system',
-                                      'text':
-                                          '🚫 $senderName ha sido expulsado/a de la sala',
-                                    });
-                                    setState(() {});
-                                  },
+                                );
+
+                                // ── Swipe-to-reply calibrado ──
+                                // Reemplaza al Dismissible (que se disparaba con
+                                // micro-deslizamientos e interfería con el scroll
+                                // vertical): exige ~64px horizontales netos con
+                                // dominancia horizontal y cancela el gesto si el
+                                // usuario termina haciendo scroll vertical.
+                                final msgKey = 'msg_${msg['id'] ?? index}';
+                                return _SwipeToReply(
+                                  key: ValueKey(msgKey),
+                                  onReply: () => _startReply(msg),
+                                  threshold: _swipeReplyThreshold,
+                                  onThresholdCrossed: () =>
+                                      HapticFeedback.lightImpact(),
+                                  child: GestureDetector(
+                                    onLongPress: () =>
+                                        _showMessageContextMenu(msg),
+                                    child: KeyedSubtree(
+                                      key: _keysForMessage(msg).isNotEmpty
+                                          ? _messageKeys[_keysForMessage(
+                                              msg,
+                                            ).first]
+                                          : null,
+                                      child: bubble,
+                                    ),
+                                  ),
                                 );
                               },
-                            );
-
-                            // ── Swipe-to-reply calibrado ──
-                            // Reemplaza al Dismissible (que se disparaba con
-                            // micro-deslizamientos e interfería con el scroll
-                            // vertical): exige ~64px horizontales netos con
-                            // dominancia horizontal y cancela el gesto si el
-                            // usuario termina haciendo scroll vertical.
-                            final msgKey = 'msg_${msg['id'] ?? index}';
-                            return _SwipeToReply(
-                              key: ValueKey(msgKey),
-                              onReply: () => _startReply(msg),
-                              threshold: _swipeReplyThreshold,
-                              onThresholdCrossed: () =>
-                                  HapticFeedback.lightImpact(),
-                              child: GestureDetector(
-                                onLongPress: () => _showMessageContextMenu(msg),
-                                child: KeyedSubtree(
-                                  key: _keysForMessage(msg).isNotEmpty
-                                      ? _messageKeys[_keysForMessage(msg).first]
-                                      : null,
-                                  child: bubble,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                            ),
+                    ),
                   ),
-                ),
 
-
-                // ── Banner de moderación / sanción activa ──
-                if (_isConnected && !_canSendMessage)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0x28FF4D6D),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: const Color(0x55FF4D6D),
-                        width: 0.8,
+                  // ── Banner de moderación / sanción activa ──
+                  if (_isConnected && !_canSendMessage)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.warning_amber_rounded,
-                          color: Color(0xFFFF4D6D),
-                          size: 18,
+                      decoration: BoxDecoration(
+                        color: const Color(0x28FF4D6D),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: const Color(0x55FF4D6D),
+                          width: 0.8,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _sanctionBannerText ??
-                                'Tu cuenta ha sido sancionada/silenciada por moderación.',
-                            style: const TextStyle(
-                              color: Color(0xFFFF8A9D),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: Color(0xFFFF4D6D),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _sanctionBannerText ??
+                                  'Tu cuenta ha sido sancionada/silenciada por moderación.',
+                              style: const TextStyle(
+                                color: Color(0xFFFF8A9D),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                // ── Barra Inferior: Conectado vs Previa ──
-                if (_isConnected)
-                  ChatMessageInputBar(
-                    enabled: _canSendMessage,
-                    disabledHint: 'Envío de mensajes bloqueado por moderación',
-                    onSendMessage: _sendMessage,
-                    onSendImage: _sendImageFromPath,
-                    onSendAudio: _sendVoiceNote,
-                    onSendDiceRoll: _sendDiceRoll,
-                    onSendPoll: _sendPoll,
-                    onSendSticker: _sendSticker,
-                    onOpenModesTap:
-                        _canManageRoles() ? _openRoomModesSelector : null,
-                    onInviteFriends: () {
-                      final currentRoom = _currentRoom;
-                      if (currentRoom != null) {
-                        RoomInviteFriendsSheet.show(
-                          context,
-                          room: currentRoom,
-                        );
-                      }
-                    },
-                    isRoleplay: _currentRoomMode == 'roleplay',
-                    userName:
-                        ref
-                                .watch(authControllerProvider)
-                                .user
-                                ?.displayName
-                                .isNotEmpty ==
-                            true
-                        ? ref.watch(authControllerProvider).user!.displayName
-                        : (ref.watch(authControllerProvider).user?.username ??
-                              'Tú'),
-                    userAvatarUrl: ref
-                        .watch(authControllerProvider)
-                        .user
-                        ?.avatarUrl,
-                    currentRole: _currentActiveRole,
-                    availableRoles: _stageRoles,
-                    currentUserId: ref.watch(authControllerProvider).user?.id,
-                    isHost: _canManageRoles(),
-                    replyingToMessage: _replyingToMessage,
-                    onCancelReply: _cancelReply,
-                    editingMessage: _editingMessage,
-                    onCancelEdit: _cancelEdit,
-                    onSendEdit: _submitEdit,
-                    onIdentityChanged: (selected) {
-                      setState(() => _currentActiveRole = selected);
-                    },
-                    onRoleChanged: (selected) {
-                      setState(() => _currentActiveRole = selected);
-                    },
-                    onTypingChanged: (typing) {
-                      // Mientras se escribe se pausan los emojis animados.
-                      _chatAnimationsEnabled.value = !typing;
-                    },
-                  )
-                else
-                  _buildPreJoinBottomBar(),
-              ],
+                  // ── Barra Inferior: Conectado vs Previa ──
+                  if (_isConnected)
+                    ChatMessageInputBar(
+                      enabled: _canSendMessage,
+                      disabledHint:
+                          'Envío de mensajes bloqueado por moderación',
+                      onSendMessage: _sendMessage,
+                      onSendImage: _sendImageFromPath,
+                      onSendAudio: _sendVoiceNote,
+                      onSendDiceRoll: _sendDiceRoll,
+                      onSendPoll: _sendPoll,
+                      onSendSticker: _sendSticker,
+                      onOpenModesTap: _canManageRoles()
+                          ? _openRoomModesSelector
+                          : null,
+                      onInviteFriends: () {
+                        final currentRoom = _currentRoom;
+                        if (currentRoom != null) {
+                          RoomInviteFriendsSheet.show(
+                            context,
+                            room: currentRoom,
+                          );
+                        }
+                      },
+                      isRoleplay: _currentRoomMode == 'roleplay',
+                      userName:
+                          ref
+                                  .watch(authControllerProvider)
+                                  .user
+                                  ?.displayName
+                                  .isNotEmpty ==
+                              true
+                          ? ref.watch(authControllerProvider).user!.displayName
+                          : (ref.watch(authControllerProvider).user?.username ??
+                                'Tú'),
+                      userAvatarUrl: ref
+                          .watch(authControllerProvider)
+                          .user
+                          ?.avatarUrl,
+                      currentRole: _currentActiveRole,
+                      availableRoles: _stageRoles,
+                      currentUserId: ref.watch(authControllerProvider).user?.id,
+                      isHost: _canManageRoles(),
+                      replyingToMessage: _replyingToMessage,
+                      onCancelReply: _cancelReply,
+                      editingMessage: _editingMessage,
+                      onCancelEdit: _cancelEdit,
+                      onSendEdit: _submitEdit,
+                      onIdentityChanged: (selected) {
+                        setState(() => _currentActiveRole = selected);
+                      },
+                      onRoleChanged: (selected) {
+                        setState(() => _currentActiveRole = selected);
+                      },
+                      onTypingChanged: (typing) {
+                        // Mientras se escribe se pausan los emojis animados.
+                        _chatAnimationsEnabled.value = !typing;
+                      },
+                    )
+                  else
+                    _buildPreJoinBottomBar(),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -5239,17 +5618,18 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
   // ── Botón de redimensión de actividad ──────────────────────────────────────
 
   Widget _buildStageResizeButton() {
-    final bool isVoiceConnected =
-        ref.watch(voiceRoomProvider.select((s) => s.isConnected));
+    final bool isVoiceConnected = ref.watch(
+      voiceRoomProvider.select((s) => s.isConnected),
+    );
     final bool isCurrentMinimized = _currentRoomMode == 'roleplay'
         ? _isRoleplayMinimized
         : (_currentRoomMode == 'voice'
-            ? _isVoiceMinimized
-            : (_currentRoomMode == 'screening'
-                ? _isStageMinimized
-                : (isVoiceConnected
-                    ? _isVoiceMinimized
-                    : _isStageMinimized)));
+              ? _isVoiceMinimized
+              : (_currentRoomMode == 'screening'
+                    ? _isStageMinimized
+                    : (isVoiceConnected
+                          ? _isVoiceMinimized
+                          : _isStageMinimized)));
 
     return Center(
       child: GestureDetector(
@@ -5289,10 +5669,7 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
           decoration: BoxDecoration(
             color: const Color(0xCC1F1B2E),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0xFF2C2542),
-              width: 0.8,
-            ),
+            border: Border.all(color: const Color(0xFF2C2542), width: 0.8),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -5306,7 +5683,9 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
               ),
               const SizedBox(width: 4),
               Text(
-                isCurrentMinimized ? 'Expandir actividad' : 'Minimizar actividad',
+                isCurrentMinimized
+                    ? 'Expandir actividad'
+                    : 'Minimizar actividad',
                 style: const TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w600,
@@ -5383,8 +5762,11 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.call_end_rounded,
-                      size: 13, color: AppColors.accentCrimson),
+                  Icon(
+                    Icons.call_end_rounded,
+                    size: 13,
+                    color: AppColors.accentCrimson,
+                  ),
                   SizedBox(width: 4),
                   Text(
                     'Colgar',
@@ -5436,11 +5818,13 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
               border: Border.all(color: const Color(0xFF2E2744), width: 0.8),
             ),
             clipBehavior: Clip.antiAlias,
-            child: (_effectiveCoverUrl != null && _effectiveCoverUrl!.isNotEmpty)
+            child:
+                (_effectiveCoverUrl != null && _effectiveCoverUrl!.isNotEmpty)
                 ? CachedNetworkImage(
                     imageUrl: _effectiveCoverUrl!,
                     fit: BoxFit.cover,
-                    placeholder: (_, _) => Container(color: const Color(0xFF1E1A2E)),
+                    placeholder: (_, _) =>
+                        Container(color: const Color(0xFF1E1A2E)),
                     errorWidget: (_, _, _) => _buildRoomCoverFallback(roomName),
                   )
                 : _buildRoomCoverFallback(roomName),
@@ -5478,7 +5862,8 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                         ),
                       ),
                       clipBehavior: Clip.antiAlias,
-                      child: room?.host.avatarUrl != null &&
+                      child:
+                          room?.host.avatarUrl != null &&
                               room!.host.avatarUrl!.isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl: room.host.avatarUrl!,
@@ -5533,7 +5918,10 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
               IconButton(
                 tooltip: 'Invitar amigos',
                 visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
                 padding: EdgeInsets.zero,
                 icon: const Icon(
                   Icons.person_add_alt_1_rounded,
@@ -5547,7 +5935,10 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
               IconButton(
                 tooltip: 'Información',
                 visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
                 padding: EdgeInsets.zero,
                 icon: const Icon(
                   Icons.info_outline_rounded,
@@ -5559,7 +5950,10 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
               IconButton(
                 tooltip: 'Opciones de la sala',
                 visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
                 padding: EdgeInsets.zero,
                 icon: const Icon(
                   Icons.more_vert_rounded,
@@ -5580,8 +5974,8 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
     final trimmed = name.trim();
     final initials = trimmed.isNotEmpty
         ? (trimmed.length <= 3
-            ? trimmed.toUpperCase()
-            : trimmed.substring(0, 2).toUpperCase())
+              ? trimmed.toUpperCase()
+              : trimmed.substring(0, 2).toUpperCase())
         : 'S';
     return Container(
       color: AppColors.avatarColor(name),
@@ -5716,7 +6110,10 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
                   child: Center(
                     child: Text(
                       'Aún no hay participantes visibles',
-                      style: TextStyle(color: Color(0xFF9E9EA8), fontSize: 12.5),
+                      style: TextStyle(
+                        color: Color(0xFF9E9EA8),
+                        fontSize: 12.5,
+                      ),
                     ),
                   ),
                 )
@@ -5766,7 +6163,6 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
     );
   }
 
-
   // ── Barra Inferior Modo Pre-Join ─────────────────────────────────────────
 
   Widget _buildPreJoinBottomBar() {
@@ -5791,10 +6187,7 @@ void _showMessageContextMenu(Map<String, dynamic> msg) {
             height: 48,
             borderColor: AppColors.accentCyan,
             customGradient: const LinearGradient(
-              colors: [
-                Color(0xFF0E3838),
-                Color(0xFF164E4E),
-              ],
+              colors: [Color(0xFF0E3838), Color(0xFF164E4E)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -5907,7 +6300,9 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
               setState(() {
                 _dx = (_dx + d.delta.dx).clamp(0.0, widget.threshold * 2);
                 _dy += d.delta.dy;
-                if (!_crossed && _dx >= widget.threshold && _dy.abs() <= _dx.abs()) {
+                if (!_crossed &&
+                    _dx >= widget.threshold &&
+                    _dy.abs() <= _dx.abs()) {
                   _crossed = true;
                   widget.onThresholdCrossed?.call();
                 }

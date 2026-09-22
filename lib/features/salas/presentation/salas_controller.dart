@@ -770,6 +770,8 @@ class SalasNotifier extends Notifier<SalasState> {
       'replyToId': m.replyToId,
       'replyToName': m.replyToName,
       'replyToBody': m.replyToBody,
+      'replyToMediaUrl': m.replyToMediaUrl,
+      'replyToType': m.replyToType,
       'isEdited': m.isEdited,
       'editedAt': m.editedAt,
       'editCount': m.editCount,

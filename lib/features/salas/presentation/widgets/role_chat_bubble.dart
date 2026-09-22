@@ -10,6 +10,7 @@ import '../../../../core/widgets/chat_animated_media.dart';
 import '../../../../core/widgets/hexagon_avatar.dart';
 import '../../../../features/feed/presentation/widgets/interactive_poll_card.dart';
 import '../../../../models/role_character.dart';
+import 'reply_preview.dart';
 import 'voice_note_bubble.dart';
 
 /// Burbuja de mensaje de chat con soporte completo de identidad de Rol / Personaje OC
@@ -35,6 +36,8 @@ class RoleChatBubble extends StatelessWidget {
     this.replyToId,
     this.replyToName,
     this.replyToBody,
+    this.replyToMediaUrl,
+    this.replyToType,
     this.onReplyTap,
     this.isEdited = false,
     this.editedAt,
@@ -80,6 +83,13 @@ class RoleChatBubble extends StatelessWidget {
   final String? replyToId;
   final String? replyToName;
   final String? replyToBody;
+
+  /// URL del medio citado (imagen): permite la miniatura limpia de la cita
+  /// sin exponer la URL cruda de Supabase como texto.
+  final String? replyToMediaUrl;
+
+  /// Tipo wire del mensaje citado (`image`, `voice`, …).
+  final String? replyToType;
   final VoidCallback? onReplyTap;
 
   /// Estado de edición
@@ -303,8 +313,9 @@ class RoleChatBubble extends StatelessWidget {
                 // derecha de la fila sino pegado al borde del contenido.
                 Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment:
-                      isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  crossAxisAlignment: isMine
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
                   children: [
                     _buildBubbleContent(context),
                     // Las notas de voz ya muestran la hora dentro de la propia
@@ -420,12 +431,18 @@ class RoleChatBubble extends StatelessWidget {
           // El acento del rol solo se permite en detalles pequeños internos
           // (cita), nunca en el fondo/borde principal de la burbuja.
           final roleColor = _resolveRoleColor();
+          final replyPreview = resolveReplyPreview(
+            body: replyToBody,
+            mediaUrl: replyToMediaUrl,
+            messageType: replyToType,
+          );
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Cita / Reply contextual (Ref: Imagen 1)
-              if (replyToBody != null && replyToBody!.isNotEmpty) ...[
+              if ((replyToBody?.isNotEmpty ?? false) ||
+                  (replyToMediaUrl?.isNotEmpty ?? false)) ...[
                 GestureDetector(
                   onTap: onReplyTap,
                   child: Container(
@@ -441,25 +458,41 @@ class RoleChatBubble extends StatelessWidget {
                         left: BorderSide(color: roleColor, width: 3),
                       ),
                     ),
-                    child: Column(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (replyToName != null)
-                          Text(
-                            replyToName!,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: roleColor,
-                            ),
+                        if (replyPreview.thumbnailUrl != null) ...[
+                          buildReplyThumbnail(
+                            replyPreview.thumbnailUrl!,
+                            size: 32,
                           ),
-                        Text(
-                          replyToBody!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFFD0D0E0),
+                          const SizedBox(width: 8),
+                        ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (replyToName != null)
+                                Text(
+                                  replyToName!,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: roleColor,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              Text(
+                                replyPreview.text,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFFD0D0E0),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -518,8 +551,8 @@ class RoleChatBubble extends StatelessWidget {
     final url = contentUrl != null && contentUrl!.isNotEmpty
         ? contentUrl!
         : (metadata?['mediaUrl'] as String? ??
-            (metadata?['imageUrl'] as String? ??
-                (body.startsWith('http') ? body : '')));
+              (metadata?['imageUrl'] as String? ??
+                  (body.startsWith('http') ? body : '')));
     return GestureDetector(
       onTap: () => _openFullscreenImage(context, url),
       child: ClipRRect(
@@ -605,7 +638,9 @@ class RoleChatBubble extends StatelessWidget {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Imagen guardada en la galería'),
+                                  content: Text(
+                                    'Imagen guardada en la galería',
+                                  ),
                                   behavior: SnackBarBehavior.floating,
                                   backgroundColor: AppColors.accentTeal,
                                 ),
@@ -688,8 +723,8 @@ class RoleChatBubble extends StatelessWidget {
     return InteractivePollCard(
       question: data['question'] as String? ?? body,
       options: options,
-      userVotedOptionId: (data['userVotedOptionId'] as String?)?.isNotEmpty ==
-              true
+      userVotedOptionId:
+          (data['userVotedOptionId'] as String?)?.isNotEmpty == true
           ? data['userVotedOptionId'] as String
           : null,
       totalVotesCount: (data['totalVotes'] as num?)?.toInt(),
@@ -698,10 +733,12 @@ class RoleChatBubble extends StatelessWidget {
   }
 
   Widget _buildDiceRollCard() {
-    final effectiveEmoji = diceEmoji ??
+    final effectiveEmoji =
+        diceEmoji ??
         metadata?['diceEmoji'] as String? ??
         (body.toLowerCase().contains('morra') ? '✊' : '🎲');
-    final effectiveResult = diceResult ??
+    final effectiveResult =
+        diceResult ??
         metadata?['diceResult'] as String? ??
         metadata?['result'] as String? ??
         '';
@@ -879,8 +916,10 @@ class RoleChatBubble extends StatelessWidget {
         );
       } else if (colored != null) {
         final closeIdx = colored.indexOf('}');
-        final content =
-            colored.substring(closeIdx + 1, colored.length - '{/color}'.length);
+        final content = colored.substring(
+          closeIdx + 1,
+          colored.length - '{/color}'.length,
+        );
         Color color;
         try {
           color = Color(

@@ -14,6 +14,7 @@ import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/sticker_catalog.dart';
 import '../../../../core/widgets/sticker_picker.dart';
 import '../../../../models/role_character.dart';
+import 'reply_preview.dart';
 import 'animated_emoji_keyboard.dart';
 import 'dice_selector_modal.dart';
 import 'poll_creation_modal.dart';
@@ -162,12 +163,14 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
       }
       if (_selectedRole != null) {
         final myId = widget.currentUserId ?? '';
-        final isStillValid = widget.availableRoles.any((r) =>
-            r.id == _selectedRole!.id &&
-            r.isValid &&
-            r.isTaken &&
-            ((r.takenByUserId != null && r.takenByUserId == myId) ||
-                (r.occupiedBy != null && r.occupiedBy == myId)));
+        final isStillValid = widget.availableRoles.any(
+          (r) =>
+              r.id == _selectedRole!.id &&
+              r.isValid &&
+              r.isTaken &&
+              ((r.takenByUserId != null && r.takenByUserId == myId) ||
+                  (r.occupiedBy != null && r.occupiedBy == myId)),
+        );
         if (!isStillValid) {
           _selectedRole = null;
           widget.onRoleChanged?.call(null);
@@ -177,13 +180,16 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
     }
     if (widget.editingMessage != oldWidget.editingMessage) {
       if (widget.editingMessage != null) {
-        final body = (widget.editingMessage!['body'] ??
-                widget.editingMessage!['content'] ??
-                widget.editingMessage!['text'] ??
-                '')
-            .toString();
+        final body =
+            (widget.editingMessage!['body'] ??
+                    widget.editingMessage!['content'] ??
+                    widget.editingMessage!['text'] ??
+                    '')
+                .toString();
         _textController.text = body;
-        _textController.selection = TextSelection.collapsed(offset: body.length);
+        _textController.selection = TextSelection.collapsed(
+          offset: body.length,
+        );
         _fieldFocusNode.requestFocus();
       } else if (oldWidget.editingMessage != null) {
         _textController.clear();
@@ -446,12 +452,14 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
     RoleCharacter? activeRole;
     if (widget.isRoleplay && _selectedRole != null) {
       final myId = widget.currentUserId ?? '';
-      final isStillValid = widget.availableRoles.any((r) =>
-          r.id == _selectedRole!.id &&
-          r.isValid &&
-          r.isTaken &&
-          ((r.takenByUserId != null && r.takenByUserId == myId) ||
-              (r.occupiedBy != null && r.occupiedBy == myId)));
+      final isStillValid = widget.availableRoles.any(
+        (r) =>
+            r.id == _selectedRole!.id &&
+            r.isValid &&
+            r.isTaken &&
+            ((r.takenByUserId != null && r.takenByUserId == myId) ||
+                (r.occupiedBy != null && r.occupiedBy == myId)),
+      );
       if (isStillValid) {
         activeRole = _selectedRole;
       }
@@ -510,36 +518,50 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                       focusNode: _fieldFocusNode,
                       enabled: widget.enabled,
                       maxLength: 4000,
-                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) =>
-                          currentLength > 3500
-                              ? Text(
-                                  '$currentLength/$maxLength',
-                                  style: const TextStyle(
-                                    color: Color(0xFF9E9EAF),
-                                    fontSize: 10,
-                                  ),
-                                )
-                              : null,
+                      buildCounter:
+                          (
+                            context, {
+                            required currentLength,
+                            required isFocused,
+                            maxLength,
+                          }) => currentLength > 3500
+                          ? Text(
+                              '$currentLength/$maxLength',
+                              style: const TextStyle(
+                                color: Color(0xFF9E9EAF),
+                                fontSize: 10,
+                              ),
+                            )
+                          : null,
                       maxLines: null,
                       style: TextStyle(
-                        color: widget.enabled ? Colors.white : const Color(0xFF8E889D),
+                        color: widget.enabled
+                            ? Colors.white
+                            : const Color(0xFF8E889D),
                         fontSize: 14,
                       ),
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         hintText: !widget.enabled
-                            ? (widget.disabledHint ?? 'No puedes enviar mensajes en este momento')
+                            ? (widget.disabledHint ??
+                                  'No puedes enviar mensajes en este momento')
                             : (activeRole != null
-                                ? 'Mensaje como ${activeRole.name}...'
-                                : 'Escribe un mensaje...'),
+                                  ? 'Mensaje como ${activeRole.name}...'
+                                  : 'Escribe un mensaje...'),
                         hintStyle: TextStyle(
                           color: !widget.enabled
                               ? ((widget.disabledHint != null &&
-                                      (widget.disabledHint!.toLowerCase().contains('moderación') ||
-                                          widget.disabledHint!.toLowerCase().contains('sancionada') ||
-                                          widget.disabledHint!.toLowerCase().contains('bloqueado')))
-                                  ? const Color(0xFFFF8A9D)
-                                  : const Color(0xFF7A7A8E))
+                                        (widget.disabledHint!
+                                                .toLowerCase()
+                                                .contains('moderación') ||
+                                            widget.disabledHint!
+                                                .toLowerCase()
+                                                .contains('sancionada') ||
+                                            widget.disabledHint!
+                                                .toLowerCase()
+                                                .contains('bloqueado')))
+                                    ? const Color(0xFFFF8A9D)
+                                    : const Color(0xFF7A7A8E))
                               : const Color(0xFF7A7A8E),
                           fontSize: 14,
                         ),
@@ -588,19 +610,22 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      gradient: widget.enabled &&
+                      gradient:
+                          widget.enabled &&
                               !_isCoolingDown &&
                               _textController.text.trim().isNotEmpty
                           ? AppColors.crimsonGlow
                           : null,
-                      color: (!widget.enabled ||
+                      color:
+                          (!widget.enabled ||
                               _isCoolingDown ||
                               _textController.text.trim().isEmpty)
                           ? const Color(0xFF1E1930)
                           : null,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: widget.enabled &&
+                        color:
+                            widget.enabled &&
                                 !_isCoolingDown &&
                                 _textController.text.trim().isNotEmpty
                             ? AppColors.accentCrimson
@@ -624,7 +649,8 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                         : Icon(
                             Icons.send_rounded,
                             size: 18,
-                            color: widget.enabled &&
+                            color:
+                                widget.enabled &&
                                     _textController.text.trim().isNotEmpty
                                 ? Colors.white
                                 : const Color(0xFF6E6888),
@@ -710,7 +736,8 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                           color: const Color(0xFFA594F9),
                           tooltip: 'Acciones de sala / Stickers',
                           onTap: () {
-                            if (widget.onOpenModesTap != null && !widget.isRoleplay) {
+                            if (widget.onOpenModesTap != null &&
+                                !widget.isRoleplay) {
                               widget.onOpenModesTap!();
                             } else {
                               _showStickerPicker();
@@ -950,8 +977,19 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
 
   Widget _buildReplyPreviewBanner() {
     final reply = widget.replyingToMessage!;
-    final author = (reply['senderName'] ?? reply['username'] ?? 'Usuario').toString();
-    final content = (reply['body'] ?? reply['content'] ?? reply['text'] ?? '').toString();
+    final author = (reply['senderName'] ?? reply['username'] ?? 'Usuario')
+        .toString();
+    final replyMeta = reply['metadata'] is Map
+        ? Map<String, dynamic>.from(reply['metadata'] as Map)
+        : null;
+    // Texto limpio: nunca se muestra la URL cruda del medio citado.
+    final preview = resolveReplyPreview(
+      body: (reply['body'] ?? reply['content'] ?? reply['text'])?.toString(),
+      mediaUrl:
+          (reply['mediaUrl'] ?? reply['contentUrl'] ?? replyMeta?['mediaUrl'])
+              ?.toString(),
+      messageType: reply['type']?.toString(),
+    );
 
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 8, 14, 2),
@@ -971,6 +1009,10 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
             size: 20,
           ),
           const SizedBox(width: 8),
+          if (preview.thumbnailUrl != null) ...[
+            buildReplyThumbnail(preview.thumbnailUrl!, size: 28),
+            const SizedBox(width: 8),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -988,7 +1030,7 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  content.isNotEmpty ? content : '[Contenido multimedia]',
+                  preview.text,
                   style: const TextStyle(
                     color: Color(0xFFB0ACC4),
                     fontSize: 12,
@@ -1000,7 +1042,11 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF8E889D)),
+            icon: const Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: Color(0xFF8E889D),
+            ),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             onPressed: widget.onCancelReply,
@@ -1012,7 +1058,9 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
 
   Widget _buildEditingBanner() {
     final editMsg = widget.editingMessage!;
-    final content = (editMsg['body'] ?? editMsg['content'] ?? editMsg['text'] ?? '').toString();
+    final content =
+        (editMsg['body'] ?? editMsg['content'] ?? editMsg['text'] ?? '')
+            .toString();
 
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 8, 14, 2),
@@ -1026,11 +1074,7 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.edit_rounded,
-            color: Color(0xFFFFB300),
-            size: 18,
-          ),
+          const Icon(Icons.edit_rounded, color: Color(0xFFFFB300), size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -1059,7 +1103,11 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF8E889D)),
+            icon: const Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: Color(0xFF8E889D),
+            ),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             onPressed: widget.onCancelEdit,
@@ -1139,7 +1187,9 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                           color: const Color(0xFF241C3B),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: const Color(0xFFA594F9).withValues(alpha: 0.4),
+                            color: const Color(
+                              0xFFA594F9,
+                            ).withValues(alpha: 0.4),
                             width: 0.8,
                           ),
                         ),
@@ -1444,7 +1494,10 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
 
                 // Encabezado de Sección: Roles Disponibles
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
+                  ),
                   child: Text(
                     'ROLES Y PERSONAJES ASIGNADOS (${userRoles.length})',
                     style: TextStyle(
@@ -1557,7 +1610,8 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
         child: Row(
           children: [
             AppAvatar(
-              imageUrl: (effectiveImageUrl != null && effectiveImageUrl.isNotEmpty)
+              imageUrl:
+                  (effectiveImageUrl != null && effectiveImageUrl.isNotEmpty)
                   ? effectiveImageUrl
                   : null,
               name: title,
@@ -1612,11 +1666,7 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
               ),
             ),
             if (isSelected)
-              Icon(
-                Icons.check_circle_rounded,
-                color: fallbackColor,
-                size: 20,
-              ),
+              Icon(Icons.check_circle_rounded, color: fallbackColor, size: 20),
           ],
         ),
       ),
@@ -1675,8 +1725,9 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                 onTap: () async {
                   Navigator.pop(ctx);
                   final picker = ImagePicker();
-                  final image =
-                      await picker.pickImage(source: ImageSource.camera);
+                  final image = await picker.pickImage(
+                    source: ImageSource.camera,
+                  );
                   if (image != null) widget.onSendImage(image.path);
                 },
               ),
@@ -1729,7 +1780,8 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         color: Colors.transparent,
-        child: iconWidget ??
+        child:
+            iconWidget ??
             Icon(
               icon,
               size: 22,
