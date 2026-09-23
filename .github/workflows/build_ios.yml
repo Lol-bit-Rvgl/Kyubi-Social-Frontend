@@ -16,15 +16,15 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Instalar dependencias Flutter
+      - name: Instalar dependencias de Flutter
         run: flutter pub get
 
-      - name: Precrear directorios de build para rsync y CocoaPods
+      - name: Precrear carpetas de build para rsync y CocoaPods
         run: |
           mkdir -p build/ios/SourcePackages
           mkdir -p ios/Pods
 
-      - name: Instalar pods de iOS
+      - name: Instalar dependencias nativas de iOS (CocoaPods)
         run: |
           cd ios
           pod install --repo-update
