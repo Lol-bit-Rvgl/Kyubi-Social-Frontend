@@ -16,18 +16,19 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Desactivar Swift Package Manager en Flutter (usar CocoaPods clásico)
+      - name: Desactivar Swift Package Manager en Flutter
         run: |
           flutter config --no-enable-swift-package-manager
 
       - name: Instalar dependencias Flutter
         run: flutter pub get
 
-      - name: Limpiar y preparar directorios nativos
+      - name: Preparar Podfile y resolver CocoaPods
         run: |
-          mkdir -p build/ios/SourcePackages
-          mkdir -p ios/Pods
           cd ios
+          # Asegurar platform :ios, '14.0' en el Podfile
+          sed -i '' "s/# platform :ios, .*/platform :ios, '14.0'/g" Podfile
+          sed -i '' "s/platform :ios, .*/platform :ios, '14.0'/g" Podfile
           rm -rf Podfile.lock Pods
           pod install --repo-update
 
