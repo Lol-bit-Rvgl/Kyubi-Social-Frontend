@@ -862,8 +862,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 color: Colors.white70,
               ),
               title: Text(
-                conversation.muted ? 'Activar notificaciones' : 'Silenciar',
-                style: const TextStyle(color: Colors.white),
+                conversation.muted
+                    ? 'Reactivar notificaciones'
+                    : 'Silenciar conversación',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -873,20 +878,66 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             ListTile(
               leading: const Icon(
                 Icons.delete_outline_rounded,
-                color: Color(0xFF9B6FCB),
+                color: AppColors.danger,
               ),
               title: const Text(
                 'Eliminar conversación',
-                style: TextStyle(color: Color(0xFF9B6FCB)),
+                style: TextStyle(
+                  color: AppColors.danger,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               onTap: () {
                 Navigator.pop(context);
-                _deleteConversation();
+                _confirmDeleteConversation();
               },
             ),
             const SizedBox(height: 12),
           ],
         ),
+      ),
+    );
+  }
+
+  void _confirmDeleteConversation() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF14141B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          'Eliminar conversación',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        ),
+        content: const Text(
+          '¿Deseas eliminar esta conversación? Los mensajes se borrarán de tu bandeja.',
+          style: TextStyle(color: Color(0xFF9E9EA8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Color(0xFF7A7A8A)),
+            ),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogCtx).pop();
+              _deleteConversation();
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -573,17 +573,6 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
     );
   }
 
-  /// Resuelve dinámicamente al destinatario del chat: otherMember → members
-  /// (excluyendo al usuario actual). Evita el fallback 'Conversación'/'@usuario'
-  /// cuando la serialización vía socket/caché no incluye otherMember.
-  ChatAuthor? _otherMember(Conversation? conversation) {
-    if (conversation == null) return null;
-    final currentUserId = ref.read(authControllerProvider).user?.id ?? '';
-    final resolved = conversation.resolveOtherMember(currentUserId);
-    if (resolved != null) return resolved;
-    return conversation.otherMember;
-  }
-
   void _openUserProfile(BuildContext context, ChatAuthor? member) {
     if (member == null) return;
     HapticFeedback.lightImpact();
@@ -1286,7 +1275,7 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
     if (conversation == null) return;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.surfaceCards,
+      backgroundColor: const Color(0xFF14141E),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1302,27 +1291,6 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
                 color: const Color(0xFF3A3A4A),
                 borderRadius: BorderRadius.circular(2),
               ),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.person_outline_rounded,
-                color: Colors.white70,
-              ),
-              title: const Text(
-                'Ver perfil',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                final other = _otherMember(conversation);
-                final username = other?.username;
-                if (username != null && username.isNotEmpty) {
-                  context.push('/profile/$username');
-                }
-              },
             ),
             ListTile(
               leading: const Icon(
@@ -1365,6 +1333,7 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
                 }
               },
             ),
+            const Divider(height: 1, color: Color(0x14FFFFFF)),
             ListTile(
               leading: Icon(
                 conversation.muted
@@ -1374,7 +1343,7 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
               ),
               title: Text(
                 conversation.muted
-                    ? 'Activar notificaciones'
+                    ? 'Reactivar notificaciones'
                     : 'Silenciar conversación',
                 style: const TextStyle(
                   color: Colors.white,
@@ -1389,23 +1358,66 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
             ListTile(
               leading: const Icon(
                 Icons.delete_outline_rounded,
-                color: Color(0xFF9B6FCB),
+                color: AppColors.danger,
               ),
               title: const Text(
                 'Eliminar conversación',
                 style: TextStyle(
-                  color: Color(0xFF9B6FCB),
+                  color: AppColors.danger,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               onTap: () {
                 Navigator.pop(context);
-                _deleteConversation();
+                _confirmDeleteConversation();
               },
             ),
             const SizedBox(height: 12),
           ],
         ),
+      ),
+    );
+  }
+
+  void _confirmDeleteConversation() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF14141B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          'Eliminar conversación',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        ),
+        content: const Text(
+          '¿Deseas eliminar esta conversación? Los mensajes se borrarán de tu bandeja.',
+          style: TextStyle(color: Color(0xFF9E9EA8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Color(0xFF7A7A8A)),
+            ),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogCtx).pop();
+              _deleteConversation();
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }

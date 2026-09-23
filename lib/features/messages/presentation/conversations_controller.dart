@@ -277,6 +277,45 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
     );
   }
 
+  /// Silencia o reactiva las notificaciones de la conversación.
+  Future<void> toggleMute(String conversationId) async {
+    final index = state.conversations.indexWhere((c) => c.id == conversationId);
+    if (index < 0) return;
+    final current = state.conversations[index];
+    final nextMuted = !current.muted;
+    final updated = [...state.conversations];
+    updated[index] = current.copyWith(muted: nextMuted);
+    state = state.copyWith(conversations: updated);
+    ConversationsCache.save(state.conversations);
+
+    try {
+      await _repo.setMuted(conversationId, nextMuted);
+    } catch (_) {
+      if (!_mounted) return;
+      final rollback = [...state.conversations];
+      final rollbackIdx = rollback.indexWhere((c) => c.id == conversationId);
+      if (rollbackIdx >= 0) {
+        rollback[rollbackIdx] = current;
+        state = state.copyWith(conversations: rollback);
+        ConversationsCache.save(state.conversations);
+      }
+      rethrow;
+    }
+  }
+
+  /// Elimina la conversación en backend y la remueve del estado local reactivamente.
+  Future<void> deleteConversation(String conversationId) async {
+    removeConversation(conversationId);
+    ConversationsCache.save(state.conversations);
+    try {
+      await _repo.deleteConversation(conversationId);
+    } catch (_) {
+      if (!_mounted) return;
+      refresh();
+      rethrow;
+    }
+  }
+
   void markRead(String conversationId) {
     final index = state.conversations.indexWhere((c) => c.id == conversationId);
     if (index < 0) return;

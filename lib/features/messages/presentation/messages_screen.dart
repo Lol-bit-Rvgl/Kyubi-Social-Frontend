@@ -465,6 +465,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
             currentUserId: currentUserId,
             pinned: state.pinnedIds.contains(conversation.id),
             onTap: () => _open(conversation),
+            onLongPress: () => _showConversationContextMenu(conversation),
           );
         },
       ),
@@ -613,6 +614,229 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
       }
     }
   }
+
+  void _showConversationContextMenu(Conversation conversation) {
+    final currentUserId = ref.watch(authControllerProvider).user?.id ?? '';
+    final otherUser = conversation.resolveOtherMember(currentUserId);
+    final otherName = (otherUser?.displayName.isNotEmpty == true)
+        ? otherUser!.displayName
+        : (otherUser?.username.isNotEmpty == true
+            ? otherUser!.username
+            : conversation.displayName);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF14141E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3A3A4A),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Row(
+                children: [
+                  AppAvatar(
+                    imageUrl: otherUser?.avatarUrl ?? conversation.avatarUrl,
+                    name: otherName,
+                    radius: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          otherName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        if (otherUser?.username.isNotEmpty == true)
+                          Text(
+                            '@${otherUser!.username}',
+                            style: const TextStyle(
+                              color: Color(0xFF8A8A9A),
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0x14FFFFFF)),
+            ListTile(
+              leading: Icon(
+                conversation.muted
+                    ? Icons.notifications_active_rounded
+                    : Icons.notifications_off_rounded,
+                color: Colors.white70,
+              ),
+              title: Text(
+                conversation.muted
+                    ? 'Reactivar notificaciones'
+                    : 'Silenciar conversación',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              onTap: () async {
+                Navigator.of(sheetContext).pop();
+                try {
+                  await ref
+                      .read(conversationsControllerProvider.notifier)
+                      .toggleMute(conversation.id);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        conversation.muted
+                            ? 'Notificaciones reactivadas'
+                            : 'Conversación silenciada',
+                      ),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                } catch (_) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('No se pudo actualizar la conversación'),
+                    ),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.person_outline_rounded,
+                color: Colors.white70,
+              ),
+              title: Text(
+                'Ver perfil de $otherName',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                final profileId = otherUser?.username.isNotEmpty == true
+                    ? otherUser!.username
+                    : otherUser?.id;
+                if (profileId != null && profileId.isNotEmpty) {
+                  context.push('/profile/$profileId');
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.delete_outline_rounded,
+                color: AppColors.danger,
+              ),
+              title: const Text(
+                'Eliminar conversación',
+                style: TextStyle(
+                  color: AppColors.danger,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _showDeleteConversationDialog(conversation);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConversationDialog(Conversation conversation) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF14141B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          'Eliminar conversación',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        ),
+        content: const Text(
+          '¿Deseas eliminar esta conversación? Los mensajes se borrarán de tu bandeja.',
+          style: TextStyle(color: Color(0xFF9E9EA8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Color(0xFF7A7A8A)),
+            ),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogCtx).pop();
+              try {
+                await ref
+                    .read(conversationsControllerProvider.notifier)
+                    .deleteConversation(conversation.id);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Conversación eliminada'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              } catch (_) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Error al eliminar la conversación'),
+                  ),
+                );
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -624,12 +848,14 @@ class _ConversationCard extends StatelessWidget {
     required this.conversation,
     required this.currentUserId,
     required this.onTap,
+    this.onLongPress,
     this.pinned = false,
   });
 
   final Conversation conversation;
   final String currentUserId;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final bool pinned;
 
   @override
@@ -658,6 +884,7 @@ class _ConversationCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: LiquidGlassContainer(
         width: double.infinity,
         borderRadius: AppDimens.radiusCard,
@@ -731,6 +958,15 @@ class _ConversationCard extends StatelessWidget {
                               ],
                             ),
                           ),
+                          if (conversation.muted) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.notifications_off_rounded,
+                              size: 13,
+                              color: Color(0xFF7A7A8A),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
                           if (conversation.lastMessage?.createdAt != null)
                             Text(
                               _formatTime(conversation.lastMessage!.createdAt),
