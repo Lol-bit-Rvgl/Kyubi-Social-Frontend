@@ -13,6 +13,7 @@ import '../models/user.dart';
 import '../repositories/auth_repository.dart';
 import '../features/messages/presentation/conversations_controller.dart';
 import '../features/messages/presentation/follow_requests_controller.dart';
+import '../features/messages/presentation/mentions_controller.dart';
 import '../features/notifications/presentation/notifications_controller.dart';
 import '../features/salas/presentation/room_invites_controller.dart';
 import '../features/salas/presentation/salas_controller.dart';
@@ -87,7 +88,16 @@ class AuthNotifier extends Notifier<AuthState> {
       ref.read(salasControllerProvider.notifier).clearAll();
     } catch (_) {}
     try {
+      ref.read(conversationsControllerProvider.notifier).clear();
+    } catch (_) {}
+    try {
       ref.read(roomInvitesControllerProvider.notifier).clear();
+    } catch (_) {}
+    try {
+      ref.read(followRequestsControllerProvider.notifier).clear();
+    } catch (_) {}
+    try {
+      ref.read(mentionsControllerProvider.notifier).clear();
     } catch (_) {}
     try {
       ConversationsCache.clear(userId: currentUserId);
@@ -104,6 +114,7 @@ class AuthNotifier extends Notifier<AuthState> {
     ref.invalidate(followRequestsControllerProvider);
     ref.invalidate(roomInvitesControllerProvider);
     ref.invalidate(notificationsControllerProvider);
+    ref.invalidate(mentionsControllerProvider);
     // Purgar fichas de personaje de la sesión anterior para evitar cross-user leaks
     ref.invalidate(myCharactersProvider);
     ref.invalidate(userCharactersProvider);
@@ -126,6 +137,7 @@ class AuthNotifier extends Notifier<AuthState> {
     ref.invalidate(followRequestsControllerProvider);
     ref.invalidate(roomInvitesControllerProvider);
     ref.invalidate(notificationsControllerProvider);
+    ref.invalidate(mentionsControllerProvider);
   }
 
   Future<void> restoreSession() async {
@@ -137,6 +149,9 @@ class AuthNotifier extends Notifier<AuthState> {
       final refresh = await TokenStorage.refreshToken();
       if ((access != null && access.isNotEmpty) ||
           (refresh != null && refresh.isNotEmpty)) {
+        if (access != null && access.isNotEmpty) {
+          ApiClient.instance.updateAuthToken(access);
+        }
         final cachedJson = await LastUserStorage.read();
         if (cachedJson != null) {
           try {
@@ -154,6 +169,8 @@ class AuthNotifier extends Notifier<AuthState> {
           ? AuthState(status: AuthStatus.authenticated, user: user)
           : const AuthState(status: AuthStatus.unauthenticated);
       if (user != null) {
+        final token = await TokenStorage.accessToken();
+        ApiClient.instance.updateAuthToken(token);
         _onUserSessionAuthenticated();
         // Push: registrar token FCM tras restaurar sesión.
         NotificationService.instance.syncTokenWithBackend(
@@ -222,8 +239,9 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(busy: true, error: null);
     try {
       final result = await _auth.login(email: email, password: password);
-      _purgeUserSessionState();
       await SessionRepository(_auth).saveSession(result);
+      ApiClient.instance.updateAuthToken(result.accessToken);
+      _purgeUserSessionState();
       final user = result.user ?? await _auth.me();
       state = AuthState(
         status: AuthStatus.authenticated,
@@ -257,8 +275,9 @@ class AuthNotifier extends Notifier<AuthState> {
         password: password,
         displayName: displayName,
       );
-      _purgeUserSessionState();
       await SessionRepository(_auth).saveSession(result);
+      ApiClient.instance.updateAuthToken(result.accessToken);
+      _purgeUserSessionState();
       final user = result.user ?? await _auth.me();
       state = AuthState(
         status: AuthStatus.authenticated,
@@ -287,8 +306,9 @@ class AuthNotifier extends Notifier<AuthState> {
         state = state.copyWith(busy: false);
         return false;
       }
-      _purgeUserSessionState();
       await SessionRepository(_auth).saveSession(result);
+      ApiClient.instance.updateAuthToken(result.accessToken);
+      _purgeUserSessionState();
       final user = result.user ?? await _auth.me();
       state = AuthState(
         status: AuthStatus.authenticated,

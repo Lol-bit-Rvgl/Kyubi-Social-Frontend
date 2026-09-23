@@ -127,6 +127,29 @@ class ApiClient {
   // -------------------------------------------------------------------------
   Dio get dio => _dio;
 
+  /// Actualiza o purga el token de autorización en las opciones globales de Dio.
+  void updateAuthToken(String? token) {
+    if (token != null && token.isNotEmpty) {
+      _dio.options.headers['Authorization'] = 'Bearer $token';
+    } else {
+      _dio.options.headers.remove('Authorization');
+    }
+  }
+
+  /// Token de autorización configurado en cabeceras en memoria.
+  String? get currentAuthToken {
+    final header = _dio.options.headers['Authorization'] as String?;
+    if (header != null && header.startsWith('Bearer ')) {
+      return header.substring(7);
+    }
+    return null;
+  }
+
+  /// Cancela cualquier refresco en vuelo tras logout o conmutación de cuenta.
+  void resetRefresh() {
+    _refreshFuture = null;
+  }
+
   /// Inyecta cabeceras de autenticación, metadatos del cliente y firma.
   Future<void> _injectRequestHeaders(RequestOptions options) async {
     try {
@@ -134,6 +157,9 @@ class ApiClient {
       if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
         options.headers['sid'] = await ClientIdentity.sid();
+      } else {
+        options.headers.remove('Authorization');
+        options.headers.remove('sid');
       }
 
       options.headers['X-Device-Id'] = await ClientIdentity.deviceId();

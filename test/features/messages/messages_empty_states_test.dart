@@ -8,6 +8,7 @@ import 'package:kyubi/features/messages/presentation/conversation_controller.dar
 import 'package:kyubi/features/messages/presentation/conversation_screen.dart';
 import 'package:kyubi/features/messages/presentation/conversations_controller.dart';
 import 'package:kyubi/features/messages/presentation/follow_requests_controller.dart';
+import 'package:kyubi/features/messages/presentation/mentions_controller.dart';
 import 'package:kyubi/features/messages/presentation/widgets/follow_requests_list.dart';
 import 'package:kyubi/features/salas/presentation/room_invites_controller.dart';
 import 'package:kyubi/models/user.dart';
@@ -180,6 +181,9 @@ void main() {
               () => _MockRoomInvitesNotifier(
                 const RoomInvitesState(loading: false, invites: []),
               ),
+            ),
+            mentionsControllerProvider.overrideWith(
+              () => _MockMentionsNotifier(),
             ),
           ],
           child: const MaterialApp(
@@ -380,4 +384,9 @@ class _MockRoomInvitesNotifier extends RoomInvitesNotifier {
 
   @override
   RoomInvitesState build() => _initialState;
+}
+
+class _MockMentionsNotifier extends MentionsNotifier {
+  @override
+  MentionsState build() => const MentionsState();
 }

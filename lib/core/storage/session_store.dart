@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../constants/storage_keys.dart';
 import '../errors/api_exception.dart';
+import '../network/api_client.dart';
 import 'secure_storage.dart';
 
 /// Contiene el token de acceso actual y operaciones de sesión.
@@ -17,6 +18,8 @@ class TokenStorage {
   }) async {
     _cachedAccessToken = accessToken;
     _cachedRefreshToken = refreshToken;
+    ApiClient.instance.updateAuthToken(accessToken);
+    ApiClient.instance.resetRefresh();
     await SecureStorage.write(StorageKeys.accessToken, accessToken);
     await SecureStorage.write(StorageKeys.refreshToken, refreshToken);
   }
@@ -24,6 +27,9 @@ class TokenStorage {
   static Future<String?> accessToken() async {
     if (_cachedAccessToken != null) return _cachedAccessToken;
     _cachedAccessToken = await SecureStorage.read(StorageKeys.accessToken);
+    if (_cachedAccessToken != null && _cachedAccessToken!.isNotEmpty) {
+      ApiClient.instance.updateAuthToken(_cachedAccessToken);
+    }
     return _cachedAccessToken;
   }
 
@@ -35,12 +41,15 @@ class TokenStorage {
 
   static Future<void> updateAccessToken(String accessToken) async {
     _cachedAccessToken = accessToken;
+    ApiClient.instance.updateAuthToken(accessToken);
     await SecureStorage.write(StorageKeys.accessToken, accessToken);
   }
 
   static Future<void> clear() async {
     _cachedAccessToken = null;
     _cachedRefreshToken = null;
+    ApiClient.instance.updateAuthToken(null);
+    ApiClient.instance.resetRefresh();
     await SecureStorage.delete(StorageKeys.accessToken);
     await SecureStorage.delete(StorageKeys.refreshToken);
     await SecureStorage.delete(StorageKeys.lastUserJson);

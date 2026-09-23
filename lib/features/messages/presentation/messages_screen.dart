@@ -10,12 +10,14 @@ import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/liquid_glass_container.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../../models/chat_conversation.dart';
+import '../../../../models/mention_item.dart';
 import '../../../../services/auth_controller.dart';
 import '../../salas/presentation/room_invites_controller.dart';
 import '../../salas/presentation/salas_controller.dart';
 import '../../salas/presentation/widgets/live_room_card.dart';
 import 'conversations_controller.dart';
 import 'follow_requests_controller.dart';
+import 'mentions_controller.dart';
 import 'widgets/follow_requests_list.dart';
 import 'widgets/new_chat_sheet.dart';
 
@@ -335,6 +337,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
         .where((req) => !activeDirectUserIds.contains(req.requester.id))
         .length;
     final inviteCount = roomInvitesCount + followInvitesCount;
+    final mentionsCount = ref.watch(mentionsControllerProvider).unreadCount;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(AppDimens.md, 8, AppDimens.md, 8),
@@ -372,7 +375,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
             _buildTabWithBadge('Private', totalUnread),
             const Tab(text: 'Rooms'),
             _buildTabWithBadge('Invites', inviteCount),
-            const Tab(text: '@Mentions'),
+            _buildTabWithBadge('@Mentions', mentionsCount),
           ],
         ),
       ),
@@ -525,18 +528,63 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
   // ── Tab: Mentions ──────────────────────────────────────────────────
 
   Widget _buildMentionsTab() {
-    // Pestaña de menciones pendientes con asset oficial
-    return EmptyView(
-      imageWidget: Image.asset(
-        AppAssets.iconMenciones,
-        width: 90,
-        height: 90,
-        fit: BoxFit.contain,
+    final state = ref.watch(mentionsControllerProvider);
+    if (state.loading && state.mentions.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (state.error != null && state.mentions.isEmpty) {
+      return ErrorView(
+        message: state.error!,
+        onRetry: () => ref.read(mentionsControllerProvider.notifier).refresh(),
+        title: 'No se pudieron cargar las menciones',
+      );
+    }
+    if (state.mentions.isEmpty) {
+      return EmptyView(
+        imageWidget: Image.asset(
+          AppAssets.iconMenciones,
+          width: 90,
+          height: 90,
+          fit: BoxFit.contain,
+        ),
+        title: 'No tienes menciones pendientes',
+        message:
+            'Cuando alguien te mencione en un chat grupal\no sala, aparecerá aquí.',
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => ref.read(mentionsControllerProvider.notifier).refresh(),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.md,
+          vertical: AppDimens.xs,
+        ),
+        itemCount: state.mentions.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final mention = state.mentions[index];
+          return _MentionCard(
+            mention: mention,
+            onTap: () => _openMention(mention),
+          );
+        },
       ),
-      title: 'No tienes menciones pendientes',
-      message:
-          'Cuando alguien te mencione en un chat grupal\no sala, aparecerá aquí.',
     );
+  }
+
+  void _openMention(MentionItem mention) {
+    ref.read(mentionsControllerProvider.notifier).markAsRead(mention.id);
+    if (mention.isRoom &&
+        mention.targetId != null &&
+        mention.targetId!.isNotEmpty) {
+      context.push('/salas/${mention.targetId}');
+    } else if (mention.isConversation &&
+        mention.targetId != null &&
+        mention.targetId!.isNotEmpty) {
+      context.push('/conversation/${mention.targetId}');
+    }
   }
 
   // ── Actions ────────────────────────────────────────────────────────
@@ -830,3 +878,214 @@ class _ConversationCard extends StatelessWidget {
     return '${date.day}/${date.month}';
   }
 }
+
+class _MentionCard extends StatelessWidget {
+  const _MentionCard({
+    required this.mention,
+    required this.onTap,
+  });
+
+  final MentionItem mention;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final actor = mention.actor;
+    final actorName = (actor?.displayName != null && actor!.displayName.isNotEmpty)
+        ? actor.displayName
+        : (actor?.username != null && actor!.username.isNotEmpty)
+            ? actor.username
+            : 'Usuario';
+    final hasUnread = !mention.isRead;
+    final isRoom = mention.isRoom;
+    final targetLabel = isRoom
+        ? (mention.targetTitle != null && mention.targetTitle!.isNotEmpty
+            ? 'Sala: ${mention.targetTitle}'
+            : 'Sala en vivo')
+        : (mention.targetTitle != null && mention.targetTitle!.isNotEmpty
+            ? 'Chat: ${mention.targetTitle}'
+            : 'Chat privado');
+
+    return GestureDetector(
+      onTap: onTap,
+      child: LiquidGlassContainer(
+        width: double.infinity,
+        borderRadius: AppDimens.radiusCard,
+        blur: 12,
+        padding: const EdgeInsets.all(12),
+        child: Stack(
+          children: [
+            if (hasUnread)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 2,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF9B6FCB), Color(0xFF5BC8AF)],
+                    ),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(AppDimens.radiusCard),
+                    ),
+                  ),
+                ),
+              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppAvatar(
+                  imageUrl: actor?.avatarUrl,
+                  name: actorName,
+                  radius: 24,
+                  showOnline: false,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    actorName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: hasUnread
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                      fontSize: 15,
+                                      color: scheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                                if (actor?.username.isNotEmpty == true) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '@${actor!.username}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF8A8A9A),
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          Text(
+                            mention.timeAgo.isNotEmpty ? mention.timeAgo : '',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: hasUnread
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                              color: hasUnread
+                                  ? const Color(0xFFA594F9)
+                                  : const Color(0xFF8A8A9A),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      // Etiqueta de contexto de sala / chat
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isRoom
+                              ? const Color(0xFF9B6FCB).withValues(alpha: 0.15)
+                              : const Color(0xFF5BC8AF).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isRoom
+                                ? const Color(0xFF9B6FCB).withValues(alpha: 0.35)
+                                : const Color(0xFF5BC8AF).withValues(alpha: 0.35),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isRoom
+                                  ? Icons.sensors_rounded
+                                  : Icons.chat_bubble_outline_rounded,
+                              size: 12,
+                              color: isRoom
+                                  ? const Color(0xFFA594F9)
+                                  : const Color(0xFF5BC8AF),
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                targetLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isRoom
+                                      ? const Color(0xFFA594F9)
+                                      : const Color(0xFF5BC8AF),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Fragmento del mensaje
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              mention.text ?? 'Te mencionó en un mensaje',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.3,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w500
+                                    : FontWeight.w400,
+                                color: hasUnread
+                                    ? scheme.onSurface
+                                    : const Color(0xFF8A8A9A),
+                              ),
+                            ),
+                          ),
+                          if (hasUnread) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF9B6FCB),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

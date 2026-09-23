@@ -119,23 +119,31 @@ class SalasNotifier extends Notifier<SalasState> {
     final reqId = ++_requestId;
     state = state.copyWith(loading: true, error: null);
     try {
-      final rooms = await _fetch();
+      final rooms = await _fetch().timeout(const Duration(seconds: 8));
       if (_disposed || reqId != _requestId) return;
       state = state.copyWith(rooms: _sortRooms(rooms), loading: false);
     } catch (e) {
       if (_disposed || reqId != _requestId) return;
       state = state.copyWith(loading: false, error: e.toString());
+    } finally {
+      if (!_disposed && reqId == _requestId && state.loading) {
+        state = state.copyWith(loading: false);
+      }
     }
   }
 
   Future<void> _loadForRequest(int reqId) async {
     try {
-      final rooms = await _fetch();
+      final rooms = await _fetch().timeout(const Duration(seconds: 8));
       if (_disposed || reqId != _requestId) return;
       state = state.copyWith(rooms: _sortRooms(rooms), loading: false);
     } catch (e) {
       if (_disposed || reqId != _requestId) return;
       state = state.copyWith(loading: false, error: e.toString());
+    } finally {
+      if (!_disposed && reqId == _requestId && state.loading) {
+        state = state.copyWith(loading: false);
+      }
     }
   }
 
@@ -170,12 +178,16 @@ class SalasNotifier extends Notifier<SalasState> {
     final reqId = ++_requestId;
     state = state.copyWith(refreshing: true, error: null);
     try {
-      final rooms = await _fetch();
+      final rooms = await _fetch().timeout(const Duration(seconds: 8));
       if (_disposed || reqId != _requestId) return;
       state = state.copyWith(rooms: _sortRooms(rooms), refreshing: false);
     } catch (e) {
       if (_disposed || reqId != _requestId) return;
       state = state.copyWith(refreshing: false, error: e.toString());
+    } finally {
+      if (!_disposed && reqId == _requestId && state.refreshing) {
+        state = state.copyWith(refreshing: false);
+      }
     }
   }
 

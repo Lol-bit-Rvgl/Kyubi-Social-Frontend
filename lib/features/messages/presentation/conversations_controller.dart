@@ -54,19 +54,29 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
       _unsubscribed = true;
       _mounted = false;
     });
+    final currentUserId = ref.watch(authControllerProvider.select((s) => s.user?.id));
+    if (currentUserId == null || currentUserId.isEmpty) {
+      return const ConversationsState();
+    }
     _listen();
-    _restoreFromCache();
+    _restoreFromCache(currentUserId);
     Future.microtask(_load);
-    return const ConversationsState();
+    return const ConversationsState(loading: true);
   }
 
   bool _mounted = true;
 
+  /// Purga el estado en memoria de conversaciones al cerrar sesión.
+  void clear() {
+    _seenMessages.clear();
+    state = const ConversationsState();
+  }
+
   /// Restaura conversaciones desde caché local antes de la carga de red,
   /// evitando que la lista desaparezca al reiniciar la app.
-  Future<void> _restoreFromCache() async {
+  Future<void> _restoreFromCache([String? userId]) async {
     try {
-      final cached = await ConversationsCache.read();
+      final cached = await ConversationsCache.read(userId: userId);
       if (cached.isEmpty || !_mounted) return;
       final conversations = cached
           .map(Conversation.fromJson)
@@ -108,18 +118,20 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
   }
 
   Future<void> _load() async {
-    if (state.loading || state.refreshing) return;
+    if (!_mounted) return;
+    if (state.loading && state.conversations.isNotEmpty) return;
     state = state.copyWith(loading: true, error: null);
     try {
       try {
-        await _socket.connect().timeout(const Duration(seconds: 4));
+        await _socket.connect().timeout(const Duration(seconds: 3));
       } catch (_) {}
       final conversations = await _repo
           .getConversations()
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 8));
       if (!_mounted) return;
       state = state.copyWith(conversations: conversations, loading: false);
-      ConversationsCache.save(conversations);
+      final myId = ref.read(authControllerProvider).user?.id;
+      ConversationsCache.save(conversations, userId: myId);
     } catch (e) {
       if (_mounted) {
         state = state.copyWith(loading: false, error: e.toString());
@@ -132,14 +144,16 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
   }
 
   Future<void> refresh() async {
+    if (!_mounted) return;
     state = state.copyWith(refreshing: true, error: null);
     try {
       final conversations = await _repo
           .getConversations()
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 8));
       if (!_mounted) return;
       state = state.copyWith(conversations: conversations, refreshing: false);
-      ConversationsCache.save(conversations);
+      final myId = ref.read(authControllerProvider).user?.id;
+      ConversationsCache.save(conversations, userId: myId);
     } catch (e) {
       if (_mounted) {
         state = state.copyWith(refreshing: false, error: e.toString());

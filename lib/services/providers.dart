@@ -6,6 +6,7 @@ import '../repositories/bookmarks_repository.dart';
 import '../repositories/chat_repository.dart';
 import '../repositories/circle_repository.dart';
 import '../repositories/follow_requests_repository.dart';
+import '../repositories/mentions_repository.dart';
 import '../repositories/notification_repository.dart';
 import '../repositories/post_repository.dart';
 import '../repositories/role_slots_repository.dart';
@@ -92,6 +93,10 @@ final notificationSocketProvider = Provider<NotificationSocketService>(
 
 final notificationRepositoryProvider = Provider<NotificationRepository>(
   (ref) => NotificationRepository(ref.watch(apiClientProvider)),
+);
+
+final mentionsRepositoryProvider = Provider<MentionsRepository>(
+  (ref) => MentionsRepository(ref.watch(apiClientProvider)),
 );
 
 final circleRepositoryProvider = Provider<CircleRepository>(

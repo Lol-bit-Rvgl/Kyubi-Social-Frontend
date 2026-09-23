@@ -95,6 +95,7 @@ class AppConfig {
   static const String usersMeAvailability = '/users/me/availability';
   static const String usersMeAchievements = '/users/me/achievements';
   static const String usersMeStickers = '/users/me/stickers';
+  static const String usersMeMentions = '/users/me/mentions';
   static const String usersOnboarding = '/users/onboarding';
   static const String usersSetupInterests = '/users/setup/interests';
   static const String usersPaymentPassword = '/users/payment-password';

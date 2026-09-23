@@ -81,7 +81,7 @@ class RoomInvitesNotifier extends Notifier<RoomInvitesState> {
     _fetching = true;
     state = state.copyWith(loading: true, error: null);
     try {
-      final list = await _repo.getRoomInvites();
+      final list = await _repo.getRoomInvites().timeout(const Duration(seconds: 8));
       if (_disposed) return;
       state = state.copyWith(
         invites: list,
@@ -92,6 +92,9 @@ class RoomInvitesNotifier extends Notifier<RoomInvitesState> {
       state = state.copyWith(loading: false, error: e.toString());
     } finally {
       _fetching = false;
+      if (!_disposed && state.loading) {
+        state = state.copyWith(loading: false);
+      }
     }
   }
 
@@ -100,7 +103,7 @@ class RoomInvitesNotifier extends Notifier<RoomInvitesState> {
     _fetching = true;
     state = state.copyWith(refreshing: true, error: null);
     try {
-      final list = await _repo.getRoomInvites();
+      final list = await _repo.getRoomInvites().timeout(const Duration(seconds: 8));
       if (_disposed) return;
       state = state.copyWith(
         invites: list,
@@ -111,6 +114,9 @@ class RoomInvitesNotifier extends Notifier<RoomInvitesState> {
       state = state.copyWith(refreshing: false, error: e.toString());
     } finally {
       _fetching = false;
+      if (!_disposed && state.refreshing) {
+        state = state.copyWith(refreshing: false);
+      }
     }
   }
 

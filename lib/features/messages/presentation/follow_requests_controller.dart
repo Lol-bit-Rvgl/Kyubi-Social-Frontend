@@ -65,12 +65,16 @@ class FollowRequestsNotifier extends Notifier<FollowRequestsState> {
     return const FollowRequestsState();
   }
 
+  void clear() {
+    state = const FollowRequestsState();
+  }
+
   Future<void> _load() async {
     if (_disposed) return;
     if (state.loading || state.refreshing) return;
     state = state.copyWith(loading: true, error: null);
     try {
-      final page = await _repo.getFollowRequests();
+      final page = await _repo.getFollowRequests().timeout(const Duration(seconds: 8));
       if (_disposed) return;
       state = state.copyWith(
         items: page.items,
@@ -81,6 +85,10 @@ class FollowRequestsNotifier extends Notifier<FollowRequestsState> {
     } catch (e) {
       if (_disposed) return;
       state = state.copyWith(loading: false, error: e.toString());
+    } finally {
+      if (!_disposed && state.loading) {
+        state = state.copyWith(loading: false);
+      }
     }
   }
 
@@ -88,7 +96,7 @@ class FollowRequestsNotifier extends Notifier<FollowRequestsState> {
     if (_disposed) return;
     state = state.copyWith(refreshing: true, error: null);
     try {
-      final page = await _repo.getFollowRequests();
+      final page = await _repo.getFollowRequests().timeout(const Duration(seconds: 8));
       if (_disposed) return;
       state = state.copyWith(
         items: page.items,
@@ -99,6 +107,10 @@ class FollowRequestsNotifier extends Notifier<FollowRequestsState> {
     } catch (e) {
       if (_disposed) return;
       state = state.copyWith(refreshing: false, error: e.toString());
+    } finally {
+      if (!_disposed && state.refreshing) {
+        state = state.copyWith(refreshing: false);
+      }
     }
   }
 
