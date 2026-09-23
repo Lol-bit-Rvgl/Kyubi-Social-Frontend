@@ -21,6 +21,7 @@ import '../../../../services/auth_controller.dart';
 import '../../../../services/providers.dart';
 import '../../salas/presentation/widgets/chat_message_input_bar.dart';
 import 'conversation_controller.dart';
+import 'conversation_info_screen.dart';
 import 'conversations_controller.dart';
 import 'widgets/match_decision_bar.dart';
 
@@ -119,46 +120,56 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         backgroundColor: const Color(0xFF12101C),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (state.typingUsers.isNotEmpty)
-              const Text(
-                'escribiendo...',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: AppColors.accentCyan,
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              )
-            else if (subtitle != null)
+        title: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () async {
+            HapticFeedback.lightImpact();
+            await ConversationInfoScreen.show(
+              context,
+              conversationId: widget.conversationId,
+            );
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Text(
-                isOnline ? '$subtitle · 🟢 En línea' : subtitle,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isOnline
-                      ? AppColors.accentTeal
-                      : const Color(0xFF8A8A9A),
-                  fontWeight: FontWeight.w500,
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-          ],
+              if (state.typingUsers.isNotEmpty)
+                const Text(
+                  'escribiendo...',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.accentCyan,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                )
+              else if (subtitle != null)
+                Text(
+                  isOnline ? '$subtitle · 🟢 En línea' : subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isOnline
+                        ? AppColors.accentTeal
+                        : const Color(0xFF8A8A9A),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
         ),
         actions: [
           IconButton(

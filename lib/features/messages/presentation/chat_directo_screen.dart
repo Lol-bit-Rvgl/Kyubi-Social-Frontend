@@ -23,6 +23,7 @@ import '../../../services/providers.dart';
 import '../../salas/presentation/widgets/chat_message_input_bar.dart';
 import '../../salas/presentation/widgets/room_user_profile_sheet.dart';
 import 'conversation_controller.dart';
+import 'conversation_info_screen.dart';
 import 'conversations_controller.dart';
 import 'widgets/chat_bubble.dart';
 
@@ -940,7 +941,23 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
         ),
         titleSpacing: 0,
         title: GestureDetector(
-          onTap: () => _openUserProfile(context, other),
+          onTap: () async {
+            HapticFeedback.lightImpact();
+            await ConversationInfoScreen.show(
+              context,
+              conversationId: widget.conversationId,
+              onWallpaperChanged: (asset) {
+                if (mounted) setState(() => _chatBgAsset = asset);
+              },
+            );
+            final prefs = await SharedPreferences.getInstance();
+            if (mounted) {
+              setState(() {
+                _chatBgAsset =
+                    prefs.getString('chat_bg_${widget.conversationId}');
+              });
+            }
+          },
           behavior: HitTestBehavior.opaque,
           child: Row(
             children: [
