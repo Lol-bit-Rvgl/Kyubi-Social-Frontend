@@ -1,0 +1,31 @@
+name: Flutter Analyze (Strict)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Flutter Analyze / --fatal-infos
+    runs-on: ubuntu-latest
+
+    env:
+      TEMP: /tmp
+      TMP: /tmp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze (fatal-infos)
+        run: flutter analyze --fatal-infos
