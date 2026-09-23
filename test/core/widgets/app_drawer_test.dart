@@ -63,6 +63,14 @@ void main() {
       expect(find.text('Comunidades'), findsNothing);
       expect(find.text('Billetera & Monedas'), findsNothing);
       expect(find.text('Tienda de Cosméticos'), findsNothing);
+
+      // Badge En sala purgado de la tarjeta del drawer
+      expect(find.text('En sala'), findsNothing);
+      expect(find.text('Activo'), findsNothing);
+
+      // Fallbacks no deben mostrarse
+      expect(find.text('Kyubi User'), findsNothing);
+      expect(find.text('Lolbit'), findsNothing);
     });
 
     testWidgets('Renders KyubiDrawer with default cosmic background and fallback color when color is null', (tester) async {
@@ -215,6 +223,39 @@ void main() {
 
       final logoutText = tester.widget<Text>(find.text('Cerrar sesión'));
       expect(logoutText.style?.color, const Color(0xFF00E5FF));
+    });
+
+    testWidgets('Tapping Cerrar sesión displays confirmation dialog and does not render Kyubi User', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              drawer: const KyubiDrawer(user: testUser),
+              body: Builder(
+                builder: (context) => ElevatedButton(
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                  child: const Text('Open Drawer'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Drawer'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cerrar sesión'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('¿Estás seguro de que deseas salir de tu cuenta?'), findsOneWidget);
+      expect(find.text('Salir'), findsOneWidget);
+      expect(find.text('Cancelar'), findsOneWidget);
+
+      // Verify no transitional fallback appears
+      expect(find.text('Kyubi User'), findsNothing);
+      expect(find.text('Lolbit'), findsNothing);
     });
   });
 }

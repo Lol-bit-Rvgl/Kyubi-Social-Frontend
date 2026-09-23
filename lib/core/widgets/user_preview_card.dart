@@ -23,6 +23,7 @@ class UserPreviewCard extends StatelessWidget {
     this.onMention,
     this.onSendMessage,
     this.activityStatus,
+    this.showActivityStatus = true,
     this.isCompact = false,
     this.width,
     this.margin,
@@ -33,6 +34,7 @@ class UserPreviewCard extends StatelessWidget {
   final VoidCallback? onMention;
   final VoidCallback? onSendMessage;
   final String? activityStatus;
+  final bool showActivityStatus;
   final bool isCompact;
   final double? width;
   final EdgeInsetsGeometry? margin;
@@ -185,17 +187,19 @@ class UserPreviewCard extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                user.handle,
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  color: Color(0xFFA594F9),
-                                  fontWeight: FontWeight.w500,
+                              if (user.handle.isNotEmpty && user.handle != '@') ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  user.handle,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    color: Color(0xFFA594F9),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              ],
                               const SizedBox(height: 6),
 
                               // Fila de Insignias: Actividad + Nivel
@@ -204,50 +208,51 @@ class UserPreviewCard extends StatelessWidget {
                                 runSpacing: 4,
                                 crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  // Píldora de actividad
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.success.withValues(
-                                        alpha: 0.15,
+                                  // Píldora de actividad (opcional)
+                                  if (showActivityStatus)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
                                       ),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
+                                      decoration: BoxDecoration(
                                         color: AppColors.success.withValues(
-                                          alpha: 0.35,
+                                          alpha: 0.15,
                                         ),
-                                        width: 0.8,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: AppColors.success.withValues(
+                                            alpha: 0.35,
+                                          ),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: const BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: AppColors.success,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            activityStatus ??
+                                                (user.isOnline
+                                                    ? 'Activo'
+                                                    : 'En sala'),
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.success,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 6,
-                                          height: 6,
-                                          decoration: const BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: AppColors.success,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 5),
-                                        Text(
-                                          activityStatus ??
-                                              (user.isOnline
-                                                  ? 'Activo'
-                                                  : 'En sala'),
-                                          style: const TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.success,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
 
                                   // Píldora de nivel
                                   Container(

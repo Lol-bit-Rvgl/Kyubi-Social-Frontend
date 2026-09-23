@@ -21,7 +21,9 @@ class HeaderProfile extends ConsumerWidget {
     final auth = ref.watch(authControllerProvider);
     final user = auth.user;
     final avatarUrl = user?.effectiveAvatarUrl;
-    final displayName = user?.displayName ?? 'Lolbit';
+    final displayName = (user?.displayName.isNotEmpty == true)
+        ? user!.displayName
+        : (user?.username ?? '');
     final unreadCount = ref.watch(unreadCountProvider);
 
     return SliverToBoxAdapter(

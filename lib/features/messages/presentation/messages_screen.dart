@@ -142,7 +142,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
     final auth = ref.watch(authControllerProvider);
     final user = auth.user;
     final avatarUrl = user?.effectiveAvatarUrl;
-    final displayName = user?.displayName ?? 'Lolbit';
+    final displayName = (user?.displayName.isNotEmpty == true)
+        ? user!.displayName
+        : (user?.username ?? '');
 
     return Padding(
         padding: const EdgeInsets.fromLTRB(

@@ -34,7 +34,7 @@ Color? _parseColor(String? hexString) {
 /// 2. Filtro de desenfoque Liquid/Frosted (BackdropFilter).
 /// 3. Velo de degradado oscuro y translúcido para contraste.
 /// 4. Contenido del menú lateral (perfil, accesos directos, logout).
-class KyubiDrawer extends ConsumerWidget {
+class KyubiDrawer extends ConsumerStatefulWidget {
   const KyubiDrawer({
     super.key,
     this.user,
@@ -43,6 +43,13 @@ class KyubiDrawer extends ConsumerWidget {
 
   final User? user;
   final VoidCallback? onProfileTap;
+
+  @override
+  ConsumerState<KyubiDrawer> createState() => _KyubiDrawerState();
+}
+
+class _KyubiDrawerState extends ConsumerState<KyubiDrawer> {
+  User? _lastKnownUser;
 
   Widget _buildDefaultCosmicBackground(
     BuildContext context, [
@@ -70,8 +77,13 @@ class KyubiDrawer extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final activeUser = user ?? ref.watch(authControllerProvider).user;
+  Widget build(BuildContext context) {
+    final authUser = ref.watch(authControllerProvider).user;
+    final currentUser = widget.user ?? authUser;
+    if (currentUser != null && currentUser.id.isNotEmpty) {
+      _lastKnownUser = currentUser;
+    }
+    final activeUser = currentUser ?? _lastKnownUser;
     final bannerUrl = activeUser?.effectiveBannerUrl ?? activeUser?.bannerUrl;
     final userColorHex = activeUser?.themeColor ??
         activeUser?.nameColor ??
@@ -82,7 +94,7 @@ class KyubiDrawer extends ConsumerWidget {
     final dynamicLogoutColor =
         activeUser?.themeSettings.accent ?? dynamicProfileColor;
 
-    final handleProfileTap = onProfileTap ??
+    final handleProfileTap = widget.onProfileTap ??
         () {
           Navigator.pop(context);
           context.push('/profile');
@@ -163,10 +175,11 @@ class KyubiDrawer extends ConsumerWidget {
                       user: activeUser ??
                           const User(
                             id: '',
-                            username: 'kyubi',
-                            displayName: 'Kyubi User',
+                            username: '',
+                            displayName: '',
                           ),
                       isCompact: true,
+                      showActivityStatus: false,
                       onViewProfile: handleProfileTap,
                     ),
                   ),
@@ -282,7 +295,7 @@ class KyubiDrawer extends ConsumerWidget {
                     color: dynamicLogoutColor,
                     isDanger: true,
                     onTap: () {
-                      _confirmLogout(context, ref);
+                      _confirmLogout(context);
                     },
                   ),
                   const SizedBox(height: 8),
@@ -295,7 +308,7 @@ class KyubiDrawer extends ConsumerWidget {
     );
   }
 
-  void _confirmLogout(BuildContext context, WidgetRef ref) {
+  void _confirmLogout(BuildContext context) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -319,24 +332,26 @@ class KyubiDrawer extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () async {
-              // 1. Cerrar diálogo
+              // 1. Cerrar inmediatamente el diálogo de confirmación
               Navigator.of(ctx).pop();
 
-              // 2. Cerrar el drawer si sigue abierto en el scaffold
-              if (context.mounted &&
-                  (Scaffold.maybeOf(context)?.isDrawerOpen ?? false)) {
+              // 2. Cerrar inmediatamente el Drawer
+              final scaffold = Scaffold.maybeOf(context);
+              if (scaffold?.isDrawerOpen ?? false) {
+                scaffold?.closeDrawer();
+              } else if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
               }
 
-              // 3. Ejecutar logout
-              await ref.read(authControllerProvider.notifier).logout();
-
-              // 4. Redirigir de manera forzada y limpiar stack
+              // 3. Navegar inmediatamente a la ruta de autenticación
               if (context.mounted) {
                 context.go('/login');
               } else {
                 ref.read(routerProvider).go('/login');
               }
+
+              // 4. Ejecutar logout
+              await ref.read(authControllerProvider.notifier).logout();
             },
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.danger,
