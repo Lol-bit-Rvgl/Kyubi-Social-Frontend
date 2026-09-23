@@ -1,4 +1,4 @@
-﻿name: Build iOS IPA
+name: Build iOS IPA
 
 on:
   workflow_dispatch:
@@ -10,12 +10,12 @@ jobs:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
 
-      - name: Seleccionar la version mas reciente de Xcode
+      - name: Seleccionar Xcode 16 si esta disponible
         run: |
-          XCODE_16=$(find /Applications -maxdepth 1 -name "Xcode_16*.app" | sort -V | tail -n 1)
-          if [ -n "$XCODE_16" ]; then
-            echo "Seleccionando $XCODE_16"
-            sudo xcode-select -s "$XCODE_16/Contents/Developer"
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name "Xcode_16*.app" | sort -V | tail -n 1)
+          if [ -n "$XCODE_PATH" ]; then
+            echo "Activando $XCODE_PATH"
+            sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
           fi
           xcodebuild -version
 
