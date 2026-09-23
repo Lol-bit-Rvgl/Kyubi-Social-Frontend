@@ -19,18 +19,21 @@ jobs:
       - name: Instalar dependencias de Flutter
         run: flutter pub get
 
-      - name: Precrear carpetas de build para rsync y CocoaPods
+      - name: Precrear directorios para rsync de Firebase y plugins
         run: |
           mkdir -p build/ios/SourcePackages
           mkdir -p ios/Pods
+          mkdir -p ios/.symlinks/plugins
 
-      - name: Instalar dependencias nativas de iOS (CocoaPods)
+      - name: Generar configuracion nativa de plugins y resolver CocoaPods
         run: |
+          flutter build ios --config-only
           cd ios
           pod install --repo-update
 
       - name: Compilar Release para iOS (no-codesign)
         run: |
+          mkdir -p build/ios/SourcePackages
           flutter build ios --release --no-codesign --dart-define=KYUBI_CLIENT_SIGN_SECRET=kyubi-hjtrfs-client-sign-v1
 
       - name: Empaquetar como archivo .IPA
