@@ -134,36 +134,44 @@ class UserPreviewCard extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Avatar circular con halo degradado neón (58px)
-                        Container(
-                          width: isCompact ? 52 : 58,
-                          height: isCompact ? 52 : 58,
-                          padding: const EdgeInsets.all(2.2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [
-                                themeSettings.primary,
-                                themeSettings.accent,
-                              ],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: themeSettings.primary.withValues(
-                                  alpha: 0.35,
+                        // Avatar circular con halo degradado neón
+                        SizedBox(
+                          width: isCompact ? 58 : 68,
+                          height: isCompact ? 58 : 68,
+                          child: AspectRatio(
+                            aspectRatio: 1.0,
+                            child: Container(
+                              width: isCompact ? 58 : 68,
+                              height: isCompact ? 58 : 68,
+                              padding: EdgeInsets.all(isCompact ? 3.0 : 5.0),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    themeSettings.primary,
+                                    themeSettings.accent,
+                                  ],
                                 ),
-                                blurRadius: 10,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: themeSettings.primary.withValues(
+                                      alpha: 0.35,
+                                    ),
+                                    blurRadius: 10,
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: AppAvatar(
-                            imageUrl: user.effectiveAvatarUrl,
-                            name: user.displayName.isNotEmpty
-                                ? user.displayName
-                                : user.username,
-                            radius: isCompact ? 24 : 27,
-                            isOnline: user.isOnline,
-                            showOnline: false,
+                              alignment: Alignment.center,
+                              child: AppAvatar(
+                                imageUrl: user.effectiveAvatarUrl,
+                                name: user.displayName.isNotEmpty
+                                    ? user.displayName
+                                    : user.username,
+                                radius: isCompact ? 26.0 : 29.0,
+                                isOnline: user.isOnline,
+                                showOnline: false,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 14),

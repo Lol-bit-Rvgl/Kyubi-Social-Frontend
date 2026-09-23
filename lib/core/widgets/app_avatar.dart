@@ -53,9 +53,12 @@ class AppAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double size = radius * 2;
+
     final Widget avatar = Container(
-      width: radius * 2,
-      height: radius * 2,
+      width: size,
+      height: size,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: borderColor != null
@@ -70,53 +73,80 @@ class AppAvatar extends StatelessWidget {
         ],
       ),
       child: ClipOval(
-        child: imageUrl != null && imageUrl!.isNotEmpty
-            ? CachedNetworkImage(
-                imageUrl: _cacheBusted(imageUrl!),
-                cacheKey: cacheKey ?? imageUrl,
-                memCacheWidth: (radius * 4).round().clamp(64, 256),
-                memCacheHeight: (radius * 4).round().clamp(64, 256),
-                fit: BoxFit.cover,
-                placeholder: (_, _) => _placeholder(),
-                errorWidget: (_, _, _) => _placeholder(),
-              )
-            : _placeholder(),
+        clipBehavior: Clip.antiAlias,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: imageUrl != null && imageUrl!.isNotEmpty
+              ? CachedNetworkImage(
+                  imageUrl: _cacheBusted(imageUrl!),
+                  cacheKey: cacheKey ?? imageUrl,
+                  memCacheWidth: (radius * 4).round().clamp(64, 256),
+                  memCacheHeight: (radius * 4).round().clamp(64, 256),
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                  placeholder: (_, _) => _placeholder(size),
+                  errorWidget: (_, _, _) => _placeholder(size),
+                )
+              : _placeholder(size),
+        ),
       ),
     );
 
-    return GestureDetector(
-      onTap: onTap,
-      child: showOnline
-          ? Stack(
-              children: [
-                avatar,
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: radius * 0.6,
-                    height: radius * 0.6,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isOnline
-                          ? AppColors.success
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                      border: Border.all(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        width: 2,
-                      ),
+    final Widget core = showOnline
+        ? Stack(
+            clipBehavior: Clip.none,
+            children: [
+              avatar,
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: radius * 0.6,
+                  height: radius * 0.6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isOnline
+                        ? AppColors.success
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    border: Border.all(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      width: 2,
                     ),
                   ),
                 ),
-              ],
-            )
-          : avatar,
+              ),
+            ],
+          )
+        : avatar;
+
+    final Widget interactive = onTap != null
+        ? GestureDetector(
+            onTap: onTap,
+            behavior: HitTestBehavior.opaque,
+            child: core,
+          )
+        : core;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: interactive,
+      ),
     );
   }
 
-  Widget _placeholder() {
+  Widget _placeholder(double size) {
     return Container(
-      color: AppColors.avatarColor(name),
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.avatarColor(name),
+      ),
       alignment: Alignment.center,
       child: Text(
         _initial,

@@ -32,42 +32,53 @@ class HeaderProfile extends ConsumerWidget {
         child: Row(
           children: [
             // ── Avatar con punto de estado y tap para abrir Drawer / Perfil ──
-            GestureDetector(
-              onTap: () => Scaffold.of(context).openDrawer(),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF1E1E2A),
-                    ),
-                    padding: const EdgeInsets.all(1.5),
-                    child: AppAvatar(
-                      imageUrl: avatarUrl,
-                      name: displayName,
-                      radius: 19,
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: user?.isOnline ?? true
-                            ? AppColors.success
-                            : const Color(0xFF7A7A8A),
-                        border: Border.all(
-                          color: AppColors.backgroundBase,
-                          width: 1.5,
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: AspectRatio(
+                aspectRatio: 1.0,
+                child: GestureDetector(
+                  onTap: () => Scaffold.of(context).openDrawer(),
+                  behavior: HitTestBehavior.opaque,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF1E1E2A),
+                        ),
+                        padding: const EdgeInsets.all(1.0),
+                        alignment: Alignment.center,
+                        child: AppAvatar(
+                          imageUrl: avatarUrl,
+                          name: displayName,
+                          radius: 19,
                         ),
                       ),
-                    ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: user?.isOnline ?? true
+                                ? AppColors.success
+                                : const Color(0xFF7A7A8A),
+                            border: Border.all(
+                              color: AppColors.backgroundBase,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
             const SizedBox(width: 12),
