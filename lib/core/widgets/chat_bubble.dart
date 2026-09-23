@@ -28,6 +28,11 @@ class ChatMessageBubble extends StatelessWidget {
     this.mediaType,
     this.type,
     this.extensions,
+    this.replyToId,
+    this.replyToName,
+    this.replyToBody,
+    this.replyToMediaUrl,
+    this.onReplyTap,
     this.onAvatarTap,
     this.onPollVote,
     this.currentUserId,
@@ -51,6 +56,11 @@ class ChatMessageBubble extends StatelessWidget {
   final String? mediaType;
   final String? type;
   final Map<String, dynamic>? extensions;
+  final String? replyToId;
+  final String? replyToName;
+  final String? replyToBody;
+  final String? replyToMediaUrl;
+  final VoidCallback? onReplyTap;
   final VoidCallback? onAvatarTap;
   final void Function(String optionId)? onPollVote;
   final String? currentUserId;
@@ -76,6 +86,11 @@ class ChatMessageBubble extends StatelessWidget {
       accentColor: accentColor,
       roleLabel: roleLabel,
       roleColor: roleColor,
+      replyToId: replyToId,
+      replyToName: replyToName,
+      replyToBody: replyToBody,
+      replyToMediaUrl: replyToMediaUrl,
+      onReplyTap: onReplyTap,
       onAvatarTap: onAvatarTap,
       onPollVote: onPollVote,
       currentUserId: currentUserId,

@@ -12,6 +12,25 @@ class ChatMessageReceived extends ChatSocketEvent {
   final Map<String, dynamic> payload;
 }
 
+/// Se actualiza/edita un mensaje de una conversación.
+class ChatMessageUpdated extends ChatSocketEvent {
+  ChatMessageUpdated(this.conversationId, this.payload);
+  final String conversationId;
+  final Map<String, dynamic> payload;
+}
+
+/// Se elimina un mensaje de una conversación.
+class ChatMessageDeleted extends ChatSocketEvent {
+  ChatMessageDeleted(
+    this.conversationId,
+    this.messageId, {
+    this.payload = const {},
+  });
+  final String conversationId;
+  final String messageId;
+  final Map<String, dynamic> payload;
+}
+
 /// Se crea una conversación nueva (otra persona nos escribió por primera vez).
 class ChatConversationNew extends ChatSocketEvent {
   ChatConversationNew(this.payload);
@@ -109,13 +128,31 @@ class ChatSocketService extends BaseSocket<ChatSocketEvent> {
       }
     });
 
-    socket.on('conversation:message_updated', (payload) {
+    void onMessageUpdated(dynamic payload) {
       final data = asMap(payload);
       final conversationId = data['conversationId'] as String? ?? '';
       if (conversationId.isNotEmpty) {
-        emitEvent(ChatMessageReceived(conversationId, data));
+        emitEvent(ChatMessageUpdated(conversationId, data));
       }
-    });
+    }
+
+    void onMessageDeleted(dynamic payload) {
+      final data = asMap(payload);
+      final conversationId = data['conversationId'] as String? ?? '';
+      final messageId =
+          data['messageId'] as String? ?? data['id'] as String? ?? '';
+      if (conversationId.isNotEmpty && messageId.isNotEmpty) {
+        emitEvent(ChatMessageDeleted(conversationId, messageId, payload: data));
+      }
+    }
+
+    socket.on('conversation:message_updated', onMessageUpdated);
+    socket.on('message:updated', onMessageUpdated);
+    socket.on('chat:message_updated', onMessageUpdated);
+
+    socket.on('conversation:message_deleted', onMessageDeleted);
+    socket.on('message:deleted', onMessageDeleted);
+    socket.on('chat:message_deleted', onMessageDeleted);
 
     socket.on('conversation:new', (payload) {
       final data = asMap(payload);

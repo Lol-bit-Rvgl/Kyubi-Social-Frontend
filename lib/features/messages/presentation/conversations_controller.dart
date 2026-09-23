@@ -90,6 +90,8 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
         case ChatMessageReceived():
           _onMessageReceived(event.conversationId, event.payload);
         case ChatConversationNew():
+        case ChatMessageUpdated():
+        case ChatMessageDeleted():
           refresh();
         case ChatTyping():
         case ChatRead():

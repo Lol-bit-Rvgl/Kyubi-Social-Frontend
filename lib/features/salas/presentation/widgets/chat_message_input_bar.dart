@@ -681,11 +681,7 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                           tooltip: 'Añadir adjuntos',
                           onTap: () {
                             HapticFeedback.lightImpact();
-                            if (widget.onOpenModesTap != null) {
-                              widget.onOpenModesTap!();
-                            } else {
-                              _showAttachmentsMenu();
-                            }
+                            _showAttachmentsMenu();
                           },
                         ),
 
@@ -730,18 +726,14 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                           },
                         ),
 
-                        // 4. Acciones de sala / extensiones (🎛️)
+                        // 4. Catálogo de stickers animados (🎛️)
                         _toolButton(
                           icon: Icons.tune_rounded,
                           color: const Color(0xFFA594F9),
-                          tooltip: 'Acciones de sala / Stickers',
+                          tooltip: 'Stickers animados',
                           onTap: () {
-                            if (widget.onOpenModesTap != null &&
-                                !widget.isRoleplay) {
-                              widget.onOpenModesTap!();
-                            } else {
-                              _showStickerPicker();
-                            }
+                            HapticFeedback.lightImpact();
+                            _showStickerPicker();
                           },
                         ),
 

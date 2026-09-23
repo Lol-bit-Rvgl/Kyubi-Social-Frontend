@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +15,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/sticker_catalog.dart';
+import '../../../core/widgets/swipe_to_reply.dart';
 import '../../../models/chat_conversation.dart';
 import '../../../models/chat_message.dart';
 import '../../../services/auth_controller.dart';
@@ -45,6 +48,8 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   String? _chatBgAsset;
+  Map<String, dynamic>? _replyingToMessage;
+  Map<String, dynamic>? _editingMessage;
 
   @override
   void initState() {
@@ -88,6 +93,278 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
     });
   }
 
+  void _startReply(Message msg) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _editingMessage = null;
+      _replyingToMessage = {
+        'id': msg.id,
+        'senderName': msg.sender.displayName.isNotEmpty
+            ? msg.sender.displayName
+            : msg.sender.username,
+        'body': msg.body,
+        'mediaUrl': msg.mediaUrl ?? msg.media?.url,
+        'type': msg.mediaType,
+      };
+    });
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyingToMessage = null;
+    });
+  }
+
+  void _startEdit(Message msg) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _replyingToMessage = null;
+      _editingMessage = {
+        'id': msg.id,
+        'body': msg.body,
+      };
+    });
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _editingMessage = null;
+    });
+  }
+
+  Future<void> _submitEdit(String messageId, String newText) async {
+    setState(() {
+      _editingMessage = null;
+    });
+    final ok = await ref
+        .read(conversationChatProvider(widget.conversationId).notifier)
+        .editMessage(messageId, newText);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo editar el mensaje')),
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteMessage(Message msg) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1B172B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Eliminar mensaje', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          '¿Estás seguro de que deseas eliminar este mensaje?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white60)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Eliminar', style: TextStyle(color: AppColors.accentCrimson)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    final ok = await ref
+        .read(conversationChatProvider(widget.conversationId).notifier)
+        .deleteMessage(msg.id);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo eliminar el mensaje')),
+      );
+    }
+  }
+
+  Future<void> _saveImageToGallery(String imageUrl) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Descargando imagen...'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 1),
+        ),
+      );
+      final dio = Dio();
+      final response = await dio.get<List<int>>(
+        imageUrl,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final bytes = response.data;
+      if (bytes != null && bytes.isNotEmpty) {
+        await Gal.putImageBytes(Uint8List.fromList(bytes));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Imagen guardada en la galería'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: AppColors.accentTeal,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar imagen: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.accentCrimson,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showMessageContextMenu(Message msg) {
+    if (msg.isDeleted) return;
+    HapticFeedback.mediumImpact();
+    final myId = ref.read(authControllerProvider).user?.id ?? '';
+    final isMine = msg.senderId == myId;
+    final text = msg.body.trim();
+    final mediaUrl = msg.mediaUrl ?? msg.media?.url;
+    final isImage = (msg.mediaType == 'image' ||
+            (mediaUrl != null && DirectChatMessageBubble.isLikelyImageUrl(mediaUrl))) ||
+        (text.startsWith('http') && DirectChatMessageBubble.isLikelyImageUrl(text));
+    final effectiveImageUrl =
+        (mediaUrl != null && mediaUrl.isNotEmpty) ? mediaUrl : (isImage ? text : '');
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF13101E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3A3A4A),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            if (text.isNotEmpty && !isImage)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Text(
+                  text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF9E9EA8),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ListTile(
+              leading: const Icon(Icons.reply_rounded, color: AppColors.accentCyan),
+              title: const Text(
+                'Responder',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _startReply(msg);
+              },
+            ),
+            if (isImage && effectiveImageUrl.isNotEmpty) ...[
+              ListTile(
+                leading: const Icon(Icons.download_rounded, color: AppColors.accentTeal),
+                title: const Text(
+                  'Guardar imagen',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'Descargar a la galería del dispositivo',
+                  style: TextStyle(color: Color(0xFF8A8A9A), fontSize: 11),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _saveImageToGallery(effectiveImageUrl);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.link_rounded, color: Color(0xFF9E9EA8)),
+                title: const Text(
+                  'Copiar enlace de imagen',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Clipboard.setData(ClipboardData(text: effectiveImageUrl));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Enlace de imagen copiado al portapapeles'),
+                      behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
+              ),
+            ] else if (text.isNotEmpty) ...[
+              ListTile(
+                leading: const Icon(Icons.copy_rounded, color: Color(0xFF9E9EA8)),
+                title: const Text(
+                  'Copiar texto',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Clipboard.setData(ClipboardData(text: text));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Mensaje copiado al portapapeles'),
+                      behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
+              ),
+            ],
+            if (isMine && !isImage && text.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.edit_rounded, color: Color(0xFFFFB300)),
+                title: const Text(
+                  'Editar mensaje',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _startEdit(msg);
+                },
+              ),
+            if (isMine)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: AppColors.accentCrimson),
+                title: const Text(
+                  'Eliminar mensaje',
+                  style: TextStyle(color: AppColors.accentCrimson, fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDeleteMessage(msg);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _send(
     String? customText, {
     String? mediaUrl,
@@ -97,12 +374,17 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
     final body = customText ?? _inputController.text;
     if (body.trim().isEmpty && mediaUrl == null && extensions == null) return;
     _inputController.clear();
+    final replyId = _replyingToMessage?['id'] as String?;
+    setState(() {
+      _replyingToMessage = null;
+    });
     final ok = await ref
         .read(conversationChatProvider(widget.conversationId).notifier)
         .send(
           body,
           mediaUrl: mediaUrl,
           mediaType: mediaType,
+          replyToId: replyId,
           extensions: extensions,
         );
     if (!mounted) return;
@@ -288,54 +570,6 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
         'voice': true,
         'durationMs': durationMs,
       },
-    );
-  }
-
-  void _showAttachmentsModal() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF141220),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border(top: BorderSide(color: Color(0xFF2E2746), width: 1)),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: AppColors.accentCyan),
-                title: const Text('Galería de fotos', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _sendImage('', ImageSource.gallery);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFFBA68C8)),
-                title: const Text('Cámara', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _sendImage('', ImageSource.camera);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -955,8 +1189,20 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
 
         final message = item.message!;
         final isMine = message.senderId == myId;
+        final replyMsg = message.replyToId != null
+            ? messages.where((m) => m.id == message.replyToId).firstOrNull
+            : null;
+        final replySenderName = replyMsg != null
+            ? (replyMsg.sender.displayName.isNotEmpty
+                ? replyMsg.sender.displayName
+                : replyMsg.sender.username)
+            : message.extensions?['replyTo']?['senderName'] as String?;
+        final replyBody = replyMsg?.body ??
+            message.extensions?['replyTo']?['body'] as String?;
+        final replyMediaUrl = replyMsg?.mediaUrl ??
+            message.extensions?['replyTo']?['mediaUrl'] as String?;
 
-        return _DirectMessageBubble(
+        final bubble = _DirectMessageBubble(
           key: ValueKey(message.id),
           body: message.body,
           timestamp: _timeLabel(message.createdAt),
@@ -972,11 +1218,28 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
           type: message.extensions?['type'] as String?,
           extensions: message.extensions,
           isDeleted: message.isDeleted,
+          isEdited: message.isEdited,
+          editedAt: message.editedAt,
+          replyToId: message.replyToId,
+          replyToName: replySenderName,
+          replyToBody: replyBody,
+          replyToMediaUrl: replyMediaUrl,
           currentUserId: myId,
           onAvatarTap: () => _openUserProfile(context, message.sender),
           onPollVote: (optId) => ref
               .read(conversationChatProvider(widget.conversationId).notifier)
               .votePoll(message.id, optId),
+        );
+
+        return SwipeToReply(
+          key: ValueKey('swipe_${message.id}'),
+          onReply: () => _startReply(message),
+          threshold: 64.0,
+          onThresholdCrossed: () => HapticFeedback.lightImpact(),
+          child: GestureDetector(
+            onLongPress: () => _showMessageContextMenu(message),
+            child: bubble,
+          ),
         );
       },
     );
@@ -1002,10 +1265,13 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
           _sendDiceRoll(diceName, result, emoji),
       onSendPoll: (question, options) => _sendPoll(question, options),
       onSendSticker: (sticker) => _sendSticker(sticker),
-      onOpenModesTap: _showAttachmentsModal,
-      // El "+" ya abre el sheet unificado (Galería/Cámara): se oculta el
-      // acceso rápido duplicado a galería.
+      // El "+" ya abre el sheet unificado (Galería/Cámara/Encuestas).
       hideQuickImageButton: true,
+      replyingToMessage: _replyingToMessage,
+      onCancelReply: _cancelReply,
+      editingMessage: _editingMessage,
+      onCancelEdit: _cancelEdit,
+      onSendEdit: (messageId, newText) => _submitEdit(messageId, newText),
       onTypingChanged: (typing) {
         if (typing) {
           ref

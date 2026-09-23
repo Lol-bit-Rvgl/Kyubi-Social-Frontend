@@ -51,6 +51,11 @@ class DirectChatMessageBubble extends StatelessWidget {
     this.accentColor,
     this.roleLabel,
     this.roleColor,
+    this.replyToId,
+    this.replyToName,
+    this.replyToBody,
+    this.replyToMediaUrl,
+    this.onReplyTap,
     this.onAvatarTap,
     this.onPollVote,
     this.currentUserId,
@@ -74,6 +79,11 @@ class DirectChatMessageBubble extends StatelessWidget {
   final Color? accentColor;
   final String? roleLabel;
   final Color? roleColor;
+  final String? replyToId;
+  final String? replyToName;
+  final String? replyToBody;
+  final String? replyToMediaUrl;
+  final VoidCallback? onReplyTap;
   final VoidCallback? onAvatarTap;
   final void Function(String optionId)? onPollVote;
   final String? currentUserId;
@@ -123,11 +133,37 @@ class DirectChatMessageBubble extends StatelessWidget {
     return body.trim().startsWith('🎤 [Nota de voz');
   }
 
+  static bool isLikelyImageUrl(String s) {
+    if (s.isEmpty) return false;
+    final clean = s.toLowerCase().split('?').first.trim();
+    return clean.endsWith('.png') ||
+        clean.endsWith('.jpg') ||
+        clean.endsWith('.jpeg') ||
+        clean.endsWith('.webp') ||
+        clean.endsWith('.gif') ||
+        clean.contains('/images/') ||
+        clean.contains('/media/') ||
+        clean.contains('supabase.co/storage/v1/object/public/');
+  }
+
   bool get _hasImage {
     final url = media?.url ?? mediaUrl;
-    if (url == null || url.isEmpty) return false;
+    if (url == null || url.isEmpty) {
+      return body.startsWith('http') && isLikelyImageUrl(body);
+    }
     final mType = media?.type ?? MediaType.fromValue(mediaType);
-    return mType == MediaType.image;
+    return mType == MediaType.image || isLikelyImageUrl(url);
+  }
+
+  bool get _hasReplyPreview {
+    final rName =
+        replyToName ?? extensions?['replyTo']?['senderName'] as String?;
+    final rBody = replyToBody ?? extensions?['replyTo']?['body'] as String?;
+    final rMedia =
+        replyToMediaUrl ?? extensions?['replyTo']?['mediaUrl'] as String?;
+    return (rName?.isNotEmpty ?? false) ||
+        (rBody?.isNotEmpty ?? false) ||
+        (rMedia?.isNotEmpty ?? false);
   }
 
   @override
@@ -524,6 +560,10 @@ class DirectChatMessageBubble extends StatelessWidget {
               ),
             )
           else ...[
+            if (_hasReplyPreview) ...[
+              _buildReplyPreviewCard(context),
+              const SizedBox(height: 6),
+            ],
             if (imageWidget != null) ...[
               imageWidget,
               if (!isRedundant && body.trim().isNotEmpty)
@@ -575,18 +615,110 @@ class DirectChatMessageBubble extends StatelessWidget {
     );
   }
 
-  Widget? _buildImage(BuildContext context) {
-    final url = media?.url ?? mediaUrl;
-    if (url == null || url.isEmpty) return null;
-    final mType = media?.type ?? MediaType.fromValue(mediaType);
-    if (mType != MediaType.image) return null;
+  Widget _buildReplyPreviewCard(BuildContext context) {
+    final rName =
+        replyToName ?? extensions?['replyTo']?['senderName'] as String? ?? 'Mensaje';
+    final rBody = replyToBody ?? extensions?['replyTo']?['body'] as String? ?? '';
+    final rMedia =
+        replyToMediaUrl ?? extensions?['replyTo']?['mediaUrl'] as String?;
+    final hasImg = rMedia != null && rMedia.isNotEmpty;
 
     return GestureDetector(
-      onTap: () => showFullscreenImage(context, url),
+      onTap: onReplyTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: (isMine ? Colors.white : Colors.black).withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border(
+            left: BorderSide(
+              color: accentColor ??
+                  (isMine ? const Color(0xFF9E8CD9) : AppColors.accentCyan),
+              width: 3.5,
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    rName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: accentColor ??
+                          (isMine
+                              ? const Color(0xFFD4A0B0)
+                              : AppColors.accentCyan),
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    hasImg && rBody.trim().isEmpty
+                        ? '📷 [Imagen]'
+                        : (rBody.trim().isEmpty ? '...' : rBody),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: Colors.white.withValues(alpha: 0.75),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (hasImg) ...[
+              const SizedBox(width: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: CachedNetworkImage(
+                  imageUrl: rMedia,
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, _, _) => const Icon(
+                    Icons.image,
+                    size: 20,
+                    color: Colors.white54,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget? _buildImage(BuildContext context) {
+    String? url = media?.url ?? mediaUrl;
+    if (url == null || url.isEmpty) {
+      if (body.startsWith('http') && isLikelyImageUrl(body)) {
+        url = body.trim();
+      } else {
+        return null;
+      }
+    } else {
+      final mType = media?.type ?? MediaType.fromValue(mediaType);
+      if (mType != MediaType.image && !isLikelyImageUrl(url)) return null;
+    }
+
+    final finalUrl = url;
+    return GestureDetector(
+      onTap: () => showFullscreenImage(context, finalUrl),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: CachedNetworkImage(
-          imageUrl: url,
+          imageUrl: finalUrl,
           width: 200,
           height: 220,
           fit: BoxFit.cover,

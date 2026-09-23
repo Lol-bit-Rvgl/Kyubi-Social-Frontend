@@ -77,6 +77,14 @@ class ConversationChatNotifier
           if (event.conversationId == _conversationId) {
             _addIncoming(event.payload);
           }
+        case ChatMessageUpdated():
+          if (event.conversationId == _conversationId) {
+            _updateMessage(event.payload);
+          }
+        case ChatMessageDeleted():
+          if (event.conversationId == _conversationId) {
+            _markDeleted(event.messageId);
+          }
         case ChatTyping():
           if (event.conversationId == _conversationId) {
             _setTyping(event.userId, event.isTyping);
@@ -208,6 +216,7 @@ class ConversationChatNotifier
     String? stickerUrl,
     String? stickerId,
     Map<String, dynamic>? poll,
+    String? replyToId,
     Map<String, dynamic>? extensions,
   }) async {
     final text = body.trim();
@@ -251,6 +260,7 @@ class ConversationChatNotifier
       body: optimisticBody,
       mediaUrl: effectiveMediaUrl,
       mediaType: mediaType ?? (effectiveMediaUrl != null ? 'image' : null),
+      replyToId: replyToId,
       extensions: combinedExt.isNotEmpty ? combinedExt : null,
       createdAt: DateTime.now(),
     );
@@ -268,6 +278,7 @@ class ConversationChatNotifier
         stickerUrl: stickerUrl,
         stickerId: stickerId,
         poll: poll,
+        replyToId: replyToId,
         extensions: combinedExt.isNotEmpty ? combinedExt : null,
       );
       if (_disposed) return true;
@@ -350,6 +361,89 @@ class ConversationChatNotifier
       users.remove(userId);
     }
     state = state.copyWith(typingUsers: users);
+  }
+
+  void _updateMessage(Map<String, dynamic> payload) {
+    final updated = Message.fromJson(payload);
+    final idx = state.messages.indexWhere((m) => m.id == updated.id);
+    if (idx >= 0) {
+      final updatedList = [...state.messages];
+      updatedList[idx] = updated;
+      state = state.copyWith(messages: updatedList);
+    }
+  }
+
+  void _markDeleted(String messageId) {
+    final idx = state.messages.indexWhere((m) => m.id == messageId);
+    if (idx >= 0) {
+      final updatedList = [...state.messages];
+      final m = updatedList[idx];
+      updatedList[idx] = m.copyWith(
+        deletedAt: DateTime.now().toIso8601String(),
+        body: 'Mensaje eliminado',
+      );
+      state = state.copyWith(messages: updatedList);
+    }
+  }
+
+  Future<bool> editMessage(String messageId, String newContent) async {
+    final oldMessages = state.messages;
+    final idx = state.messages.indexWhere((m) => m.id == messageId);
+    if (idx < 0) return false;
+
+    // Actualización optimista inmediata
+    final updatedList = [...state.messages];
+    updatedList[idx] = updatedList[idx].copyWith(
+      body: newContent,
+      editedAt: DateTime.now().toIso8601String(),
+    );
+    state = state.copyWith(messages: updatedList);
+
+    try {
+      final updated = await _repo.editMessage(
+        _conversationId,
+        messageId,
+        newContent,
+      );
+      if (!_disposed) {
+        final currentIdx = state.messages.indexWhere((m) => m.id == messageId);
+        if (currentIdx >= 0) {
+          final list = [...state.messages];
+          list[currentIdx] = updated;
+          state = state.copyWith(messages: list);
+        }
+      }
+      return true;
+    } catch (_) {
+      if (!_disposed) {
+        state = state.copyWith(messages: oldMessages);
+      }
+      return false;
+    }
+  }
+
+  Future<bool> deleteMessage(String messageId) async {
+    final oldMessages = state.messages;
+    final idx = state.messages.indexWhere((m) => m.id == messageId);
+    if (idx < 0) return false;
+
+    // Actualización optimista inmediata
+    final updatedList = [...state.messages];
+    updatedList[idx] = updatedList[idx].copyWith(
+      deletedAt: DateTime.now().toIso8601String(),
+      body: 'Mensaje eliminado',
+    );
+    state = state.copyWith(messages: updatedList);
+
+    try {
+      await _repo.deleteMessage(_conversationId, messageId);
+      return true;
+    } catch (_) {
+      if (!_disposed) {
+        state = state.copyWith(messages: oldMessages);
+      }
+      return false;
+    }
   }
 
   Future<void> _markRead() async {

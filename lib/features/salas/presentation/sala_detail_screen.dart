@@ -18,6 +18,7 @@ import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/chat_animated_media.dart';
 import '../../../../core/widgets/sticker_catalog.dart';
 import '../../../../core/widgets/system_toast.dart';
+import '../../../../core/widgets/swipe_to_reply.dart';
 import '../../../../models/role_character.dart';
 import '../../../../models/room.dart';
 import '../../../../services/auth_controller.dart';
@@ -4005,6 +4006,32 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                 }
               },
             ),
+            if (isHost || _canManageRoles())
+              ListTile(
+                leading: const Icon(
+                  Icons.tune_rounded,
+                  color: Color(0xFFA594F9),
+                ),
+                title: const Text(
+                  'Modos de sala y actividades',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Cambiar entre Chat estándar, Voz en vivo y Roleplay Stage',
+                  style: TextStyle(color: Color(0xFF8A8A9A), fontSize: 12),
+                ),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF5A5A6A),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openRoomModesSelector();
+                },
+              ),
             ListTile(
               leading: const Icon(
                 Icons.share_rounded,
@@ -5557,9 +5584,6 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                       onSendDiceRoll: _sendDiceRoll,
                       onSendPoll: _sendPoll,
                       onSendSticker: _sendSticker,
-                      onOpenModesTap: _canManageRoles()
-                          ? _openRoomModesSelector
-                          : null,
                       onInviteFriends: () {
                         final currentRoom = _currentRoom;
                         if (currentRoom != null) {
@@ -5915,6 +5939,22 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (_canManageRoles())
+                IconButton(
+                  tooltip: 'Modos de sala',
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 32,
+                    height: 32,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(
+                    Icons.tune_rounded,
+                    color: Color(0xFFA594F9),
+                    size: 19,
+                  ),
+                  onPressed: _openRoomModesSelector,
+                ),
               IconButton(
                 tooltip: 'Invitar amigos',
                 visualDensity: VisualDensity.compact,
@@ -6211,109 +6251,6 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   }
 }
 
-/// Envoltorio de gesto para swipe-to-reply con umbral calibrado.
-///
-/// Sustituye al `Dismissible` anterior que se activaba con micro-deslizamientos
-/// horizontales e interfería con el scroll vertical del chat:
-/// - Exige un desplazamiento horizontal neto ≥ [threshold] (~64px) para
-///   activar la respuesta (al soltar el dedo).
-/// - Cancela el gesto si la componente vertical domina el deslizamiento
-///   (|dy| > |dx|): el scroll vertical queda totalmente intacto.
-/// - Emite [onThresholdCrossed] una única vez por gesto (feedback háptico).
-/// - Muestra una insignia de respuesta mientras se supera el umbral.
-class _SwipeToReply extends StatefulWidget {
-  const _SwipeToReply({
-    super.key,
-    required this.child,
-    required this.onReply,
-    required this.threshold,
-    this.onThresholdCrossed,
-  });
+/// Envoltorio de gesto para swipe-to-reply con umbral calibrado delegado a [SwipeToReply].
+typedef _SwipeToReply = SwipeToReply;
 
-  final Widget child;
-  final VoidCallback onReply;
-  final double threshold;
-  final VoidCallback? onThresholdCrossed;
-
-  @override
-  State<_SwipeToReply> createState() => _SwipeToReplyState();
-}
-
-class _SwipeToReplyState extends State<_SwipeToReply> {
-  double _dx = 0;
-  double _dy = 0;
-  bool _crossed = false;
-
-  void _reset({required bool fire}) {
-    final dx = _dx;
-    final dy = _dy;
-    final horizontalDominant = dy.abs() <= dx.abs();
-    _dx = 0;
-    _dy = 0;
-    _crossed = false;
-    // Solo activa la respuesta si el gesto terminó siendo horizontal
-    // dominante; si el usuario acabó haciendo scroll vertical, se cancela.
-    if (fire && horizontalDominant && dx >= widget.threshold) {
-      widget.onReply();
-    }
-    if (mounted) setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Si el gesto terminó siendo vertical, no se traslada la burbuja.
-    final horizontal = _dy.abs() <= _dx.abs();
-    final dx = horizontal ? _dx : 0.0;
-    return Stack(
-      clipBehavior: Clip.hardEdge,
-      children: [
-        Positioned(
-          left: 8,
-          top: 0,
-          bottom: 0,
-          child: IgnorePointer(
-            child: Opacity(
-              opacity: (dx / widget.threshold).clamp(0.0, 1.0),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentCyan.withValues(alpha: 0.18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.reply_rounded,
-                    color: AppColors.accentCyan,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        Transform.translate(
-          offset: Offset(dx * 0.35, 0),
-          child: GestureDetector(
-            behavior: HitTestBehavior.deferToChild,
-            onHorizontalDragStart: (_) => _reset(fire: false),
-            onHorizontalDragUpdate: (d) {
-              setState(() {
-                _dx = (_dx + d.delta.dx).clamp(0.0, widget.threshold * 2);
-                _dy += d.delta.dy;
-                if (!_crossed &&
-                    _dx >= widget.threshold &&
-                    _dy.abs() <= _dx.abs()) {
-                  _crossed = true;
-                  widget.onThresholdCrossed?.call();
-                }
-              });
-            },
-            onHorizontalDragEnd: (_) => _reset(fire: true),
-            onHorizontalDragCancel: () => _reset(fire: false),
-            child: widget.child,
-          ),
-        ),
-      ],
-    );
-  }
-}

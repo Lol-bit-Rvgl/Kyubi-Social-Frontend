@@ -1,10 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:gal/gal.dart';
-import 'package:photo_view/photo_view.dart';
 
+import '../../../../core/widgets/fullscreen_image_viewer.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/chat_animated_media.dart';
 import '../../../../core/widgets/hexagon_avatar.dart';
@@ -595,107 +593,7 @@ class RoleChatBubble extends StatelessWidget {
   void _openFullscreenImage(BuildContext context, String url) {
     if (url.isEmpty) return;
     HapticFeedback.lightImpact();
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
-            children: [
-              Positioned.fill(
-                child: PhotoView(
-                  imageProvider: NetworkImage(url),
-                  minScale: PhotoViewComputedScale.contained,
-                  maxScale: PhotoViewComputedScale.covered * 2.5,
-                  backgroundDecoration: const BoxDecoration(
-                    color: Colors.black,
-                  ),
-                ),
-              ),
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 8,
-                right: 16,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: () async {
-                        try {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Descargando imagen...'),
-                              behavior: SnackBarBehavior.floating,
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                          final dio = Dio();
-                          final response = await dio.get<List<int>>(
-                            url,
-                            options: Options(responseType: ResponseType.bytes),
-                          );
-                          final bytes = response.data;
-                          if (bytes != null && bytes.isNotEmpty) {
-                            await Gal.putImageBytes(Uint8List.fromList(bytes));
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Imagen guardada en la galería',
-                                  ),
-                                  behavior: SnackBarBehavior.floating,
-                                  backgroundColor: AppColors.accentTeal,
-                                ),
-                              );
-                            }
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error al guardar: $e'),
-                                behavior: SnackBarBehavior.floating,
-                                backgroundColor: AppColors.accentCrimson,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.download_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    showFullscreenImage(context, url);
   }
 
   /// Encuesta interactiva con opciones y porcentajes, construida a partir de

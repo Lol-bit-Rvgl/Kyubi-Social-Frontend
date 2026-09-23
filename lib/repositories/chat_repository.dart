@@ -128,6 +128,28 @@ class ChatRepository {
     await _api.deleteJson(AppConfig.roomDetail(conversationId));
   }
 
+  Future<Message> editMessage(
+    String conversationId,
+    String messageId,
+    String newBody,
+  ) async {
+    final json = await _api.patchJson(
+      '${AppConfig.conversationMessages(conversationId)}/$messageId',
+      data: {'body': newBody, 'content': newBody},
+    );
+    final data = json['data'] is Map<String, dynamic> ? json['data'] : json;
+    return Message.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteMessage(
+    String conversationId,
+    String messageId,
+  ) async {
+    await _api.deleteJson(
+      '${AppConfig.conversationMessages(conversationId)}/$messageId',
+    );
+  }
+
   Future<List<Message>> searchMessages(
     String conversationId,
     String query,
