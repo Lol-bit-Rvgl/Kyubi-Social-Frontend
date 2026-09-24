@@ -41,6 +41,11 @@ abstract class Post with _$Post {
     @Default(false) bool chapterMode,
     int? chapterNumber,
     PostWarnings? warnings,
+    @Default(false) bool isEdited,
+    @JsonKey(fromJson: nullableDateFromJson, toJson: nullableDateToJson)
+    DateTime? createdAt,
+    @JsonKey(fromJson: nullableDateFromJson, toJson: nullableDateToJson)
+    DateTime? updatedAt,
     @JsonKey(fromJson: nullableDateFromJson, toJson: nullableDateToJson)
     DateTime? publishedAt,
     String? themeBgColor,
@@ -58,6 +63,13 @@ abstract class Post with _$Post {
 
   /// `true` cuando el post solo es visible para su autor.
   bool get isPrivate => visibility == 'PRIVATE';
+
+  /// `true` cuando el post fue editado explícitamente o su fecha de actualización difiere de la de creación.
+  bool get wasEdited =>
+      isEdited ||
+      (updatedAt != null &&
+          createdAt != null &&
+          updatedAt!.difference(createdAt!).inSeconds > 2);
 
   factory Post.fromJson(Map<String, dynamic> json) =>
       _$PostFromJson(<String, dynamic>{

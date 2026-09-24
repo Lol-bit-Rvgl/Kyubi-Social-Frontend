@@ -21,8 +21,9 @@ import '../../../../../services/providers.dart';
 import '../feed_controller.dart';
 import '../../../profile/presentation/user_posts_controller.dart';
 import '../../../../features/saved/presentation/bookmarks_controller.dart';
-import 'interactive_poll_card.dart';
+import 'edit_post_modal.dart';
 import 'floating_reaction_menu.dart';
+import 'interactive_poll_card.dart';
 import 'reaction_picker_popup.dart';
 
 void _onSpecialTextTap(BuildContext context, String text) {
@@ -259,6 +260,17 @@ class PostCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (post.wasEdited) ...[
+                    const SizedBox(width: 4),
+                    const Text(
+                      '· (editado)',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: Color(0xFF8E88A8),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
                   // Insignia de privacidad: distingue los posts que solo ve
                   // su autor del resto del muro.
                   if (post.isPrivate) ...[
@@ -633,7 +645,7 @@ class PostCard extends ConsumerWidget {
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  _showEditSheet(context, ref);
+                  EditPostModal.show(context, post: post);
                 },
               ),
               ListTile(
@@ -682,207 +694,6 @@ class PostCard extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  void _showEditSheet(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController(text: post.body);
-    var selectedVisibility = post.visibility;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF14141B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          MediaQuery.of(sheetContext).viewInsets.bottom + 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3A3A4A),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Editar publicación',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              maxLines: 6,
-              minLines: 3,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                hintText: '¿Qué está pensando?',
-                hintStyle: TextStyle(color: Color(0xFF6E6888)),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            StatefulBuilder(
-              builder: (context, setSheetState) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 8),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'Visibilidad:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFFB0B0C0),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ChoiceChip(
-                        label: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.public_rounded, size: 14),
-                            SizedBox(width: 4),
-                            Text('Público'),
-                          ],
-                        ),
-                        selected: selectedVisibility != 'PRIVATE',
-                        onSelected: (selected) {
-                          if (selected) {
-                            setSheetState(() => selectedVisibility = 'PUBLIC');
-                          }
-                        },
-                        selectedColor: AppColors.accentCyan.withValues(alpha: 0.25),
-                        labelStyle: TextStyle(
-                          fontSize: 12,
-                          fontWeight: selectedVisibility != 'PRIVATE'
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: selectedVisibility != 'PRIVATE'
-                              ? AppColors.accentCyan
-                              : const Color(0xFFB0B0C0),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.lock_rounded, size: 14),
-                            SizedBox(width: 4),
-                            Text('Solo yo'),
-                          ],
-                        ),
-                        selected: selectedVisibility == 'PRIVATE',
-                        onSelected: (selected) {
-                          if (selected) {
-                            setSheetState(() => selectedVisibility = 'PRIVATE');
-                          }
-                        },
-                        selectedColor: AppColors.accentCyan.withValues(alpha: 0.25),
-                        labelStyle: TextStyle(
-                          fontSize: 12,
-                          fontWeight: selectedVisibility == 'PRIVATE'
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: selectedVisibility == 'PRIVATE'
-                              ? AppColors.accentCyan
-                              : const Color(0xFFB0B0C0),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(sheetContext),
-                  child: const Text(
-                    'Cancelar',
-                    style: TextStyle(color: Color(0xFF6E6888)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () async {
-                    final newBody = controller.text.trim();
-                    final visibilityChanged = selectedVisibility != post.visibility;
-                    final bodyChanged = newBody.isNotEmpty && newBody != post.body;
-                    if (!visibilityChanged && !bodyChanged) {
-                      Navigator.pop(sheetContext);
-                      return;
-                    }
-                    Navigator.pop(sheetContext);
-                    await _updatePost(
-                      context,
-                      ref,
-                      body: bodyChanged ? newBody : null,
-                      visibility: visibilityChanged ? selectedVisibility : null,
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accentCyan,
-                    foregroundColor: Colors.black,
-                  ),
-                  child: const Text(
-                    'Guardar',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _updatePost(
-    BuildContext context,
-    WidgetRef ref, {
-    String? body,
-    String? visibility,
-  }) async {
-    final repo = ref.read(postRepositoryProvider);
-    try {
-      final updated = await repo.updatePost(
-        post.id,
-        body: body,
-        visibility: visibility,
-      );
-      ref.read(feedControllerProvider.notifier).updatePost(updated);
-      ref.read(userPostsProvider(post.author.id).notifier).updatePost(updated);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Publicación actualizada')),
-        );
-      }
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo actualizar la publicación')),
-        );
-      }
-    }
   }
 
   void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {

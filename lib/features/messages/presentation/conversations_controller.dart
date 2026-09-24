@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -50,6 +52,8 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
 
   @override
   ConversationsState build() {
+    _mounted = true;
+    _unsubscribed = false;
     ref.onDispose(() {
       _unsubscribed = true;
       _mounted = false;
@@ -73,7 +77,7 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
   }
 
   /// Restaura conversaciones desde caché local antes de la carga de red,
-  /// evitando que la lista desaparezca al reiniciar la app.
+  /// evitando que la lista desaparezca o se quede en spinner infinito.
   Future<void> _restoreFromCache([String? userId]) async {
     try {
       final cached = await ConversationsCache.read(userId: userId);
@@ -83,7 +87,7 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
           .where((c) => c.lastMessage != null)
           .toList();
       if (!_mounted) return;
-      state = state.copyWith(conversations: conversations);
+      state = state.copyWith(conversations: conversations, loading: false);
     } catch (_) {}
   }
 
@@ -119,26 +123,39 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
 
   Future<void> _load() async {
     if (!_mounted) return;
-    if (state.loading && state.conversations.isNotEmpty) return;
-    state = state.copyWith(loading: true, error: null);
+    final hasExisting = state.conversations.isNotEmpty;
+    state = state.copyWith(
+      loading: !hasExisting,
+      refreshing: hasExisting,
+      error: null,
+    );
     try {
-      try {
-        await _socket.connect().timeout(const Duration(seconds: 3));
-      } catch (_) {}
+      // Conectar socket en background sin bloquear la llamada HTTP crítica
+      unawaited(_socket.connect().catchError((_) {}));
+
       final conversations = await _repo
           .getConversations()
           .timeout(const Duration(seconds: 8));
       if (!_mounted) return;
-      state = state.copyWith(conversations: conversations, loading: false);
+      state = state.copyWith(
+        conversations: conversations,
+        loading: false,
+        refreshing: false,
+        error: null,
+      );
       final myId = ref.read(authControllerProvider).user?.id;
       ConversationsCache.save(conversations, userId: myId);
     } catch (e) {
       if (_mounted) {
-        state = state.copyWith(loading: false, error: e.toString());
+        state = state.copyWith(
+          loading: false,
+          refreshing: false,
+          error: state.conversations.isEmpty ? e.toString() : null,
+        );
       }
     } finally {
-      if (_mounted && state.loading) {
-        state = state.copyWith(loading: false);
+      if (_mounted && (state.loading || state.refreshing)) {
+        state = state.copyWith(loading: false, refreshing: false);
       }
     }
   }
@@ -151,7 +168,11 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
           .getConversations()
           .timeout(const Duration(seconds: 8));
       if (!_mounted) return;
-      state = state.copyWith(conversations: conversations, refreshing: false);
+      state = state.copyWith(
+        conversations: conversations,
+        refreshing: false,
+        error: null,
+      );
       final myId = ref.read(authControllerProvider).user?.id;
       ConversationsCache.save(conversations, userId: myId);
     } catch (e) {

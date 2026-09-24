@@ -77,6 +77,16 @@ class RoomParticipant {
           : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': user.id,
+    'username': user.username,
+    'displayName': user.displayName,
+    'avatarUrl': user.avatarUrl,
+    'role': role,
+    'joinedAt': joinedAt,
+    if (activeCharacter != null) 'activeCharacter': activeCharacter!.toJson(),
+  };
 }
 
 /// Sala de reuniones en vivo (`serializeRoom` del backend).
@@ -282,6 +292,40 @@ class Room {
         .where((s) => s.isNotEmpty)
         .toList();
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'description': description,
+    'imageUrl': imageUrl,
+    'chatBackgroundUrl': chatBackgroundUrl,
+    'cinemaVideoId': cinemaVideoId,
+    'cinemaState': cinemaState,
+    'cinemaCurrentTime': cinemaCurrentTime,
+    'cinemaUpdatedAt': cinemaUpdatedAt?.toIso8601String(),
+    'currentMode': currentMode,
+    'host': host.toJson(),
+    'status': status == RoomStatus.ended ? 'ENDED' : 'ACTIVE',
+    'access': access.wireValue,
+    'kind': 'SOCIAL',
+    'capacity': capacity,
+    'isHost': isHost,
+    'isParticipant': isParticipant,
+    'participantCount': participantCount,
+    'participants': participants.map((p) => p.toJson()).toList(),
+    'tags': tags,
+    'rules': rules,
+    if (activeCharacter != null) 'activeCharacter': activeCharacter!.toJson(),
+    'stageRoles': stageRoles.map((r) => r.toJson()).toList(),
+    if (circle != null)
+      'circle': {
+        'id': circle!.id,
+        'name': circle!.name,
+        'avatarUrl': circle!.avatarUrl,
+      },
+    'createdAt': createdAt,
+    'endedAt': endedAt,
+  };
 
   Room copyWith({
     String? name,

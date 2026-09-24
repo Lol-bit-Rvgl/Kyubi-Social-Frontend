@@ -42,6 +42,9 @@ _Post _$PostFromJson(Map<String, dynamic> json) => _Post(
   warnings: json['warnings'] == null
       ? null
       : PostWarnings.fromJson(json['warnings'] as Map<String, dynamic>?),
+  isEdited: json['isEdited'] as bool? ?? false,
+  createdAt: nullableDateFromJson(json['createdAt']),
+  updatedAt: nullableDateFromJson(json['updatedAt']),
   publishedAt: nullableDateFromJson(json['publishedAt']),
   themeBgColor: json['themeBgColor'] as String?,
   themeAccent: json['themeAccent'] as String?,
@@ -74,6 +77,9 @@ Map<String, dynamic> _$PostToJson(_Post instance) => <String, dynamic>{
   'chapterMode': instance.chapterMode,
   'chapterNumber': instance.chapterNumber,
   'warnings': instance.warnings,
+  'isEdited': instance.isEdited,
+  'createdAt': nullableDateToJson(instance.createdAt),
+  'updatedAt': nullableDateToJson(instance.updatedAt),
   'publishedAt': nullableDateToJson(instance.publishedAt),
   'themeBgColor': instance.themeBgColor,
   'themeAccent': instance.themeAccent,

@@ -122,10 +122,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen>
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildPrivateTab(state),
-                    _buildRoomsTab(salasState),
-                    _buildInvitesTab(),
-                    _buildMentionsTab(),
+                    _KeepAliveTab(child: _buildPrivateTab(state)),
+                    _KeepAliveTab(child: _buildRoomsTab(salasState)),
+                    _KeepAliveTab(child: _buildInvitesTab()),
+                    _KeepAliveTab(child: _buildMentionsTab()),
                   ],
                 ),
               ),
@@ -1324,6 +1324,26 @@ class _MentionCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _KeepAliveTab extends StatefulWidget {
+  const _KeepAliveTab({required this.child});
+  final Widget child;
+
+  @override
+  State<_KeepAliveTab> createState() => _KeepAliveTabState();
+}
+
+class _KeepAliveTabState extends State<_KeepAliveTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 

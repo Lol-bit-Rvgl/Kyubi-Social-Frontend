@@ -315,7 +315,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     ),
                   ),
                   Text(
-                    '${post.author.handle} · ${post.timeAgo}',
+                    '${post.author.handle} · ${post.timeAgo}${post.wasEdited ? ' · (editado)' : ''}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),

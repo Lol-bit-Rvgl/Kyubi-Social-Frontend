@@ -103,32 +103,34 @@ class ConversationsCache {
           : StorageKeys.conversationsCache;
 
   static Future<void> save(List<dynamic> conversations, {String? userId}) async {
-    final jsonList = conversations.map((c) => c.toJson()).toList();
-    await SecureStorage.write(
-      _key(userId),
-      jsonEncode(jsonList),
-    );
+    try {
+      final jsonList = conversations.map((c) => c.toJson()).toList();
+      await SecureStorage.write(
+        _key(userId),
+        jsonEncode(jsonList),
+      );
+    } catch (_) {}
   }
 
   static Future<List<Map<String, dynamic>>> read({String? userId}) async {
-    final raw = await SecureStorage.read(_key(userId));
-    if (raw == null || raw.isEmpty) return [];
     try {
+      final raw = await SecureStorage.read(_key(userId));
+      if (raw == null || raw.isEmpty) return [];
       final decoded = jsonDecode(raw);
       if (decoded is List) {
         return decoded.whereType<Map<String, dynamic>>().toList();
       }
-    } on FormatException {
-      // ignore
-    }
+    } catch (_) {}
     return [];
   }
 
   static Future<void> clear({String? userId}) async {
-    await SecureStorage.delete(_key(userId));
-    if (userId != null && userId.isNotEmpty) {
-      await SecureStorage.delete(StorageKeys.conversationsCache);
-    }
+    try {
+      await SecureStorage.delete(_key(userId));
+      if (userId != null && userId.isNotEmpty) {
+        await SecureStorage.delete(StorageKeys.conversationsCache);
+      }
+    } catch (_) {}
   }
 }
 
@@ -142,30 +144,32 @@ class RoomsCache {
           : 'rooms_cache_default';
 
   static Future<void> save(List<dynamic> rooms, {String? userId}) async {
-    final jsonList = rooms.map((r) => r.toJson()).toList();
-    await SecureStorage.write(
-      _key(userId),
-      jsonEncode(jsonList),
-    );
+    try {
+      final jsonList = rooms.map((r) => r.toJson()).toList();
+      await SecureStorage.write(
+        _key(userId),
+        jsonEncode(jsonList),
+      );
+    } catch (_) {}
   }
 
   static Future<List<Map<String, dynamic>>> read({String? userId}) async {
-    final raw = await SecureStorage.read(_key(userId));
-    if (raw == null || raw.isEmpty) return [];
     try {
+      final raw = await SecureStorage.read(_key(userId));
+      if (raw == null || raw.isEmpty) return [];
       final decoded = jsonDecode(raw);
       if (decoded is List) {
         return decoded.whereType<Map<String, dynamic>>().toList();
       }
-    } on FormatException {
-      // ignore
-    }
+    } catch (_) {}
     return [];
   }
 
   static Future<void> clear({String? userId}) async {
-    await SecureStorage.delete(_key(userId));
-    await SecureStorage.delete('rooms_cache_default');
+    try {
+      await SecureStorage.delete(_key(userId));
+      await SecureStorage.delete('rooms_cache_default');
+    } catch (_) {}
   }
 }
 

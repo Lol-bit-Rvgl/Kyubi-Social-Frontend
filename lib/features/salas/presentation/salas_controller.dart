@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/storage/session_store.dart';
 import '../../../models/role_character.dart';
 import '../../../models/room.dart';
 import '../../../repositories/room_repository.dart';
@@ -91,19 +92,34 @@ class SalasNotifier extends Notifier<SalasState> {
 
   @override
   SalasState build() {
+    _disposed = false;
     ref.onDispose(() => _disposed = true);
     final currentUserId = ref.watch(authControllerProvider.select((s) => s.user?.id));
     _clearMemoryData();
     if (currentUserId != null && currentUserId.isNotEmpty) {
+      _restoreFromCache(currentUserId);
       Future.microtask(_load);
       return const SalasState(loading: true);
     }
     return const SalasState();
   }
 
+  /// Restaura salas desde caché local inmediatamente antes de la llamada de red.
+  Future<void> _restoreFromCache(String userId) async {
+    try {
+      final cached = await RoomsCache.read(userId: userId);
+      if (cached.isEmpty || _disposed) return;
+      final rooms = cached.map(Room.fromJson).toList();
+      if (_disposed) return;
+      state = state.copyWith(rooms: _sortRooms(rooms), loading: false);
+    } catch (_) {}
+  }
+
   /// Purga síncrona de todo el estado en memoria al cambiar de cuenta o cerrar sesión.
   void clearAll() {
     _clearMemoryData();
+    final currentUserId = ref.read(authControllerProvider).user?.id;
+    RoomsCache.clear(userId: currentUserId);
     state = const SalasState();
   }
 
@@ -117,17 +133,34 @@ class SalasNotifier extends Notifier<SalasState> {
   Future<void> _load() async {
     if (_disposed) return;
     final reqId = ++_requestId;
-    state = state.copyWith(loading: true, error: null);
+    final hasExistingData = state.rooms.isNotEmpty;
+    state = state.copyWith(
+      loading: !hasExistingData,
+      refreshing: hasExistingData,
+      error: null,
+    );
     try {
       final rooms = await _fetch().timeout(const Duration(seconds: 8));
       if (_disposed || reqId != _requestId) return;
-      state = state.copyWith(rooms: _sortRooms(rooms), loading: false);
+      final sorted = _sortRooms(rooms);
+      state = state.copyWith(
+        rooms: sorted,
+        loading: false,
+        refreshing: false,
+        error: null,
+      );
+      final currentUserId = ref.read(authControllerProvider).user?.id;
+      RoomsCache.save(sorted, userId: currentUserId);
     } catch (e) {
       if (_disposed || reqId != _requestId) return;
-      state = state.copyWith(loading: false, error: e.toString());
+      state = state.copyWith(
+        loading: false,
+        refreshing: false,
+        error: state.rooms.isEmpty ? e.toString() : null,
+      );
     } finally {
-      if (!_disposed && reqId == _requestId && state.loading) {
-        state = state.copyWith(loading: false);
+      if (!_disposed && reqId == _requestId && (state.loading || state.refreshing)) {
+        state = state.copyWith(loading: false, refreshing: false);
       }
     }
   }
@@ -136,13 +169,25 @@ class SalasNotifier extends Notifier<SalasState> {
     try {
       final rooms = await _fetch().timeout(const Duration(seconds: 8));
       if (_disposed || reqId != _requestId) return;
-      state = state.copyWith(rooms: _sortRooms(rooms), loading: false);
+      final sorted = _sortRooms(rooms);
+      state = state.copyWith(
+        rooms: sorted,
+        loading: false,
+        refreshing: false,
+        error: null,
+      );
+      final currentUserId = ref.read(authControllerProvider).user?.id;
+      RoomsCache.save(sorted, userId: currentUserId);
     } catch (e) {
       if (_disposed || reqId != _requestId) return;
-      state = state.copyWith(loading: false, error: e.toString());
+      state = state.copyWith(
+        loading: false,
+        refreshing: false,
+        error: state.rooms.isEmpty ? e.toString() : null,
+      );
     } finally {
-      if (!_disposed && reqId == _requestId && state.loading) {
-        state = state.copyWith(loading: false);
+      if (!_disposed && reqId == _requestId && (state.loading || state.refreshing)) {
+        state = state.copyWith(loading: false, refreshing: false);
       }
     }
   }
@@ -180,7 +225,10 @@ class SalasNotifier extends Notifier<SalasState> {
     try {
       final rooms = await _fetch().timeout(const Duration(seconds: 8));
       if (_disposed || reqId != _requestId) return;
-      state = state.copyWith(rooms: _sortRooms(rooms), refreshing: false);
+      final sorted = _sortRooms(rooms);
+      state = state.copyWith(rooms: sorted, refreshing: false, error: null);
+      final currentUserId = ref.read(authControllerProvider).user?.id;
+      RoomsCache.save(sorted, userId: currentUserId);
     } catch (e) {
       if (_disposed || reqId != _requestId) return;
       state = state.copyWith(refreshing: false, error: e.toString());
