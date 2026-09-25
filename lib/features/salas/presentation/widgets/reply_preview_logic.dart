@@ -60,8 +60,12 @@ ReplyPreview resolveReplyPreview({
   final mediaIsUrl = _isRawUrl(rawMedia);
   final audioLike =
       type == 'voice' ||
+      type == 'audio' ||
+      type == 'voice_note' ||
       (bodyIsUrl && _looksLikeAudioUrl(rawBody)) ||
-      (mediaIsUrl && _looksLikeAudioUrl(rawMedia));
+      (mediaIsUrl && _looksLikeAudioUrl(rawMedia)) ||
+      rawBody.startsWith('🎤') ||
+      rawBody.contains('[Nota de voz');
   if (audioLike) {
     return const ReplyPreview(text: '🎤 Nota de voz');
   }

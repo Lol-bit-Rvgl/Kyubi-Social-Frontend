@@ -40,6 +40,7 @@ class SalaDetailNotifier extends FamilyNotifier<SalaDetailState, String> {
 
   @override
   SalaDetailState build(String arg) {
+    ref.keepAlive();
     ref.onDispose(() => _disposed = true);
     _roomId = arg;
     Future.microtask(_load);

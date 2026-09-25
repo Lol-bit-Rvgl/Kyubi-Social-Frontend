@@ -21,7 +21,9 @@ bool isRedundantImageText(String text) {
       t == '[Imagen adjunta]' ||
       t == '📷 [Imagen adjunta]' ||
       t == '📷 Imagen adjunta' ||
-      t == 'Imagen adjunta';
+      t == 'Imagen adjunta' ||
+      t == '[Contenido multimedia]' ||
+      t == '📷 [Contenido multimedia]';
 }
 
 /// Burbuja de chat moderna y multifuncional con soporte para:
@@ -122,7 +124,10 @@ class DirectChatMessageBubble extends StatelessWidget {
   }
 
   bool get _isVoiceNote {
-    if (type?.toUpperCase() == 'VOICE_NOTE' ||
+    final t = type?.toUpperCase();
+    if (t == 'VOICE' ||
+        t == 'VOICE_NOTE' ||
+        t == 'AUDIO' ||
         mediaType == 'audio' ||
         mediaType == 'voice') {
       return true;
@@ -130,7 +135,23 @@ class DirectChatMessageBubble extends StatelessWidget {
     if (extensions?['voice'] == true || extensions?['audioUrl'] != null) {
       return true;
     }
-    return body.trim().startsWith('🎤 [Nota de voz');
+    final cleanBody = body.trim();
+    if (cleanBody.startsWith('🎤 [Nota de voz') ||
+        cleanBody.startsWith('🎤') ||
+        cleanBody.contains('[Nota de voz')) {
+      return true;
+    }
+    final effectiveUrl =
+        (media?.url ?? mediaUrl ?? '').toLowerCase().split('?').first;
+    if (effectiveUrl.endsWith('.m4a') ||
+        effectiveUrl.endsWith('.mp3') ||
+        effectiveUrl.endsWith('.aac') ||
+        effectiveUrl.endsWith('.wav') ||
+        effectiveUrl.endsWith('.ogg') ||
+        effectiveUrl.contains('/audio/')) {
+      return true;
+    }
+    return false;
   }
 
   static bool isLikelyImageUrl(String s) {
@@ -458,7 +479,10 @@ class DirectChatMessageBubble extends StatelessWidget {
   }
 
   Widget _buildVoiceNoteCard(BuildContext context) {
-    final audioUrl = extensions?['audioUrl'] as String? ?? mediaUrl;
+    final audioUrl = media?.url ??
+        mediaUrl ??
+        extensions?['audioUrl'] as String? ??
+        (body.startsWith('http') ? body.trim() : null);
     if (audioUrl != null &&
         (audioUrl.startsWith('http://') || audioUrl.startsWith('https://'))) {
       return VoiceNoteBubble(

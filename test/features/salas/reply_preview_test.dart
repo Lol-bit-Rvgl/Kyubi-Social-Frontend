@@ -40,6 +40,19 @@ void main() {
       expect(preview.thumbnailUrl, isNull);
     });
 
+    test('etiqueta notas de voz con messageType audio o texto representativo', () {
+      final p1 = resolveReplyPreview(
+        body: '🎤 [Nota de voz (5s)]',
+        messageType: 'audio',
+      );
+      expect(p1.text, '🎤 Nota de voz');
+
+      final p2 = resolveReplyPreview(
+        body: '🎤 [Nota de voz (2s)]',
+      );
+      expect(p2.text, '🎤 Nota de voz');
+    });
+
     test('texto plano se conserva tal cual (1:1)', () {
       final preview = resolveReplyPreview(
         body: 'Hola mundo',

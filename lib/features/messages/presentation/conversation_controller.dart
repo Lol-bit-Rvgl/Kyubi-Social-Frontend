@@ -262,7 +262,7 @@ class ConversationChatNotifier
       mediaType: mediaType ?? (effectiveMediaUrl != null ? 'image' : null),
       replyToId: replyToId,
       extensions: combinedExt.isNotEmpty ? combinedExt : null,
-      createdAt: DateTime.now(),
+      createdAt: DateTime.now().toUtc(),
     );
     state = state.copyWith(
       messages: [...state.messages, optimistic],

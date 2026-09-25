@@ -251,7 +251,7 @@ class SalaChatNotifier
               isOnline: me.isOnline,
             ),
       body: text,
-      createdAt: DateTime.now(),
+      createdAt: DateTime.now().toUtc(),
     );
     state = state.copyWith(
       messages: [...state.messages, optimistic],

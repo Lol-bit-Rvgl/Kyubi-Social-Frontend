@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kyubi/core/widgets/animated_sticker.dart';
 import 'package:kyubi/core/widgets/chat_bubble.dart';
 import 'package:kyubi/features/feed/presentation/widgets/interactive_poll_card.dart';
+import 'package:kyubi/features/salas/presentation/widgets/voice_note_bubble.dart';
 
 void main() {
   group('1. Fotos sin texto redundante [Imagen adjunta]', () {
@@ -24,6 +25,26 @@ void main() {
       // No debe existir widget de texto con [Imagen adjunta]
       expect(find.text('📷 [Imagen adjunta]'), findsNothing);
       expect(find.text('[Imagen adjunta]'), findsNothing);
+    });
+
+    testWidgets('Oculta el texto redundante cuando el cuerpo es [Contenido multimedia]', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: ChatMessageBubble(
+              displayName: 'Usuario',
+              body: '📷 [Contenido multimedia]',
+              timestamp: '12:00',
+              mediaUrl: 'https://example.com/foto.jpg',
+              mediaType: 'image',
+            ),
+          ),
+        ),
+      );
+
+      // No debe existir widget de texto redundante
+      expect(find.text('📷 [Contenido multimedia]'), findsNothing);
+      expect(find.text('[Contenido multimedia]'), findsNothing);
     });
 
     testWidgets('Muestra la descripción real si el usuario escribió un pie de foto', (tester) async {
@@ -163,6 +184,25 @@ void main() {
       // Debe mostrar icono de reproducción y duración formateada 00:08
       expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
       expect(find.text('00:08'), findsOneWidget);
+    });
+
+    testWidgets('Renderiza VoiceNoteBubble cuando type es VOICE con mediaUrl m4a', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: ChatMessageBubble(
+              displayName: 'Usuario',
+              body: '',
+              timestamp: '12:00',
+              type: 'VOICE',
+              mediaUrl: 'https://example.com/audio.m4a',
+            ),
+          ),
+        ),
+      );
+
+      // Debe montar VoiceNoteBubble
+      expect(find.byType(VoiceNoteBubble), findsOneWidget);
     });
   });
 

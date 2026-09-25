@@ -80,6 +80,7 @@ class _CinemaPlayerViewState extends ConsumerState<CinemaPlayerView>
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   bool _showCenterActionFeedback = false;
   Timer? _feedbackTimer;
+  bool _isDisposed = false;
 
   bool get _canControl => widget.isHost || widget.canManage;
 
@@ -267,6 +268,12 @@ class _CinemaPlayerViewState extends ConsumerState<CinemaPlayerView>
         );
         break;
       case 'STOP':
+        setState(() {
+          _state = 'STOPPED';
+          _position = Duration.zero;
+        });
+        unawaited(controller.pauseVideo());
+        break;
       case 'CLEAR':
       case 'REMOVE':
         setState(() {
@@ -303,12 +310,11 @@ class _CinemaPlayerViewState extends ConsumerState<CinemaPlayerView>
   // ── Emisión del HOST hacia la sala vía Socket ────────────────────────────
 
   void _onPlayerState(YoutubePlayerValue value) {
-    if (!mounted) return;
+    if (!mounted || _isDisposed) return;
     if (_applyingSync) return;
 
-    // Si la aplicación está inactiva (ej. barra de notificaciones bajada en Android),
-    // la WebView puede pausar localmente el video. NO debemos propagarlo como pausa del anfitrión.
-    if (_lifecycleState == AppLifecycleState.inactive) return;
+    // Si la aplicación no está en primer plano y activa, ignorar eventos automáticos del WebView
+    if (_lifecycleState != AppLifecycleState.resumed) return;
 
     if (!_canControl) return;
 
@@ -553,13 +559,17 @@ class _CinemaPlayerViewState extends ConsumerState<CinemaPlayerView>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    _isDisposed = true;
+    _playerSub?.cancel();
+    _playerSub = null;
+    _positionSub?.cancel();
+    _positionSub = null;
+    _socketSub?.cancel();
+    _socketSub = null;
+    _syncGuardTimer?.cancel();
     _controlsTimer?.cancel();
     _feedbackTimer?.cancel();
-    _socketSub?.cancel();
-    _syncGuardTimer?.cancel();
-    _playerSub?.cancel();
-    _positionSub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _controller?.close();
     super.dispose();
   }

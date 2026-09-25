@@ -247,8 +247,18 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     for (var i = messages.length - 1; i >= 0; i--) {
       final current = messages[i];
       items.add(_ConvItem.message(current));
-      if (i == 0 || !_sameDay(current.createdAt, messages[i - 1].createdAt)) {
+      if (i == 0) {
         items.add(_ConvItem.date(current.createdAt));
+      } else {
+        final prev = messages[i - 1];
+        final isTemp = current.id.startsWith('local-');
+        final same = isTemp
+            ? (_sameDay(current.createdAt, prev.createdAt) ||
+                _sameDay(DateTime.now(), prev.createdAt))
+            : _sameDay(current.createdAt, prev.createdAt);
+        if (!same) {
+          items.add(_ConvItem.date(current.createdAt));
+        }
       }
     }
 
@@ -766,44 +776,50 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   }
 
   Future<void> _sendAudio(int durationMs, Uint8List bytes, String filename) async {
-    if (bytes.isNotEmpty) {
-      try {
-        final uploadRepo = ref.read(uploadRepositoryProvider);
-        final url = await uploadRepo.uploadFile(
-          'media',
-          bytes: bytes,
-          filename: filename,
-          contentType: 'audio/m4a',
+    if (bytes.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo grabar la nota de voz')),
         );
-        if (url.isNotEmpty) {
-          final ok = await ref
-              .read(conversationChatProvider(widget.conversationId).notifier)
-              .send(
-                '🎤 [Nota de voz (${durationMs ~/ 1000}s)]',
-                mediaUrl: url,
-                mediaType: 'audio',
-                extensions: {
-                  'voice': true,
-                  'durationMs': durationMs,
-                  'audioUrl': url,
-                },
-              );
-          if (ok) {
-            _scrollToBottom();
-            ref.read(conversationsControllerProvider.notifier).refresh();
-            return;
-          }
-        }
-      } catch (_) {}
+      }
+      return;
     }
-    _send(
-      '🎤 [Nota de voz (${durationMs ~/ 1000}s)]',
-      mediaType: 'audio',
-      extensions: {
-        'voice': true,
-        'durationMs': durationMs,
-      },
-    );
+    try {
+      final uploadRepo = ref.read(uploadRepositoryProvider);
+      final effectiveName = filename.endsWith('.m4a') ? filename : '$filename.m4a';
+      final url = await uploadRepo.uploadFile(
+        'media',
+        bytes: bytes,
+        filename: effectiveName,
+        contentType: 'audio/m4a',
+      );
+      if (url.isNotEmpty) {
+        final ok = await ref
+            .read(conversationChatProvider(widget.conversationId).notifier)
+            .send(
+              '🎤 [Nota de voz (${durationMs ~/ 1000}s)]',
+              mediaUrl: url,
+              mediaType: 'audio',
+              extensions: {
+                'voice': true,
+                'durationMs': durationMs,
+                'audioUrl': url,
+              },
+            );
+        if (ok) {
+          _scrollToBottom();
+          ref.read(conversationsControllerProvider.notifier).refresh();
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('[AUDIO_DEBUG] Error subiendo nota de voz: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo subir la nota de voz')),
+        );
+      }
+    }
   }
 
   Widget _buildComposer(ConversationChatState state) {
@@ -1021,7 +1037,9 @@ class _ConvItem {
 }
 
 bool _sameDay(DateTime a, DateTime b) {
-  return a.year == b.year && a.month == b.month && a.day == b.day;
+  final la = a.toLocal();
+  final lb = b.toLocal();
+  return la.year == lb.year && la.month == lb.month && la.day == lb.day;
 }
 
 class _DateSeparator extends StatelessWidget {

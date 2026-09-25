@@ -388,6 +388,10 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
     }
     try {
       final file = File(path);
+      if (!await file.exists()) {
+        widget.onSendAudio(durationMs, Uint8List(0), 'voice_note.m4a');
+        return;
+      }
       final bytes = await file.readAsBytes();
       widget.onSendAudio(durationMs, bytes, 'voice_note.m4a');
     } catch (_) {

@@ -381,8 +381,26 @@ class RoleChatBubble extends StatelessWidget {
       );
     }
 
-    if (type == 'VOICE') return _buildVoiceCard();
-    if (type == 'IMAGE') return _buildImageCard(context);
+    final isVoice = type == 'VOICE' ||
+        type == 'AUDIO' ||
+        type == 'VOICE_NOTE' ||
+        (contentUrl != null &&
+            (contentUrl!.endsWith('.m4a') ||
+                contentUrl!.endsWith('.mp3') ||
+                contentUrl!.endsWith('.aac') ||
+                contentUrl!.contains('/audio/'))) ||
+        body.startsWith('🎤');
+    if (isVoice) return _buildVoiceCard();
+
+    final isImage = type == 'IMAGE' ||
+        (contentUrl != null &&
+            (contentUrl!.endsWith('.jpg') ||
+                contentUrl!.endsWith('.jpeg') ||
+                contentUrl!.endsWith('.png') ||
+                contentUrl!.endsWith('.webp') ||
+                contentUrl!.endsWith('.gif') ||
+                contentUrl!.contains('/images/')));
+    if (isImage) return _buildImageCard(context);
     if (type == 'POLL') {
       final poll = _buildPollCard();
       if (poll != null) return poll;
@@ -509,9 +527,14 @@ class RoleChatBubble extends StatelessWidget {
   /// Reproductor de voz integrado (barra de progreso, play/pause y duración)
   /// usando la URL de audio guardada en el mensaje.
   Widget _buildVoiceCard() {
+    final metaUrl = metadata?['mediaUrl'] as String? ??
+        metadata?['audioUrl'] as String? ??
+        metadata?['contentUrl'] as String?;
     final url = contentUrl != null && contentUrl!.isNotEmpty
         ? contentUrl!
-        : body;
+        : (metaUrl != null && metaUrl.isNotEmpty
+            ? metaUrl
+            : (body.startsWith('http') ? body : ''));
     if (url.isEmpty) {
       return Container(
         width: 220,
