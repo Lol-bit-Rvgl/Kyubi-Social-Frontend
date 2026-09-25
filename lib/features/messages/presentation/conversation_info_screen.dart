@@ -513,6 +513,7 @@ class _ConversationInfoScreenState extends ConsumerState<ConversationInfoScreen>
 
   Widget _buildWallpaperCard() {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF13111E),
@@ -542,9 +543,13 @@ class _ConversationInfoScreenState extends ConsumerState<ConversationInfoScreen>
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'Fondo del chat',
+                  softWrap: true,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -554,6 +559,9 @@ class _ConversationInfoScreenState extends ConsumerState<ConversationInfoScreen>
                 SizedBox(height: 2),
                 Text(
                   'Personaliza el wallpaper...',
+                  softWrap: true,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                   style: TextStyle(
                     color: Colors.white54,
                     fontSize: 11.5,
@@ -562,6 +570,7 @@ class _ConversationInfoScreenState extends ConsumerState<ConversationInfoScreen>
               ],
             ),
           ),
+          const SizedBox(width: 8),
           OutlinedButton(
             onPressed: _changeWallpaper,
             style: OutlinedButton.styleFrom(

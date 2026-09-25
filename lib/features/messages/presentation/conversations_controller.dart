@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/session_store.dart';
+import '../../../core/widgets/app_messenger.dart';
 import '../../../models/chat_conversation.dart';
 import '../../../models/chat_message.dart';
 import '../../../repositories/chat_repository.dart';
@@ -135,7 +136,7 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
 
       final conversations = await _repo
           .getConversations()
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 15));
       if (!_mounted) return;
       state = state.copyWith(
         conversations: conversations,
@@ -152,6 +153,9 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
           refreshing: false,
           error: state.conversations.isEmpty ? e.toString() : null,
         );
+        if (state.conversations.isNotEmpty) {
+          showAppSnackBar('Sin conexión / reintentando en segundo plano...');
+        }
       }
     } finally {
       if (_mounted && (state.loading || state.refreshing)) {
@@ -162,14 +166,19 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
 
   Future<void> refresh() async {
     if (!_mounted) return;
-    state = state.copyWith(refreshing: true, error: null);
+    state = state.copyWith(
+      loading: state.conversations.isEmpty,
+      refreshing: state.conversations.isNotEmpty,
+      error: null,
+    );
     try {
       final conversations = await _repo
           .getConversations()
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 15));
       if (!_mounted) return;
       state = state.copyWith(
         conversations: conversations,
+        loading: false,
         refreshing: false,
         error: null,
       );
@@ -177,11 +186,18 @@ class ConversationsNotifier extends Notifier<ConversationsState> {
       ConversationsCache.save(conversations, userId: myId);
     } catch (e) {
       if (_mounted) {
-        state = state.copyWith(refreshing: false, error: e.toString());
+        state = state.copyWith(
+          loading: false,
+          refreshing: false,
+          error: state.conversations.isEmpty ? e.toString() : null,
+        );
+        if (state.conversations.isNotEmpty) {
+          showAppSnackBar('Sin conexión / reintentando en segundo plano...');
+        }
       }
     } finally {
-      if (_mounted && state.refreshing) {
-        state = state.copyWith(refreshing: false);
+      if (_mounted && (state.loading || state.refreshing)) {
+        state = state.copyWith(loading: false, refreshing: false);
       }
     }
   }

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
+import 'core/widgets/app_messenger.dart';
 import 'core/widgets/vhs_notification_toast.dart';
 import 'routing/app_router.dart';
 import 'services/providers.dart';
@@ -167,6 +168,7 @@ class _KyubiAppState extends ConsumerState<KyubiApp> {
     final userTheme = ref.watch(userThemeProvider);
 
     return MaterialApp.router(
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.buildLight(themeSettings: userTheme),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/session_store.dart';
+import '../../../core/widgets/app_messenger.dart';
 import '../../../models/role_character.dart';
 import '../../../models/room.dart';
 import '../../../repositories/room_repository.dart';
@@ -140,7 +141,7 @@ class SalasNotifier extends Notifier<SalasState> {
       error: null,
     );
     try {
-      final rooms = await _fetch().timeout(const Duration(seconds: 8));
+      final rooms = await _fetch().timeout(const Duration(seconds: 15));
       if (_disposed || reqId != _requestId) return;
       final sorted = _sortRooms(rooms);
       state = state.copyWith(
@@ -158,6 +159,9 @@ class SalasNotifier extends Notifier<SalasState> {
         refreshing: false,
         error: state.rooms.isEmpty ? e.toString() : null,
       );
+      if (state.rooms.isNotEmpty) {
+        showAppSnackBar('Sin conexión / reintentando en segundo plano...');
+      }
     } finally {
       if (!_disposed && reqId == _requestId && (state.loading || state.refreshing)) {
         state = state.copyWith(loading: false, refreshing: false);
@@ -167,7 +171,7 @@ class SalasNotifier extends Notifier<SalasState> {
 
   Future<void> _loadForRequest(int reqId) async {
     try {
-      final rooms = await _fetch().timeout(const Duration(seconds: 8));
+      final rooms = await _fetch().timeout(const Duration(seconds: 15));
       if (_disposed || reqId != _requestId) return;
       final sorted = _sortRooms(rooms);
       state = state.copyWith(
@@ -185,6 +189,9 @@ class SalasNotifier extends Notifier<SalasState> {
         refreshing: false,
         error: state.rooms.isEmpty ? e.toString() : null,
       );
+      if (state.rooms.isNotEmpty) {
+        showAppSnackBar('Sin conexión / reintentando en segundo plano...');
+      }
     } finally {
       if (!_disposed && reqId == _requestId && (state.loading || state.refreshing)) {
         state = state.copyWith(loading: false, refreshing: false);
@@ -221,20 +228,36 @@ class SalasNotifier extends Notifier<SalasState> {
   Future<void> refresh() async {
     if (_disposed) return;
     final reqId = ++_requestId;
-    state = state.copyWith(refreshing: true, error: null);
+    state = state.copyWith(
+      loading: state.rooms.isEmpty,
+      refreshing: state.rooms.isNotEmpty,
+      error: null,
+    );
     try {
-      final rooms = await _fetch().timeout(const Duration(seconds: 8));
+      final rooms = await _fetch().timeout(const Duration(seconds: 15));
       if (_disposed || reqId != _requestId) return;
       final sorted = _sortRooms(rooms);
-      state = state.copyWith(rooms: sorted, refreshing: false, error: null);
+      state = state.copyWith(
+        rooms: sorted,
+        loading: false,
+        refreshing: false,
+        error: null,
+      );
       final currentUserId = ref.read(authControllerProvider).user?.id;
       RoomsCache.save(sorted, userId: currentUserId);
     } catch (e) {
       if (_disposed || reqId != _requestId) return;
-      state = state.copyWith(refreshing: false, error: e.toString());
+      state = state.copyWith(
+        loading: false,
+        refreshing: false,
+        error: state.rooms.isEmpty ? e.toString() : null,
+      );
+      if (state.rooms.isNotEmpty) {
+        showAppSnackBar('Sin conexión / reintentando en segundo plano...');
+      }
     } finally {
-      if (!_disposed && reqId == _requestId && state.refreshing) {
-        state = state.copyWith(refreshing: false);
+      if (!_disposed && reqId == _requestId && (state.loading || state.refreshing)) {
+        state = state.copyWith(loading: false, refreshing: false);
       }
     }
   }

@@ -35,6 +35,13 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   bool _warnSpoiler = false;
   bool _saving = false;
 
+  /// Límites de longitud alineados con el backend y las reglas de diseño.
+  static const int _maxTitleLength = 50;
+  static const int _maxBodyLength = 2000;
+  static const int _maxTagsCount = 5;
+  static const int _maxTagLength = 25;
+  static const int _maxTagsTotalLength = 150;
+
   /// Máximo de imágenes por publicación (el backend limita a 4 en el grid del feed).
   static const int _maxImages = 4;
 
@@ -46,6 +53,13 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   void initState() {
     super.initState();
     _loadMyCircles();
+    _titleController.addListener(_onTextChanged);
+    _bodyController.addListener(_onTextChanged);
+    _tagsController.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadMyCircles() async {
@@ -73,10 +87,58 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   @override
   void dispose() {
+    _titleController.removeListener(_onTextChanged);
+    _bodyController.removeListener(_onTextChanged);
+    _tagsController.removeListener(_onTextChanged);
     _titleController.dispose();
     _bodyController.dispose();
     _tagsController.dispose();
     super.dispose();
+  }
+
+  List<String> get _parsedTags => _tagsController.text
+      .split(',')
+      .map((t) => t.trim())
+      .where((t) => t.isNotEmpty)
+      .toList();
+
+  String? get _tagsValidationError {
+    final raw = _tagsController.text.trim();
+    if (raw.isEmpty) return null;
+
+    final tags = _parsedTags;
+    if (tags.length > _maxTagsCount) {
+      return 'Máximo $_maxTagsCount etiquetas permitidas (${tags.length}/$_maxTagsCount)';
+    }
+
+    final invalidCharsRegex = RegExp(r'^[a-zA-Z0-9_\-\u00C0-\u017F\s#]+$');
+    for (final tag in tags) {
+      if (tag.length > _maxTagLength) {
+        return 'La etiqueta "$tag" supera los $_maxTagLength caracteres (${tag.length}/$_maxTagLength)';
+      }
+      if (!invalidCharsRegex.hasMatch(tag)) {
+        return 'La etiqueta "$tag" contiene caracteres no permitidos';
+      }
+    }
+    return null;
+  }
+
+  int get _bodyLength => _bodyController.text.length;
+  bool get _isBodyTooLong => _bodyLength > _maxBodyLength;
+  bool get _isBodyEmpty => _bodyController.text.trim().isEmpty;
+  bool get _isTitleTooLong => _titleController.text.length > _maxTitleLength;
+
+  bool get _canSubmit {
+    if (_saving || _uploadingMedia) return false;
+    if (_isBodyEmpty || _isBodyTooLong) return false;
+    if (_isTitleTooLong) return false;
+    if (_tagsValidationError != null) return false;
+    if (_visibility == 'CIRCLE' &&
+        _selectedCircleId == null &&
+        _myCircles.isEmpty) {
+      return false;
+    }
+    return true;
   }
 
   /// Abre la galería y agrega hasta [_maxImages] imágenes seleccionadas.
@@ -113,7 +175,17 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   }
 
   Future<void> _submit() async {
+    if (!_canSubmit) return;
     if (!_formKey.currentState!.validate()) return;
+    if (_tagsValidationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_tagsValidationError!),
+          backgroundColor: AppColors.accentCrimson,
+        ),
+      );
+      return;
+    }
     if (_visibility == 'CIRCLE') {
       if (_myCircles.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -138,10 +210,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     // Gamefeel: impacto medio al publicar (acción principal).
     HapticFeedback.mediumImpact();
     setState(() => _saving = true);
-    final tags = _tagsController.text
-        .split(',')
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
+    final tags = _parsedTags
+        .take(_maxTagsCount)
+        .map((t) => t.length > _maxTagLength ? t.substring(0, _maxTagLength) : t)
         .toList();
     try {
       // Subir las imágenes seleccionadas antes de crear la publicación.
@@ -357,20 +428,26 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   color: const Color(0xFF14141B),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: const Color(0xFF22222E),
+                    color: _isTitleTooLong
+                        ? AppColors.accentCrimson
+                        : const Color(0xFF22222E),
                     width: 0.8,
                   ),
                 ),
                 child: TextFormField(
                   controller: _titleController,
-                  maxLength: 80,
+                  maxLength: _maxTitleLength,
+                  maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(_maxTitleLength),
+                  ],
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
                   decoration: const InputDecoration(
-                    labelText: 'Título (opcional)',
+                    labelText: 'Título (opcional, máx. 50)',
                     hintText: '¿De qué trata tu publicación?',
                     border: InputBorder.none,
                     counterStyle: TextStyle(
@@ -390,7 +467,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   color: const Color(0xFF14141B),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: const Color(0xFF22222E),
+                    color: _isBodyTooLong
+                        ? AppColors.accentCrimson
+                        : const Color(0xFF22222E),
                     width: 0.8,
                   ),
                 ),
@@ -401,10 +480,20 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       controller: _bodyController,
                       minLines: 6,
                       maxLines: 12,
-                      maxLength: 2000,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Escribe algo para publicar'
-                          : null,
+                      maxLength: _maxBodyLength,
+                      maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                      inputFormatters: [
+                        LengthLimitingTextInputFormatter(_maxBodyLength),
+                      ],
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Escribe algo para publicar';
+                        }
+                        if (v.length > _maxBodyLength) {
+                          return 'El contenido no puede superar $_maxBodyLength caracteres';
+                        }
+                        return null;
+                      },
                       style: const TextStyle(
                         fontSize: 14,
                         height: 1.4,
@@ -424,18 +513,24 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          '2000 caracteres máx.',
+                        Text(
+                          '$_bodyLength / $_maxBodyLength caracteres',
                           style: TextStyle(
                             fontSize: 11.5,
-                            fontStyle: FontStyle.italic,
-                            color: Color(0xFF7A7A8E),
+                            fontWeight: FontWeight.w600,
+                            color: _bodyLength > _maxBodyLength
+                                ? AppColors.accentCrimson
+                                : (_bodyLength >= 1800
+                                    ? Colors.orangeAccent
+                                    : const Color(0xFF7A7A8E)),
                           ),
                         ),
                         Icon(
                           Icons.text_fields_rounded,
                           size: 16,
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: _bodyLength > _maxBodyLength
+                              ? AppColors.accentCrimson
+                              : Colors.white.withValues(alpha: 0.3),
                         ),
                       ],
                     ),
@@ -461,23 +556,56 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   color: const Color(0xFF14141B),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: const Color(0xFF22222E),
+                    color: _tagsValidationError != null
+                        ? AppColors.accentCrimson
+                        : const Color(0xFF22222E),
                     width: 0.8,
                   ),
                 ),
-                child: TextFormField(
-                  controller: _tagsController,
-                  style: const TextStyle(fontSize: 13.5, color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Etiquetas (separadas por coma)',
-                    hintText: 'terror, roleplay, anime',
-                    prefixIcon: Icon(
-                      Icons.tag_rounded,
-                      size: 20,
-                      color: AppColors.accentCyan,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: _tagsController,
+                      inputFormatters: [
+                        LengthLimitingTextInputFormatter(_maxTagsTotalLength),
+                      ],
+                      style: const TextStyle(fontSize: 13.5, color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Etiquetas (máx. $_maxTagsCount, hasta $_maxTagLength car. c/u)',
+                        hintText: 'terror, roleplay, anime',
+                        prefixIcon: Icon(
+                          Icons.tag_rounded,
+                          size: 20,
+                          color: _tagsValidationError != null
+                              ? AppColors.accentCrimson
+                              : AppColors.accentCyan,
+                        ),
+                        border: InputBorder.none,
+                        suffixText: '${_parsedTags.length}/$_maxTagsCount',
+                        suffixStyle: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: _parsedTags.length > _maxTagsCount
+                              ? AppColors.accentCrimson
+                              : const Color(0xFF6A6A7E),
+                        ),
+                      ),
                     ),
-                    border: InputBorder.none,
-                  ),
+                    if (_tagsValidationError != null) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6, left: 4),
+                        child: Text(
+                          _tagsValidationError!,
+                          style: const TextStyle(
+                            color: AppColors.accentCrimson,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
 
@@ -806,14 +934,20 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 child: SizedBox(
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: (_saving || _uploadingMedia) ? null : _submit,
+                    onPressed: _canSubmit ? _submit : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accentCrimson,
-                      foregroundColor: Colors.white,
+                      backgroundColor: _canSubmit
+                          ? AppColors.accentCrimson
+                          : const Color(0xFF33202A),
+                      foregroundColor: _canSubmit
+                          ? Colors.white
+                          : Colors.white38,
+                      disabledBackgroundColor: const Color(0xFF221620),
+                      disabledForegroundColor: Colors.white24,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      elevation: 4,
+                      elevation: _canSubmit ? 4 : 0,
                       shadowColor: AppColors.accentCrimson.withValues(
                         alpha: 0.4,
                       ),

@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 
 import '../config/app_config.dart';
 import '../errors/api_exception.dart';
@@ -45,6 +48,11 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Desactivar keep-alive en peticiones GET para evitar que el socket quede
+          // latente y sea abortado por el sistema operativo al pausar/reanudar la app.
+          if (options.method.toUpperCase() == 'GET') {
+            options.headers['Connection'] = 'close';
+          }
           await _injectRequestHeaders(options);
           handler.next(options);
         },
@@ -66,13 +74,41 @@ class ApiClient {
             );
           }
 
-          // ── Reintento con backoff exponencial (1s, 2s) ──
-          // Solo peticiones idempotentes (GET) y solo ante fallos
-          // transitorios: cold-start (502/503/504) o timeout de conexión.
           final isIdempotent =
               (error.requestOptions.method.toUpperCase()) == 'GET';
           final retryCount =
               (error.requestOptions.extra['__kyubi_retry_count'] as int?) ?? 0;
+
+          // ── 1. Reintento ante socket abort / conexión cerrada al reanudar la app ──
+          final isAbortOrReset = _isConnectionAbortOrReset(error);
+          if (isAbortOrReset && retryCount < _maxRetries) {
+            final opts = error.requestOptions;
+            opts.extra['__kyubi_retry_count'] = retryCount + 1;
+            // Forzar una nueva conexión cerrando el socket existente
+            opts.headers['Connection'] = 'close';
+            invalidateConnectionPool();
+
+            // Backoff exponencial breve: 300ms → 800ms
+            final delayMs = retryCount == 0 ? 300 : 800;
+            if (kDebugMode) {
+              debugPrint(
+                '[API] Socket abort/reset detectado en ${opts.path} (${error.error ?? error.message}). Reintentando ${retryCount + 1}/$_maxRetries en ${delayMs}ms...',
+              );
+            }
+            await Future<void>.delayed(Duration(milliseconds: delayMs));
+
+            try {
+              final res = await _retry(opts);
+              handler.resolve(res);
+              return;
+            } catch (retryError) {
+              if (retryError is DioException) {
+                error = retryError;
+              }
+            }
+          }
+
+          // ── 2. Reintento con backoff exponencial para servidor iniciando o timeouts (GET) ──
           if (isIdempotent &&
               retryCount < _maxRetries &&
               (isServerStarting ||
@@ -83,8 +119,15 @@ class ApiClient {
             await Future<void>.delayed(
               Duration(seconds: 1 << retryCount),
             );
-            handler.resolve(await _retry(opts));
-            return;
+            try {
+              final res = await _retry(opts);
+              handler.resolve(res);
+              return;
+            } catch (retryError) {
+              if (retryError is DioException) {
+                error = retryError;
+              }
+            }
           }
 
           final is401 = response?.statusCode == 401;
@@ -112,6 +155,7 @@ class ApiClient {
         },
       ),
     );
+    _initLifecycleObserver();
   }
 
   static final ApiClient instance = ApiClient._internal();
@@ -184,7 +228,11 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? query,
   }) async {
-    final res = await _dio.get<dynamic>(path, queryParameters: query);
+    final res = await _dio.get<dynamic>(
+      path,
+      queryParameters: query,
+      options: Options(headers: {'Connection': 'close'}),
+    );
     return _decodeObject(res);
   }
 
@@ -387,8 +435,84 @@ class ApiClient {
   Future<Response<dynamic>> _retry(RequestOptions requestOptions) async {
     final token = await TokenStorage.accessToken();
     final opts = requestOptions;
-    opts.headers['Authorization'] = 'Bearer $token';
+    if (token != null && token.isNotEmpty) {
+      opts.headers['Authorization'] = 'Bearer $token';
+    }
+    if (opts.data is FormData) {
+      opts.data = (opts.data as FormData).clone();
+    }
     return _dio.fetch<dynamic>(opts);
+  }
+
+  void _initLifecycleObserver() {
+    try {
+      WidgetsBinding.instance.addObserver(_ApiClientLifecycleObserver(this));
+    } catch (_) {
+      // Ignorar si WidgetsBinding no está disponible (ej. tests unitarios)
+    }
+  }
+
+  /// Invalida el pool de conexiones del HttpClient para forzar la creación de
+  /// nuevos sockets TCP limpios al salir y volver a la app.
+  void invalidateConnectionPool() {
+    if (kIsWeb) return;
+    try {
+      final oldAdapter = _dio.httpClientAdapter;
+      _dio.httpClientAdapter = IOHttpClientAdapter();
+      oldAdapter.close(force: true);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[API] Error al renovar adapter HTTP: $e');
+      }
+    }
+  }
+
+  /// Detecta si el fallo fue por desconexión de socket, socket abort, o conexión
+  /// cerrada prematuramente por el sistema operativo al reanudar la app.
+  static bool _isConnectionAbortOrReset(DioException error) {
+    final rawError = error.error;
+    if (rawError is HttpException) {
+      final msg = rawError.message.toLowerCase();
+      if (msg.contains('software caused connection abort') ||
+          msg.contains('connection closed before full header was received') ||
+          msg.contains('connection closed') ||
+          msg.contains('connection reset')) {
+        return true;
+      }
+    }
+    if (rawError is SocketException) {
+      final msg = rawError.message.toLowerCase();
+      final osMsg = rawError.osError?.message.toLowerCase() ?? '';
+      if (msg.contains('software caused connection abort') ||
+          msg.contains('connection reset') ||
+          msg.contains('connection closed') ||
+          msg.contains('broken pipe') ||
+          osMsg.contains('abort') ||
+          osMsg.contains('reset') ||
+          osMsg.contains('broken pipe')) {
+        return true;
+      }
+    }
+
+    final combinedMsg =
+        '${error.message ?? ''} ${error.error ?? ''}'.toLowerCase();
+    if (combinedMsg.contains('software caused connection abort') ||
+        combinedMsg.contains('connection closed before full header was received') ||
+        combinedMsg.contains('connection reset') ||
+        combinedMsg.contains('connection closed') ||
+        combinedMsg.contains('broken pipe')) {
+      return true;
+    }
+
+    if (error.type == DioExceptionType.connectionError &&
+        (combinedMsg.contains('abort') ||
+            combinedMsg.contains('closed') ||
+            combinedMsg.contains('reset') ||
+            combinedMsg.contains('broken'))) {
+      return true;
+    }
+
+    return false;
   }
 
   ApiException _toException(Response<dynamic> res, String fallback) {
@@ -518,4 +642,19 @@ ApiExceptionType _statusType(int? status) {
 /// Wrapper para leer el storage con seguridad tipada.
 Future<String?> readStoredString(String key) {
   return SecureStorage.read(key);
+}
+
+class _ApiClientLifecycleObserver with WidgetsBindingObserver {
+  final ApiClient _client;
+  _ApiClientLifecycleObserver(this._client);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (kDebugMode) {
+        debugPrint('[API] App resumed: invalidando pool de conexiones de HttpClient');
+      }
+      _client.invalidateConnectionPool();
+    }
+  }
 }

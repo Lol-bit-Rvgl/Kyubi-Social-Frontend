@@ -1,7 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -116,6 +115,20 @@ class _EditPostModalState extends ConsumerState<EditPostModal> {
       return;
     }
 
+    if (newBody.length > 2000) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El contenido no puede superar 2000 caracteres')),
+      );
+      return;
+    }
+
+    if (newTitle.length > 50) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El título no puede superar 50 caracteres')),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
 
     try {
@@ -217,14 +230,23 @@ class _EditPostModalState extends ConsumerState<EditPostModal> {
             TextField(
               controller: _titleController,
               enabled: !_saving,
+              maxLength: 50,
+              maxLengthEnforcement: MaxLengthEnforcement.enforced,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(50),
+              ],
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
                 fontSize: 14.5,
               ),
               decoration: InputDecoration(
-                hintText: 'Título (opcional)',
+                hintText: 'Título (opcional, máx. 50)',
                 hintStyle: const TextStyle(color: Color(0xFF6E6888)),
+                counterStyle: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF6E6888),
+                ),
                 filled: true,
                 fillColor: const Color(0xFF1E1A2B),
                 border: OutlineInputBorder(
@@ -253,10 +275,19 @@ class _EditPostModalState extends ConsumerState<EditPostModal> {
               enabled: !_saving,
               maxLines: 5,
               minLines: 3,
+              maxLength: 2000,
+              maxLengthEnforcement: MaxLengthEnforcement.enforced,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(2000),
+              ],
               style: const TextStyle(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
                 hintText: '¿Qué estás pensando?',
                 hintStyle: const TextStyle(color: Color(0xFF6E6888)),
+                counterStyle: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF6E6888),
+                ),
                 filled: true,
                 fillColor: const Color(0xFF1E1A2B),
                 border: OutlineInputBorder(
