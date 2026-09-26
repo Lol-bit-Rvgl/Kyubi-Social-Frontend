@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/chat_conversation.dart';
@@ -65,7 +66,7 @@ class ConversationChatNotifier
   ConversationChatState build(String arg) {
     _disposed = false;
     _listen();
-    _load();
+    Future.microtask(_load);
     return const ConversationChatState();
   }
 
@@ -168,8 +169,11 @@ class ConversationChatNotifier
     try {
       final page = await _repo.getMessages(_conversationId);
       if (_disposed) return;
+      final pendingOptimistic = state.messages
+          .where((m) => m.id.startsWith('temp-') || m.id.startsWith('local-'))
+          .toList();
       state = state.copyWith(
-        messages: page.messages.reversed.toList(),
+        messages: [...pendingOptimistic, ...page.messages.reversed],
         hasMore: page.hasMore,
         loading: false,
       );
@@ -353,8 +357,18 @@ class ConversationChatNotifier
       try {
         await _markRead();
       } catch (_) {}
-    } catch (_) {
+    } catch (e) {
       if (!_disposed) {
+        String errorMsg = 'Error al enviar mensaje';
+        if (e is DioException) {
+          final data = e.response?.data;
+          if (data is Map) {
+            final serverMsg = data['message'] ?? data['error'];
+            if (serverMsg is String && serverMsg.isNotEmpty) {
+              errorMsg = serverMsg;
+            }
+          }
+        }
         // En caso de error, marcar el mensaje con error para permitir reintento o retirarlo
         final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
         if (idx >= 0) {
@@ -363,9 +377,10 @@ class ConversationChatNotifier
             extensions: {
               ...?optimistic.extensions,
               'status': 'error',
+              'errorMessage': errorMsg,
             },
           );
-          state = state.copyWith(messages: updated);
+          state = state.copyWith(messages: updated, error: errorMsg);
         }
       }
     }

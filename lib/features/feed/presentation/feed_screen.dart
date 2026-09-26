@@ -66,6 +66,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             child: EndReachedNotifier(
               onEndReached: notifier.loadMore,
               child: CustomScrollView(
+                // ignore: deprecated_member_use
+                cacheExtent: 350,
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: ClampingScrollPhysics(),
                 ),
@@ -585,15 +587,20 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
       sliver: SliverList(
-        delegate: SliverChildBuilderDelegate((context, index) {
-          if (index >= feed.posts.length) {
-            return ListEndIndicator(hasMore: feed.hasMore);
-          }
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 18),
-            child: PostCard(post: feed.posts[index]),
-          );
-        }, childCount: feed.posts.length + 1),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            if (index >= feed.posts.length) {
+              return ListEndIndicator(hasMore: feed.hasMore);
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: PostCard(post: feed.posts[index]),
+            );
+          },
+          childCount: feed.posts.length + 1,
+          addAutomaticKeepAlives: true,
+          addRepaintBoundaries: true,
+        ),
       ),
     );
   }

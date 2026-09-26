@@ -2949,7 +2949,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
       salas.deleteRoomMessage(widget.roomId, localId);
       if (!mounted) return;
       setState(() {});
-      _showSendError('Error al enviar mensaje');
+      String errorMsg = 'Error al enviar mensaje';
+      if (e is DioException) {
+        final data = e.response?.data;
+        if (data is Map) {
+          final serverMsg = data['message'] ?? data['error'];
+          if (serverMsg is String && serverMsg.isNotEmpty) {
+            errorMsg = serverMsg;
+          }
+        }
+      }
+      _showSendError(errorMsg);
     }
   }
 
@@ -4856,7 +4866,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     final state = ref.watch(salaDetailControllerProvider(widget.roomId));
     final room = state.room;
     final roomName = room?.name ?? 'Sala';
-    final myId = ref.watch(authControllerProvider).user?.id ?? '';
+    final currentUser = ref.watch(authControllerProvider.select((s) => s.user));
+    final myId = currentUser?.id ?? '';
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
 
     final isHostOrActiveParticipant = room != null &&
@@ -4919,6 +4930,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                     : CachedNetworkImage(
                         imageUrl: _effectiveBgUrl!,
                         fit: BoxFit.cover,
+                        memCacheWidth: 800,
+                        memCacheHeight: 800,
                         errorWidget: (_, _, _) => const SizedBox.shrink(),
                       ),
               ),
@@ -5154,6 +5167,9 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                           : ListView.builder(
                               controller: _scrollController,
                               reverse: true,
+                              // ignore: deprecated_member_use
+                              cacheExtent: 350,
+                              addRepaintBoundaries: true,
                               physics: const AlwaysScrollableScrollPhysics(
                                 parent: BouncingScrollPhysics(),
                               ),
@@ -5640,23 +5656,13 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                         }
                       },
                       isRoleplay: _currentRoomMode == 'roleplay',
-                      userName:
-                          ref
-                                  .watch(authControllerProvider)
-                                  .user
-                                  ?.displayName
-                                  .isNotEmpty ==
-                              true
-                          ? ref.watch(authControllerProvider).user!.displayName
-                          : (ref.watch(authControllerProvider).user?.username ??
-                                'Tú'),
-                      userAvatarUrl: ref
-                          .watch(authControllerProvider)
-                          .user
-                          ?.avatarUrl,
+                      userName: currentUser?.displayName.isNotEmpty == true
+                          ? currentUser!.displayName
+                          : (currentUser?.username ?? 'Tú'),
+                      userAvatarUrl: currentUser?.avatarUrl,
                       currentRole: _currentActiveRole,
                       availableRoles: _stageRoles,
-                      currentUserId: ref.watch(authControllerProvider).user?.id,
+                      currentUserId: currentUser?.id,
                       isHost: _canManageRoles(),
                       replyingToMessage: _replyingToMessage,
                       onCancelReply: _cancelReply,
@@ -5895,6 +5901,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                 ? CachedNetworkImage(
                     imageUrl: _effectiveCoverUrl!,
                     fit: BoxFit.cover,
+                    memCacheWidth: 200,
+                    memCacheHeight: 200,
                     placeholder: (_, _) =>
                         Container(color: const Color(0xFF1E1A2E)),
                     errorWidget: (_, _, _) => _buildRoomCoverFallback(roomName),
@@ -5940,6 +5948,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                           ? CachedNetworkImage(
                               imageUrl: room.host.avatarUrl!,
                               fit: BoxFit.cover,
+                              memCacheWidth: 80,
+                              memCacheHeight: 80,
                               errorWidget: (_, _, _) => const Icon(
                                 Icons.person_rounded,
                                 size: 12,

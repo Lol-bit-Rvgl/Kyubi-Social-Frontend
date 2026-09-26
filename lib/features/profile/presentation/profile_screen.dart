@@ -252,11 +252,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = ref.watch(authControllerProvider);
-    final user = auth.user;
+    final user = ref.watch(authControllerProvider.select((s) => s.user));
+    final authError = ref.watch(authControllerProvider.select((s) => s.error));
 
     if (user == null) {
-      if (auth.error != null) {
+      if (authError != null) {
         return Scaffold(
           backgroundColor: _bg,
           body: Center(
@@ -281,7 +281,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    auth.error ?? 'Error de conexión',
+                    authError,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.textSecondary,

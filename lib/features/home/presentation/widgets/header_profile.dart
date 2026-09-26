@@ -18,8 +18,7 @@ class HeaderProfile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authControllerProvider);
-    final user = auth.user;
+    final user = ref.watch(authControllerProvider.select((s) => s.user));
     final avatarUrl = user?.effectiveAvatarUrl;
     final displayName = (user?.displayName.isNotEmpty == true)
         ? user!.displayName

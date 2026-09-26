@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/post_author.dart';
@@ -186,8 +187,11 @@ class SalaChatNotifier
         }
         deduplicated.add(m);
       }
+      final pendingOptimistic = state.messages
+          .where((m) => m.id.startsWith('local-') || m.id.startsWith('temp-'))
+          .toList();
       state = state.copyWith(
-        messages: deduplicated,
+        messages: [...deduplicated, ...pendingOptimistic],
         hasMore: page.hasMore,
         loading: false,
       );
@@ -297,8 +301,18 @@ class SalaChatNotifier
       } else {
         state = state.copyWith(messages: [...state.messages, sentWithStatus]);
       }
-    } catch (_) {
+    } catch (e) {
       if (!_disposed) {
+        String errorMsg = 'Error al enviar mensaje';
+        if (e is DioException) {
+          final data = e.response?.data;
+          if (data is Map) {
+            final serverMsg = data['message'] ?? data['error'];
+            if (serverMsg is String && serverMsg.isNotEmpty) {
+              errorMsg = serverMsg;
+            }
+          }
+        }
         final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
         if (idx >= 0) {
           final list = List<RoomChatMessage>.from(state.messages);
@@ -306,9 +320,10 @@ class SalaChatNotifier
             metadata: {
               ...?optimistic.metadata,
               'status': 'error',
+              'errorMessage': errorMsg,
             },
           );
-          state = state.copyWith(messages: list);
+          state = state.copyWith(messages: list, error: errorMsg);
         }
       }
     }

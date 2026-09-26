@@ -85,37 +85,7 @@ void main() async {
     return;
   }
 
-  // Inicializar localización defensivamente para intl
-  try {
-    await initializeDateFormatting('es', null);
-  } catch (e) {
-    debugPrint('[Intl] Advertencia al inicializar formato de fechas: $e');
-  }
-
-  // Inicializar notificaciones push (FCM) de forma defensiva: si no hay
-  // configuración de Firebase (google-services.json / plist) la app sigue.
-  try {
-    await NotificationService.instance.initialize();
-  } catch (e) {
-    debugPrint('[FCM] Advertencia al inicializar notificaciones: $e');
-  }
-
-  // Configuración de telemetría Crashlytics:
-  // En debug se desactiva para no contaminar el panel con excepciones locales;
-  // en release/producción se asegura activa para capturar crashes reales.
-  try {
-    if (kDebugMode) {
-      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(false);
-    } else {
-      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
-    }
-  } catch (e) {
-    debugPrint('[Crashlytics] Advertencia al configurar Crashlytics: $e');
-  }
-
   // ErrorWidget builder global: previene pantalla ploma/gris silenciosa.
-  // En debug muestra el dump de la excepción; en release muestra una vista
-  // genérica sin exponer detalles internos ni stack trace.
   ErrorWidget.builder = (FlutterErrorDetails details) {
     if (kDebugMode) {
       return Material(
@@ -206,14 +176,46 @@ void main() async {
     );
   };
 
-  // Precargar catálogo de emojis animados WebP
-  try {
-    await AnimatedEmojiManager.instance.init();
-  } catch (e) {
-    debugPrint('[EmojiManager] Advertencia al inicializar emojis: $e');
-  }
-
+  // ── Montaje Inmediato del Primer Frame ─────────────────────────────────────
+  // No bloquear el arranque con múltiples awaits ni lecturas masivas síncronas.
   _runApp();
+
+  // ── Inicialización Diferida de Servicios Secundarios ───────────────────────
+  // Se ejecutan en microtask / post-primer-frame sin congelar la interfaz ni
+  // retrasar la renderización del SplashScreen / pantalla inicial.
+  Future.microtask(() async {
+    // 1. Inicializar localización para intl
+    try {
+      await initializeDateFormatting('es', null);
+    } catch (e) {
+      debugPrint('[Intl] Advertencia al inicializar formato de fechas: $e');
+    }
+
+    // 2. Inicializar notificaciones push (FCM) de forma defensiva
+    try {
+      await NotificationService.instance.initialize();
+    } catch (e) {
+      debugPrint('[FCM] Advertencia al inicializar notificaciones: $e');
+    }
+
+    // 3. Configuración de telemetría Crashlytics
+    try {
+      if (kDebugMode) {
+        await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(false);
+      } else {
+        await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+      }
+    } catch (e) {
+      debugPrint('[Crashlytics] Advertencia al configurar Crashlytics: $e');
+    }
+
+    // 4. Precargar catálogo de emojis animados WebP
+    try {
+      await AnimatedEmojiManager.instance.init();
+    } catch (e) {
+      debugPrint('[EmojiManager] Advertencia al inicializar emojis: $e');
+    }
+  });
 }
 
 /// Monta el árbol principal de la app. Se usa tanto al arrancar como desde

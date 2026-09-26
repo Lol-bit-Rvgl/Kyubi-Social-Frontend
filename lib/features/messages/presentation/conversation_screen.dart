@@ -129,6 +129,14 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     ref.listen<ConversationChatState>(
       conversationChatProvider(widget.conversationId),
       (previous, next) {
+        if (next.error != null && next.error != previous?.error) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(next.error!),
+              backgroundColor: const Color(0xFF2A121E),
+            ),
+          );
+        }
         final prevLast = previous == null || previous.messages.isEmpty
             ? null
             : previous.messages.last.id;

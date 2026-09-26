@@ -723,6 +723,8 @@ class DirectChatMessageBubble extends StatelessWidget {
                   imageUrl: rMedia,
                   width: 32,
                   height: 32,
+                  memCacheWidth: 64,
+                  memCacheHeight: 64,
                   fit: BoxFit.cover,
                   errorWidget: (_, _, _) => const Icon(
                     Icons.image,
@@ -760,6 +762,8 @@ class DirectChatMessageBubble extends StatelessWidget {
           imageUrl: finalUrl,
           width: 200,
           height: 220,
+          memCacheWidth: 400,
+          memCacheHeight: 440,
           fit: BoxFit.cover,
           placeholder: (_, _) => Container(
             width: 200,

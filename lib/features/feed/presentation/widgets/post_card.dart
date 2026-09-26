@@ -397,6 +397,8 @@ class PostCard extends ConsumerWidget {
                 child: CachedNetworkImage(
                   imageUrl: mediaUrls[index],
                   fit: BoxFit.cover,
+                  memCacheWidth: 600,
+                  memCacheHeight: 600,
                   placeholder: (_, _) => const KyubiShimmer(),
                   errorWidget: (_, _, _) => Container(
                     color: const Color(0xFF1E1E2A),
@@ -448,6 +450,8 @@ class PostCard extends ConsumerWidget {
             child: CachedNetworkImage(
               imageUrl: url,
               fit: BoxFit.cover,
+              memCacheWidth: 800,
+              memCacheHeight: 800,
               placeholder: (_, _) => const KyubiShimmer(),
               errorWidget: (_, _, _) => Container(
                 height: 180,
