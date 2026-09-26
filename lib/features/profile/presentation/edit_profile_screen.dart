@@ -20,6 +20,7 @@ import '../../../../services/auth_controller.dart';
 import '../../../../services/providers.dart';
 import '../../../../services/user_theme_provider.dart';
 import 'widgets/hex_color_picker_tile.dart';
+import '../../../../core/widgets/hsv_color_picker_dialog.dart';
 
 Color _parseColorHex(String hex, Color fallback) {
   final clean = hex.replaceAll('#', '').trim();
@@ -956,46 +957,96 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    '#00E676', '#00E5FF', '#FFD700', '#FF4081',
-                    '#FF5722', '#7C4DFF', '#BA68C8', '#FFFFFF',
-                  ].map((hex) {
-                    final color = _parseColorHex(hex, const Color(0xFF00E676));
-                    final isSelected = _themeAccentColor.toUpperCase() == hex.toUpperCase();
-                    return InkWell(
-                      key: Key('theme_accent_$hex'),
-                      onTap: () => setState(() => _themeAccentColor = hex),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isSelected ? Colors.white : Colors.black45,
-                            width: isSelected ? 2.5 : 1,
+                    ...[
+                      '#00E676', '#00E5FF', '#FFD700', '#FF4081',
+                      '#FF5722', '#7C4DFF', '#BA68C8', '#FFFFFF',
+                    ].map((hex) {
+                      final color = _parseColorHex(hex, const Color(0xFF00E676));
+                      final isSelected = _themeAccentColor.toUpperCase() == hex.toUpperCase();
+                      return InkWell(
+                        key: Key('theme_accent_$hex'),
+                        onTap: () => setState(() => _themeAccentColor = hex),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isSelected ? Colors.white : Colors.black45,
+                              width: isSelected ? 2.5 : 1,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: color.withValues(alpha: 0.6),
+                                      blurRadius: 6,
+                                    ),
+                                  ]
+                                : null,
                           ),
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: color.withValues(alpha: 0.6),
-                                    blurRadius: 6,
-                                  ),
-                                ]
+                          child: isSelected
+                              ? Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: ThemeData.estimateBrightnessForColor(color) == Brightness.dark
+                                      ? Colors.white
+                                      : Colors.black,
+                                )
                               : null,
                         ),
-                        child: isSelected
-                            ? Icon(
-                                Icons.check,
-                                size: 16,
-                                color: ThemeData.estimateBrightnessForColor(color) == Brightness.dark
-                                    ? Colors.white
-                                    : Colors.black,
-                              )
-                            : null,
+                      );
+                    }),
+                    InkWell(
+                      key: const Key('custom_accent_color_btn'),
+                      onTap: () async {
+                        final selected = await showHsvColorPickerDialog(
+                          context,
+                          initialHex: _themeAccentColor,
+                          title: 'Color de Acento',
+                          previewName: _nameController.text.trim().isNotEmpty
+                              ? _nameController.text.trim()
+                              : user.displayName,
+                          showBubblePreview: true,
+                          onLiveColorChanged: (liveHex) {
+                            setState(() => _themeAccentColor = liveHex);
+                          },
+                        );
+                        if (selected != null) {
+                          setState(() => _themeAccentColor = selected);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        height: 32,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1833),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFFA594F9).withValues(alpha: 0.4),
+                            width: 1,
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.palette_rounded, size: 14, color: Color(0xFFA594F9)),
+                            SizedBox(width: 5),
+                            Text(
+                              '+ Rueda HSV',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFA594F9),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 14),
 

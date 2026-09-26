@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/widgets/hsv_color_picker_dialog.dart';
 
 /// Formateador que convierte caracteres a mayúsculas, filtra caracteres no hexadecimales
 /// y limita la longitud a un máximo de 6 caracteres.
@@ -43,14 +44,6 @@ class HexColorPickerTile extends StatefulWidget {
   final ValueChanged<String> onColorChanged;
   final String? previewName;
 
-  @override
-  State<HexColorPickerTile> createState() => _HexColorPickerTileState();
-}
-
-class _HexColorPickerTileState extends State<HexColorPickerTile> {
-  late final TextEditingController _hexController;
-  late String _currentColorHex;
-
   static const List<String> extendedPalette = [
     '#FF0055', '#E91E63', '#F44336', '#FF5722',
     '#FF9100', '#FFD700', '#FFC107', '#FFA000',
@@ -59,6 +52,14 @@ class _HexColorPickerTileState extends State<HexColorPickerTile> {
     '#BA68C8', '#9C27B0', '#7C4DFF', '#673AB7',
     '#FF1493', '#FF4081', '#A594F9', '#FFFFFF',
   ];
+
+  @override
+  State<HexColorPickerTile> createState() => _HexColorPickerTileState();
+}
+
+class _HexColorPickerTileState extends State<HexColorPickerTile> {
+  late final TextEditingController _hexController;
+  late String _currentColorHex;
 
   @override
   void initState() {
@@ -119,95 +120,27 @@ class _HexColorPickerTileState extends State<HexColorPickerTile> {
   }
 
   void _openPaletteDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF140F24),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: Colors.white.withValues(alpha: 0.15),
-            width: 1,
-          ),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.palette_rounded, color: Color(0xFFA594F9), size: 22),
-            SizedBox(width: 8),
-            Text(
-              'Paleta de Colores',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 17,
-              ),
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: 320,
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.center,
-            children: extendedPalette.map((hex) {
-              final color = _parseColor(hex);
-              final isSelected =
-                  _currentColorHex.toUpperCase() == hex.toUpperCase();
-              return InkWell(
-                key: Key('palette_color_$hex'),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  _selectColor(hex);
-                },
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected
-                          ? Colors.white
-                          : Colors.black.withValues(alpha: 0.3),
-                      width: isSelected ? 2.5 : 1,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: color.withValues(alpha: 0.6),
-                              blurRadius: 8,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: isSelected
-                      ? Icon(
-                          Icons.check_rounded,
-                          size: 20,
-                          color: ThemeData.estimateBrightnessForColor(color) ==
-                                  Brightness.dark
-                              ? Colors.white
-                              : Colors.black,
-                        )
-                      : null,
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text(
-              'Cerrar',
-              style: TextStyle(color: Color(0xFFA594F9)),
-            ),
-          ),
-        ],
-      ),
-    );
+    showHsvColorPickerDialog(
+      context,
+      initialHex: _currentColorHex,
+      previewName: widget.previewName,
+      title: 'Paleta de Colores',
+      showBubblePreview: true,
+      onLiveColorChanged: (liveHex) {
+        final clean = liveHex.replaceAll('#', '').trim().toUpperCase();
+        if (clean.length == 6) {
+          _hexController.text = clean;
+          setState(() {
+            _currentColorHex = '#$clean';
+          });
+          widget.onColorChanged('#$clean');
+        }
+      },
+    ).then((selected) {
+      if (selected != null) {
+        _selectColor(selected);
+      }
+    });
   }
 
   String _capitalizeName(String value) {
@@ -323,6 +256,16 @@ class _HexColorPickerTileState extends State<HexColorPickerTile> {
                         ),
                         filled: true,
                         fillColor: const Color(0xFF1E1833),
+                        suffixIcon: IconButton(
+                          key: const Key('open_hsv_spectrum_picker_btn'),
+                          tooltip: 'Abrir espectro visual (Rueda HSV)',
+                          icon: const Icon(
+                            Icons.palette_rounded,
+                            size: 19,
+                            color: Color(0xFFA594F9),
+                          ),
+                          onPressed: () => _openPaletteDialog(context),
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
@@ -347,7 +290,32 @@ class _HexColorPickerTileState extends State<HexColorPickerTile> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: const Key('open_spectrum_wheel_btn'),
+                  onPressed: () => _openPaletteDialog(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  icon: const Icon(
+                    Icons.donut_large_rounded,
+                    size: 14,
+                    color: Color(0xFFA594F9),
+                  ),
+                  label: const Text(
+                    'Abrir Rueda de Espectro HSV',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFA594F9),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
 
               // Vista previa en vivo del nombre
               Container(

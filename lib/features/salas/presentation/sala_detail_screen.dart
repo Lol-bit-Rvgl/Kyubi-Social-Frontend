@@ -184,6 +184,30 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Comprobación síncrona inmediata de membresía para evitar cualquier parpadeo de "Unirse a la sala"
+    final currentUserId = ref.read(authControllerProvider).user?.id;
+    final cachedDetailRoom =
+        ref.read(salaDetailControllerProvider(widget.roomId)).room;
+    final cachedSalasRoom = ref
+        .read(salasControllerProvider)
+        .rooms
+        .where((r) => r.id == widget.roomId)
+        .firstOrNull;
+    final initialRoom = cachedDetailRoom ?? cachedSalasRoom;
+
+    if (initialRoom != null && currentUserId != null && currentUserId.isNotEmpty) {
+      final isHostOrActive = (initialRoom.hostId == currentUserId ||
+              initialRoom.host.id == currentUserId) ||
+          initialRoom.isParticipant ||
+          initialRoom.participants.any(
+            (p) => p.user.id == currentUserId && p.role != 'INVITED',
+          );
+      if (isHostOrActive) {
+        _isConnected = true;
+      }
+    }
+
     _chatSub = ref.read(roomSocketProvider).events.listen(_onRoomSocketEvent);
     // El socket de sala SIEMPRE debe conectarse y unirse a la sala al entrar,
     // independientemente de quién sea (host o espectador). Sin esto, los
@@ -4813,6 +4837,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
         _applyRoomMode(nextRoom.currentMode, notifyToast: false);
       }
 
+      final myId = ref.read(authControllerProvider).user?.id ?? '';
+      final isMember = nextRoom.isParticipant ||
+          (myId.isNotEmpty &&
+              (nextRoom.host.id == myId || nextRoom.hostId == myId)) ||
+          nextRoom.participants.any(
+            (p) => p.user.id == myId && p.role != 'INVITED',
+          );
+      if (isMember && !_isConnected) {
+        setState(() => _isConnected = true);
+      }
+
       if (_isConnected && !_chatStarted) {
         _startRoomChat();
       }
@@ -4823,6 +4858,17 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
     final roomName = room?.name ?? 'Sala';
     final myId = ref.watch(authControllerProvider).user?.id ?? '';
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
+    final isHostOrActiveParticipant = room != null &&
+        myId.isNotEmpty &&
+        ((room.host.id == myId || room.hostId == myId) ||
+            room.isParticipant ||
+            room.participants.any(
+              (p) => p.user.id == myId && p.role != 'INVITED',
+            ));
+    if (isHostOrActiveParticipant && !_isConnected) {
+      _isConnected = true;
+    }
 
     // Estado de carga defensivo: si aún no cargó la sala, o si la sala es privada
     // pero la sesión de usuario aún no está hidratada, mostrar pantalla de carga
@@ -5572,8 +5618,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                       ),
                     ),
 
-                  // ── Barra Inferior: Conectado vs Previa ──
-                  if (_isConnected)
+                  // ── Barra Inferior: Conectado vs Resolviendo vs Previa ──
+                  if (_isConnected || isHostOrActiveParticipant)
                     ChatMessageInputBar(
                       enabled: _canSendMessage,
                       disabledHint:
@@ -5628,6 +5674,8 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                         _chatAnimationsEnabled.value = !typing;
                       },
                     )
+                  else if (room == null || state.loading)
+                    _buildResolvingBottomBar()
                   else
                     _buildPreJoinBottomBar(),
                 ],
@@ -6197,6 +6245,52 @@ class _SalaDetailScreenState extends ConsumerState<SalaDetailScreen> {
                   ),
                 ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Barra Inferior Neutra / Placeholder (Mientras se resuelve membresía) ─
+
+  Widget _buildResolvingBottomBar() {
+    return Container(
+      key: const Key('sala_resolving_bottom_bar'),
+      height: 68 + MediaQuery.of(context).viewInsets.bottom,
+      padding: EdgeInsets.fromLTRB(
+        14,
+        8,
+        14,
+        12 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFF13101E),
+        border: Border(top: BorderSide(color: Color(0xFF221D32), width: 0.8)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B162B).withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.05),
+                width: 1,
+              ),
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFFA594F9),
+                ),
+              ),
+            ),
           ),
         ),
       ),

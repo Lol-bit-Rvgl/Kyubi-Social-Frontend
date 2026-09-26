@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/room.dart';
 import '../../../repositories/room_repository.dart';
 import '../../../services/providers.dart';
+import 'salas_controller.dart';
 
 /// Estado del detalle de una sala: datos + participantes + acciones.
 class SalaDetailState {
@@ -44,7 +45,18 @@ class SalaDetailNotifier extends FamilyNotifier<SalaDetailState, String> {
     ref.onDispose(() => _disposed = true);
     _roomId = arg;
     Future.microtask(_load);
-    return const SalaDetailState(loading: true);
+
+    // Pre-hidratar desde la lista de salas en memoria para evitar parpadeos visuales
+    final cachedRoom = ref
+        .read(salasControllerProvider)
+        .rooms
+        .where((r) => r.id == arg)
+        .firstOrNull;
+
+    return SalaDetailState(
+      room: cachedRoom,
+      loading: cachedRoom == null,
+    );
   }
 
   late String _roomId;
