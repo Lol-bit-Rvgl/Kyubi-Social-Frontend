@@ -154,8 +154,17 @@ class VoiceRoomController extends ChangeNotifier {
       if (event is TrackSubscribedEvent) {
         if (_isDeafened && event.track.kind == TrackType.AUDIO) {
           try {
-            await event.track.stop();
+            event.track.mediaStreamTrack.enabled = false;
+            await event.track.disable();
+            await event.publication.disable();
           } catch (_) {}
+          // Asegurar silencio en el siguiente ciclo tras el start() de LiveKit
+          Future.microtask(() async {
+            try {
+              event.track.mediaStreamTrack.enabled = false;
+              await event.track.disable();
+            } catch (_) {}
+          });
         }
       }
     });
@@ -223,7 +232,7 @@ class VoiceRoomController extends ChangeNotifier {
     return enable;
   }
 
-  /// Aplica el ensordecimiento deteniendo o iniciando las pistas remotas.
+  /// Aplica el ensordecimiento silenciando o reactivando las pistas remotas.
   Future<void> applyDeafen(bool deafened) async {
     _isDeafened = deafened;
     final room = _room;
@@ -231,10 +240,19 @@ class VoiceRoomController extends ChangeNotifier {
       for (final participant in room.remoteParticipants.values) {
         for (final publication in participant.audioTrackPublications) {
           try {
+            final track = publication.track;
+            if (track != null) {
+              track.mediaStreamTrack.enabled = !deafened;
+              if (deafened) {
+                await track.disable();
+              } else {
+                await track.enable();
+              }
+            }
             if (deafened) {
-              await publication.track?.stop();
+              await publication.disable();
             } else {
-              await publication.track?.start();
+              await publication.enable();
             }
           } catch (e) {
             debugPrint('[voice] Error toggling audio track: $e');
@@ -516,34 +534,16 @@ class VoiceRoomNotifier extends Notifier<VoiceRoomState> {
   Future<bool> toggleMic() => toggleMicrophone();
 
   /// Alterna el ensordecimiento (deafen): silencia todo el audio entrante
-  /// de la sala y silencia obligatoriamente el micrófono local.
+  /// de la sala y silencia obligatoriamente el micrófono local (estilo Discord).
   Future<void> toggleDeafen() async {
     final newDeafenState = !state.isDeafened;
-    final room = _ctrl.room;
 
     // 1. Silenciar o reactivar tracks de audio de todos los participantes remotos
-    if (room != null) {
-      for (final participant in room.remoteParticipants.values) {
-        for (final publication in participant.audioTrackPublications) {
-          try {
-            if (newDeafenState) {
-              await publication.track?.stop();
-            } else {
-              await publication.track?.start();
-            }
-          } catch (e) {
-            debugPrint('[voice] Error al alternar track de audio remoto: $e');
-          }
-        }
-      }
-    }
     await _ctrl.applyDeafen(newDeafenState);
 
     // 2. Si se ensordece, también debe mutear su propio micrófono obligatoriamente
-    if (newDeafenState && !state.isMuted) {
-      await room?.localParticipant?.setMicrophoneEnabled(false);
-    } else if (!newDeafenState && !state.isMuted) {
-      await room?.localParticipant?.setMicrophoneEnabled(true);
+    if (newDeafenState) {
+      await _ctrl.setMicrophoneEnabled(false);
     }
 
     state = state.copyWith(

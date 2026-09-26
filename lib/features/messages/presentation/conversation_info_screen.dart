@@ -13,6 +13,7 @@ import '../../../../core/widgets/fullscreen_image_viewer.dart';
 import '../../../../models/chat_message.dart';
 import '../../../../services/auth_controller.dart';
 import '../../../../services/providers.dart';
+import '../../roles/presentation/role_library_screen.dart';
 import 'conversation_controller.dart';
 import 'conversations_controller.dart';
 import 'widgets/chat_bubble.dart';
@@ -23,21 +24,25 @@ class ConversationInfoScreen extends ConsumerStatefulWidget {
     super.key,
     required this.conversationId,
     this.onWallpaperChanged,
+    this.onRoleplayModeChanged,
   });
 
   final String conversationId;
   final ValueChanged<String?>? onWallpaperChanged;
+  final ValueChanged<bool>? onRoleplayModeChanged;
 
   static Future<void> show(
     BuildContext context, {
     required String conversationId,
     ValueChanged<String?>? onWallpaperChanged,
+    ValueChanged<bool>? onRoleplayModeChanged,
   }) {
     return Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => ConversationInfoScreen(
           conversationId: conversationId,
           onWallpaperChanged: onWallpaperChanged,
+          onRoleplayModeChanged: onRoleplayModeChanged,
         ),
       ),
     );
@@ -54,6 +59,7 @@ class _ConversationInfoScreenState extends ConsumerState<ConversationInfoScreen>
   Animation<double>? _scaleAnim;
   Animation<double>? _glowAnim;
   String? _chatBgAsset;
+  bool _isRoleplayMode = false;
 
   @override
   void initState() {
@@ -86,6 +92,7 @@ class _ConversationInfoScreenState extends ConsumerState<ConversationInfoScreen>
       if (!mounted) return;
       setState(() {
         _chatBgAsset = prefs.getString('chat_bg_${widget.conversationId}');
+        _isRoleplayMode = prefs.getBool('roleplay_mode_${widget.conversationId}') ?? false;
       });
     } catch (_) {}
   }
@@ -320,6 +327,8 @@ class _ConversationInfoScreenState extends ConsumerState<ConversationInfoScreen>
             ),
             const SizedBox(height: 18),
             _buildWallpaperCard(),
+            const SizedBox(height: 12),
+            _buildRoleplayModeCard(),
 
             const SizedBox(height: 28),
 
@@ -606,6 +615,156 @@ class _ConversationInfoScreenState extends ConsumerState<ConversationInfoScreen>
           color: Color(0xFFA594F9),
           size: 22,
         ),
+      ),
+    );
+  }
+
+  Widget _buildRoleplayModeCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13111E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _isRoleplayMode
+              ? const Color(0xFFE5A93C).withValues(alpha: 0.55)
+              : const Color(0xFF26203D),
+          width: _isRoleplayMode ? 1.2 : 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _isRoleplayMode
+                      ? const Color(0xFFE5A93C).withValues(alpha: 0.15)
+                      : const Color(0xFF1E1930),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _isRoleplayMode
+                        ? const Color(0xFFE5A93C)
+                        : const Color(0xFF332B4F),
+                    width: 1,
+                  ),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.theater_comedy_rounded,
+                    color: _isRoleplayMode
+                        ? const Color(0xFFE5A93C)
+                        : Colors.white60,
+                    size: 22,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Modo Roleplay',
+                      softWrap: true,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Fichas de personaje y burbujas de rol en este chat',
+                      softWrap: true,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Switch.adaptive(
+                value: _isRoleplayMode,
+                activeThumbColor: const Color(0xFFE5A93C),
+                activeTrackColor: const Color(0xFFE5A93C).withValues(alpha: 0.35),
+                onChanged: (val) async {
+                  HapticFeedback.selectionClick();
+                  setState(() => _isRoleplayMode = val);
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('roleplay_mode_${widget.conversationId}', val);
+                  widget.onRoleplayModeChanged?.call(val);
+                },
+              ),
+            ],
+          ),
+          if (_isRoleplayMode) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: Color(0x1FFFFFFF)),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () async {
+                HapticFeedback.lightImpact();
+                final picked = await RoleLibraryScreen.showPicker(context);
+                if (picked != null && mounted) {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('active_role_${widget.conversationId}', picked.id);
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Personaje seleccionado: ${picked.name}'),
+                      backgroundColor: const Color(0xFF2A121E),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B172B),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF2E2746), width: 0.8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.person_pin_circle_rounded,
+                      size: 18,
+                      color: Color(0xFFE5A93C),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Seleccionar personaje de biblioteca...',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFE5A93C),
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 12,
+                      color: Colors.white38,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

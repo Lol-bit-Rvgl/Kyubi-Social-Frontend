@@ -12,14 +12,20 @@ import '../../../../core/constants/app_assets.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/widgets/chat_bubble.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../../core/widgets/state_views.dart';
 import '../../../../core/widgets/sticker_catalog.dart';
 import '../../../../core/widgets/swipe_to_reply.dart';
+import '../../../../models/character.dart';
 import '../../../../models/chat_conversation.dart';
 import '../../../../models/chat_message.dart';
+import '../../../../models/role_character.dart';
 import '../../../../services/auth_controller.dart';
 import '../../../../services/providers.dart';
+import '../../roles/presentation/role_library_screen.dart';
 import '../../salas/presentation/widgets/chat_message_input_bar.dart';
+import '../../salas/presentation/widgets/role_chat_bubble.dart';
 import 'conversation_controller.dart';
 import 'conversation_info_screen.dart';
 import 'conversations_controller.dart';
@@ -40,6 +46,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   final _scrollController = ScrollController();
   Map<String, dynamic>? _replyingToMessage;
   Map<String, dynamic>? _editingMessage;
+  bool _isRoleplayMode = false;
+  RoleCharacter? _activeRole;
 
   @override
   void initState() {
@@ -52,6 +60,46 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       conversationChatProvider(widget.conversationId).notifier,
     );
     await notifier.loadFor(widget.conversationId);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isRp = prefs.getBool('roleplay_mode_${widget.conversationId}') ?? false;
+      final activeRoleId = prefs.getString('active_role_${widget.conversationId}');
+      RoleCharacter? restoredRole;
+      if (isRp && activeRoleId != null && activeRoleId.isNotEmpty) {
+        final myChars = ref.read(myCharactersProvider).valueOrNull ?? [];
+        final foundChar = myChars.where((c) => c.id == activeRoleId).firstOrNull;
+        final user = ref.read(authControllerProvider).user;
+        final myName = user?.displayName.isNotEmpty == true
+            ? user!.displayName
+            : (user?.username ?? 'Tú');
+        if (foundChar != null) {
+          restoredRole = foundChar.toRoleCharacter(
+            currentUserId: user?.id,
+            currentUsername: myName,
+          );
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _isRoleplayMode = isRp;
+          if (restoredRole != null) {
+            _activeRole = restoredRole;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  Map<String, dynamic>? _buildRoleExtensions(Map<String, dynamic>? base) {
+    if (!_isRoleplayMode || _activeRole == null) return base;
+    return <String, dynamic>{
+      ...?base,
+      'role': _activeRole!.toJson(),
+      'roleColor': _activeRole!.colorHex,
+      'roleColorHex': _activeRole!.colorHex,
+      'roleName': _activeRole!.name,
+      'roleAvatarUrl': _activeRole!.avatarUrl,
+    };
   }
 
   @override
@@ -127,7 +175,34 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             await ConversationInfoScreen.show(
               context,
               conversationId: widget.conversationId,
+              onRoleplayModeChanged: (enabled) {
+                if (mounted) setState(() => _isRoleplayMode = enabled);
+              },
             );
+            final prefs = await SharedPreferences.getInstance();
+            final isRp = prefs.getBool('roleplay_mode_${widget.conversationId}') ?? false;
+            final activeRoleId = prefs.getString('active_role_${widget.conversationId}');
+            RoleCharacter? restoredRole = _activeRole;
+            if (activeRoleId != null && activeRoleId.isNotEmpty) {
+              final myChars = ref.read(myCharactersProvider).valueOrNull ?? [];
+              final foundChar = myChars.where((c) => c.id == activeRoleId).firstOrNull;
+              final user = ref.read(authControllerProvider).user;
+              final myName = user?.displayName.isNotEmpty == true
+                  ? user!.displayName
+                  : (user?.username ?? 'Tú');
+              if (foundChar != null) {
+                restoredRole = foundChar.toRoleCharacter(
+                  currentUserId: user?.id,
+                  currentUsername: myName,
+                );
+              }
+            }
+            if (mounted) {
+              setState(() {
+                _isRoleplayMode = isRp;
+                _activeRole = restoredRole;
+              });
+            }
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,6 +316,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     }
     final myId = ref.watch(authControllerProvider).user?.id ?? '';
     final showLoader = state.hasMore;
+    final currentUser = ref.watch(authControllerProvider).user;
+    final myName = currentUser?.displayName.isNotEmpty == true
+        ? currentUser!.displayName
+        : (currentUser?.username ?? 'Tú');
 
     final items = <_ConvItem>[];
     final messages = state.messages;
@@ -299,33 +378,99 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         final replyMediaUrl = replyMsg?.mediaUrl ??
             message.extensions?['replyTo']?['mediaUrl'] as String?;
 
-        // DM 1:1: sin nombre dentro de la burbuja para mantener burbujas
-        // compactas y proporcionales (especialmente con textos muy cortos).
-        final bubble = ChatMessageBubble(
-          key: ValueKey(message.id),
-          displayName: '',
-          body: message.body,
-          timestamp: _timeLabel(message.createdAt),
-          avatarUrl: message.sender.avatarUrl,
-          avatarName: message.sender.displayName,
-          isMine: message.senderId == myId,
-          isDeleted: message.isDeleted,
-          isEdited: message.isEdited,
-          editedAt: message.editedAt,
-          replyToId: message.replyToId,
-          replyToName: replySenderName,
-          replyToBody: replyBody,
-          replyToMediaUrl: replyMediaUrl,
-          media: message.media,
-          mediaUrl: message.mediaUrl,
-          mediaType: message.mediaType,
-          type: message.extensions?['type'] as String?,
-          extensions: message.extensions,
-          currentUserId: myId,
-          onPollVote: (optId) => ref
-              .read(conversationChatProvider(widget.conversationId).notifier)
-              .votePoll(message.id, optId),
-        );
+        RoleCharacter? messageRole;
+        final roleRaw = message.extensions?['role'];
+        if (roleRaw is Map) {
+          messageRole = RoleCharacter.fromJson(Map<String, dynamic>.from(roleRaw));
+        } else if (_isRoleplayMode && (message.senderId == myId) && _activeRole != null) {
+          messageRole = _activeRole;
+        }
+
+        final Widget bubble;
+        if (_isRoleplayMode || messageRole != null) {
+          final isMine = message.senderId == myId;
+          final authorRealName = isMine
+              ? myName
+              : (message.sender.displayName.isNotEmpty
+                  ? message.sender.displayName
+                  : message.sender.username);
+          bubble = RoleChatBubble(
+            key: ValueKey(message.id),
+            body: message.body,
+            senderName: messageRole != null ? messageRole.name : authorRealName,
+            userName: authorRealName,
+            role: messageRole,
+            userAvatarUrl: messageRole?.avatarUrl ?? message.sender.avatarUrl,
+            isMine: isMine,
+            timestamp: _timeLabel(message.createdAt),
+            messageType: (message.mediaType == 'dice' ||
+                    message.extensions?['dice'] != null)
+                ? 'dice'
+                : (message.mediaType == 'sticker' ||
+                        message.extensions?['stickerId'] != null)
+                    ? 'sticker'
+                    : (message.mediaType == 'poll' ||
+                            message.extensions?['poll'] != null)
+                        ? 'poll'
+                        : (message.mediaType == 'audio' ||
+                                message.extensions?['voice'] != null)
+                            ? 'voice'
+                            : (message.mediaType == 'image')
+                                ? 'image'
+                                : 'message',
+            contentUrl: message.mediaUrl ?? message.media?.url,
+            metadata: message.extensions,
+            isDiceRoll: message.mediaType == 'dice' ||
+                message.extensions?['dice'] != null,
+            diceResult: message.extensions?['dice']?['result']?.toString(),
+            diceEmoji: message.extensions?['dice']?['emoji']?.toString(),
+            isSticker: message.mediaType == 'sticker' ||
+                message.extensions?['stickerId'] != null,
+            stickerAsset: message.mediaUrl ??
+                (message.extensions?['assetPath'] as String?),
+            stickerEmoji: message.extensions?['emoji'] as String?,
+            replyToId: message.replyToId,
+            replyToName: replySenderName,
+            replyToBody: replyBody,
+            replyToMediaUrl: replyMediaUrl,
+            isEdited: message.isEdited,
+            editedAt: message.editedAt,
+            onPollVote: (optId) => ref
+                .read(conversationChatProvider(widget.conversationId).notifier)
+                .votePoll(message.id, optId),
+            onUserTap: () {
+              if (message.sender.username.isNotEmpty) {
+                context.push('/profile/${message.sender.username}');
+              }
+            },
+          );
+        } else {
+          bubble = ChatMessageBubble(
+            key: ValueKey(message.id),
+            displayName: '',
+            body: message.body,
+            timestamp: _timeLabel(message.createdAt),
+            avatarUrl: message.sender.avatarUrl,
+            avatarName: message.sender.displayName,
+            isMine: message.senderId == myId,
+            isDeleted: message.isDeleted,
+            isEdited: message.isEdited,
+            editedAt: message.editedAt,
+            replyToId: message.replyToId,
+            replyToName: replySenderName,
+            replyToBody: replyBody,
+            replyToMediaUrl: replyMediaUrl,
+            media: message.media,
+            mediaUrl: message.mediaUrl,
+            mediaType: message.mediaType,
+            type: message.extensions?['type'] as String?,
+            extensions: message.extensions,
+            currentUserId: myId,
+            onPollVote: (optId) => ref
+                .read(conversationChatProvider(widget.conversationId).notifier)
+                .votePoll(message.id, optId),
+          );
+        }
 
         return SwipeToReply(
           key: ValueKey('swipe_${message.id}'),
@@ -633,7 +778,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
           mediaUrl: mediaUrl,
           mediaType: mediaType,
           replyToId: replyId,
-          extensions: extensions,
+          extensions: _buildRoleExtensions(extensions),
         );
     if (!mounted) return;
     if (ok) {
@@ -651,13 +796,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     ref.read(conversationChatProvider(widget.conversationId).notifier).send(
       '$emoji Ha lanzado $diceName: $result',
       mediaType: 'dice',
-      extensions: {
+      extensions: _buildRoleExtensions({
         'dice': {
           'name': diceName,
           'result': result,
           'emoji': emoji,
         },
-      },
+      }),
     );
     _scrollToBottom();
   }
@@ -666,7 +811,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     ref.read(conversationChatProvider(widget.conversationId).notifier).send(
       '📊 Encuesta: $question\n${options.map((o) => '• $o').join('\n')}',
       mediaType: 'poll',
-      extensions: {
+      extensions: _buildRoleExtensions({
         'poll': {
           'question': question,
           'options': options
@@ -676,7 +821,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               .toList(),
           'totalVotes': 0,
         },
-      },
+      }),
     );
     _scrollToBottom();
   }
@@ -689,13 +834,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       fallbackText,
       mediaUrl: sticker.assetPath,
       mediaType: 'sticker',
-      extensions: {
+      extensions: _buildRoleExtensions({
         'isAnimated': true,
         'stickerId': sticker.id,
         'assetPath': sticker.assetPath,
         'emoji': sticker.emoji,
         'name': sticker.name,
-      },
+      }),
     );
     _scrollToBottom();
   }
@@ -747,7 +892,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
       final ok = await ref
           .read(conversationChatProvider(widget.conversationId).notifier)
-          .send('', mediaUrl: url, mediaType: 'image');
+          .send(
+            '',
+            mediaUrl: url,
+            mediaType: 'image',
+            type: 'IMAGE',
+            extensions: _buildRoleExtensions(null),
+          );
 
       if (!mounted) return;
       if (ok) {
@@ -800,11 +951,11 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               '🎤 [Nota de voz (${durationMs ~/ 1000}s)]',
               mediaUrl: url,
               mediaType: 'audio',
-              extensions: {
+              extensions: _buildRoleExtensions({
                 'voice': true,
                 'durationMs': durationMs,
                 'audioUrl': url,
-              },
+              }),
             );
         if (ok) {
           _scrollToBottom();
@@ -827,13 +978,59 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     final myName = user?.displayName.isNotEmpty == true
         ? user!.displayName
         : (user?.username ?? 'Tú');
+    final myId = user?.id ?? '';
+
+    final List<RoleCharacter> availableRoles;
+    if (_isRoleplayMode) {
+      final myCharacters = ref.watch(myCharactersProvider).valueOrNull ?? [];
+      availableRoles = myCharacters
+          .map((c) => c.toRoleCharacter(
+                currentUserId: myId,
+                currentUsername: myName,
+              ))
+          .toList();
+
+      if (_activeRole != null &&
+          !availableRoles.any((r) => r.id == _activeRole!.id)) {
+        availableRoles.add(_activeRole!);
+      }
+    } else {
+      availableRoles = const [];
+    }
 
     return ChatMessageInputBar(
       enabled: true,
       disabledHint: 'Escribe un mensaje...',
-      isRoleplay: false,
+      isRoleplay: _isRoleplayMode,
       userName: myName,
       userAvatarUrl: user?.avatarUrl,
+      currentRole: _activeRole,
+      availableRoles: availableRoles,
+      currentUserId: myId,
+      onRoleChanged: (role) async {
+        setState(() => _activeRole = role);
+        final prefs = await SharedPreferences.getInstance();
+        if (role != null) {
+          await prefs.setString(
+            'active_role_${widget.conversationId}',
+            role.id,
+          );
+        } else {
+          await prefs.remove('active_role_${widget.conversationId}');
+        }
+      },
+      onIdentityChanged: (role) async {
+        setState(() => _activeRole = role);
+        final prefs = await SharedPreferences.getInstance();
+        if (role != null) {
+          await prefs.setString(
+            'active_role_${widget.conversationId}',
+            role.id,
+          );
+        } else {
+          await prefs.remove('active_role_${widget.conversationId}');
+        }
+      },
       onSendMessage: (text) => _send(text),
       onSendImage: (imagePath) => _sendImage(imagePath),
       onSendAudio: (durationMs, bytes, filename) =>
@@ -881,6 +1078,82 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            SwitchListTile.adaptive(
+              secondary: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _isRoleplayMode
+                      ? const Color(0xFFE5A93C).withValues(alpha: 0.15)
+                      : const Color(0xFF1E1930),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _isRoleplayMode
+                        ? const Color(0xFFE5A93C)
+                        : const Color(0xFF332B4F),
+                    width: 1,
+                  ),
+                ),
+                child: Icon(
+                  Icons.theater_comedy_rounded,
+                  color: _isRoleplayMode ? const Color(0xFFE5A93C) : Colors.white60,
+                  size: 18,
+                ),
+              ),
+              title: const Text(
+                'Modo Roleplay',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                'Fichas de personaje y burbujas de rol',
+                style: TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+              value: _isRoleplayMode,
+              activeThumbColor: const Color(0xFFE5A93C),
+              activeTrackColor: const Color(0xFFE5A93C).withValues(alpha: 0.35),
+              onChanged: (val) async {
+                setState(() => _isRoleplayMode = val);
+                Navigator.pop(context);
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('roleplay_mode_${widget.conversationId}', val);
+              },
+            ),
+            if (_isRoleplayMode)
+              ListTile(
+                leading: const Icon(
+                  Icons.person_pin_circle_rounded,
+                  color: Color(0xFFE5A93C),
+                ),
+                title: const Text(
+                  'Elegir personaje activo',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  _activeRole != null ? _activeRole!.name : 'Sin personaje asignado (toca para elegir)',
+                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final picked = await RoleLibraryScreen.showPicker(context);
+                  if (picked != null && mounted) {
+                    final myUser = ref.read(authControllerProvider).user;
+                    final roleToUse = picked.copyWith(
+                      isTaken: true,
+                      takenByUserId: myUser?.id,
+                      takenByUsername: myUser?.displayName.isNotEmpty == true
+                          ? myUser!.displayName
+                          : myUser?.username,
+                    );
+                    setState(() => _activeRole = roleToUse);
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString(
+                      'active_role_${widget.conversationId}',
+                      roleToUse.id,
+                    );
+                  }
+                },
+              ),
+            const Divider(height: 1, color: Color(0x14FFFFFF)),
             ListTile(
               leading: Icon(
                 conversation.muted
