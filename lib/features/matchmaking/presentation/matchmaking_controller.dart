@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/chat_socket.dart';
 
 /// Estado del buscaparejas aleatorio.
-enum MatchStatus { idle, searching, matched, timeout, error }
+enum MatchStatus { idle, connecting, searching, matched, timeout, error }
 
 class MatchState {
   const MatchState({
@@ -26,7 +26,8 @@ class MatchState {
   final String? conversationId;
   final String? error;
 
-  bool get isSearching => status == MatchStatus.searching;
+  bool get isSearching =>
+      status == MatchStatus.searching || status == MatchStatus.connecting;
 
   MatchState copyWith({
     MatchStatus? status,
@@ -56,6 +57,7 @@ class MatchmakingController extends Notifier<MatchState> {
 
   StreamSubscription<ChatSocketEvent>? _sub;
   Timer? _timeoutTimer;
+  Timer? _reconnectTimer;
   int _requestId = 0;
   bool _disposed = false;
 
@@ -66,42 +68,44 @@ class MatchmakingController extends Notifier<MatchState> {
       _disposed = true;
       _sub?.cancel();
       _timeoutTimer?.cancel();
+      _reconnectTimer?.cancel();
       ChatSocketService.instance.stopMatchmaking();
     });
     _sub = ChatSocketService.instance.events.listen(_onEvent);
+    // Verificación preventiva y reconexión activa con token renovado
+    Future.microtask(() async {
+      if (!_disposed) {
+        await ChatSocketService.instance.ensureConnected();
+      }
+    });
     return const MatchState();
   }
 
   /// Inicia (o reinicia) la búsqueda en [category].
-  void startSearch(String category) {
+  Future<void> startSearch(String category) async {
     _requestId++;
     final id = _requestId;
     _timeoutTimer?.cancel();
-    state = MatchState(status: MatchStatus.searching, category: category);
+    _reconnectTimer?.cancel();
+
+    // Colocar el estado en connecting con el radar visual animado y error limpio
+    state = MatchState(
+      status: MatchStatus.connecting,
+      category: category,
+      error: null,
+    );
 
     final socket = ChatSocketService.instance;
-    if (!socket.isConnected) {
-      socket
-          .connect()
-          .then((_) {
-            if (_disposed || _requestId != id) return;
-            if (socket.isConnected) {
-              socket.startMatchmaking(category);
-              _timeoutTimer = Timer(
-                _serverTimeout,
-                () => _onServerTimedOut(id, category),
-              );
-            } else {
-              _onConnectionFailed(id, category);
-            }
-          })
-          .catchError((_) {
-            if (_disposed || _requestId != id) return;
-            _onConnectionFailed(id, category);
-          });
+    final connected = await socket.ensureConnected();
+
+    if (_disposed || _requestId != id) return;
+
+    if (!connected || !socket.isConnected) {
+      _onConnectionFailed(id, category);
       return;
     }
 
+    state = state.copyWith(status: MatchStatus.searching, error: null);
     socket.joinMatchmaking(category: category);
     _timeoutTimer = Timer(
       _serverTimeout,
@@ -109,23 +113,63 @@ class MatchmakingController extends Notifier<MatchState> {
     );
   }
 
-  /// Vuelve a buscar en la última categoría usada.
-  void retry() {
+  /// Vuelve a buscar en la última categoría usada reiniciando la conexión desde cero.
+  Future<void> retry() async {
+    _requestId++;
+    final id = _requestId;
+    _timeoutTimer?.cancel();
+    _reconnectTimer?.cancel();
+
     final category = state.category.isNotEmpty ? state.category : '🎭 Roleplay';
-    startSearch(category);
+
+    // 1. Limpiar completamente el estado de error (error = null).
+    // 2. Colocar el estado en connecting/searching con el radar visual animado.
+    state = MatchState(
+      status: MatchStatus.connecting,
+      category: category,
+      error: null,
+    );
+
+    // 3. Reiniciar la conexión de socket desde cero (reconnect()) antes de emitir la búsqueda.
+    final socket = ChatSocketService.instance;
+    final connected = await socket.reconnect();
+
+    if (_disposed || _requestId != id) return;
+
+    if (!connected || !socket.isConnected) {
+      _onConnectionFailed(id, category);
+      return;
+    }
+
+    state = state.copyWith(status: MatchStatus.searching, error: null);
+    socket.joinMatchmaking(category: category);
+    _timeoutTimer = Timer(
+      _serverTimeout,
+      () => _onServerTimedOut(id, category),
+    );
   }
 
   /// Cancela la búsqueda y deja el controlador en reposo.
   void cancel() {
     _requestId++;
     _timeoutTimer?.cancel();
+    _reconnectTimer?.cancel();
     ChatSocketService.instance.leaveMatchmaking();
     state = const MatchState();
+  }
+
+  void _scheduleAutoReconnect(String category) {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 2), () {
+      if (_disposed || state.status == MatchStatus.matched) return;
+      retry();
+    });
   }
 
   void _onServerTimedOut(int id, String category) {
     if (_disposed || _requestId != id) return;
     state = MatchState(status: MatchStatus.timeout, category: category);
+    _scheduleAutoReconnect(category);
   }
 
   void _onConnectionFailed(int id, String category) {
@@ -141,6 +185,7 @@ class MatchmakingController extends Notifier<MatchState> {
       case ChatMatchFound(:final peer, :final category, :final conversationId):
         if (!state.isSearching || _disposed) return;
         _timeoutTimer?.cancel();
+        _reconnectTimer?.cancel();
         state = MatchState(
           status: MatchStatus.matched,
           category: category,
@@ -155,6 +200,7 @@ class MatchmakingController extends Notifier<MatchState> {
           category: category,
           error: reason,
         );
+        _scheduleAutoReconnect(category);
       default:
         break;
     }

@@ -867,13 +867,24 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       if (!await file.exists()) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo leer la imagen seleccionada')),
+          const SnackBar(content: Text('No se pudo leer el archivo seleccionado')),
         );
         return;
       }
 
       final bytes = await file.readAsBytes();
       final filename = resolvedPath.split(RegExp(r'[\\/]')).last;
+      final lower = resolvedPath.toLowerCase();
+
+      // Si el archivo seleccionado es un audio, delegar a _sendAudio
+      final isAudio = lower.endsWith('.mp3') ||
+          lower.endsWith('.m4a') ||
+          lower.endsWith('.aac') ||
+          lower.endsWith('.wav');
+      if (isAudio) {
+        return await _sendAudio(10000, bytes, filename);
+      }
+
       final uploadRepo = ref.read(uploadRepositoryProvider);
       final url = await uploadRepo.uploadFile(
         'media',
@@ -885,19 +896,26 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       if (url.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo subir la imagen')),
+          const SnackBar(content: Text('No se pudo subir el archivo')),
         );
         return;
       }
 
+      final isVideo = lower.endsWith('.mp4');
+      final isPdf = lower.endsWith('.pdf');
+      final mediaType = isVideo ? 'video' : (isPdf ? 'file' : 'image');
+      final msgType = isPdf ? 'FILE' : (isVideo ? 'VIDEO' : 'IMAGE');
+
       final ok = await ref
           .read(conversationChatProvider(widget.conversationId).notifier)
           .send(
-            '',
+            isPdf ? '📄 $filename' : '',
             mediaUrl: url,
-            mediaType: 'image',
-            type: 'IMAGE',
-            extensions: _buildRoleExtensions(null),
+            mediaType: mediaType,
+            type: msgType,
+            extensions: _buildRoleExtensions(
+              isPdf ? {'fileName': filename, 'fileSize': bytes.length} : null,
+            ),
           );
 
       if (!mounted) return;
@@ -906,13 +924,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         ref.read(conversationsControllerProvider.notifier).refresh();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo enviar la imagen')),
+          const SnackBar(content: Text('No se pudo enviar el archivo')),
         );
       }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al procesar la imagen')),
+        const SnackBar(content: Text('Error al procesar el archivo')),
       );
     }
   }
@@ -923,6 +941,12 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     if (ext.endsWith('.png')) return 'image/png';
     if (ext.endsWith('.webp')) return 'image/webp';
     if (ext.endsWith('.gif')) return 'image/gif';
+    if (ext.endsWith('.mp4')) return 'video/mp4';
+    if (ext.endsWith('.pdf')) return 'application/pdf';
+    if (ext.endsWith('.mp3')) return 'audio/mpeg';
+    if (ext.endsWith('.m4a')) return 'audio/m4a';
+    if (ext.endsWith('.aac')) return 'audio/aac';
+    if (ext.endsWith('.wav')) return 'audio/wav';
     return 'image/jpeg';
   }
 
@@ -930,31 +954,42 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     if (bytes.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo grabar la nota de voz')),
+          const SnackBar(content: Text('No se pudo grabar o leer el audio')),
         );
       }
       return;
     }
     try {
       final uploadRepo = ref.read(uploadRepositoryProvider);
-      final effectiveName = filename.endsWith('.m4a') ? filename : '$filename.m4a';
+      final lower = filename.toLowerCase();
+      final isKnownExt = lower.endsWith('.m4a') ||
+          lower.endsWith('.mp3') ||
+          lower.endsWith('.aac') ||
+          lower.endsWith('.wav');
+      final effectiveName = isKnownExt ? filename : '$filename.m4a';
+      final contentType = lower.endsWith('.mp3')
+          ? 'audio/mpeg'
+          : (lower.endsWith('.aac')
+              ? 'audio/aac'
+              : (lower.endsWith('.wav') ? 'audio/wav' : 'audio/m4a'));
       final url = await uploadRepo.uploadFile(
         'media',
         bytes: bytes,
         filename: effectiveName,
-        contentType: 'audio/m4a',
+        contentType: contentType,
       );
       if (url.isNotEmpty) {
         final ok = await ref
             .read(conversationChatProvider(widget.conversationId).notifier)
             .send(
-              '🎤 [Nota de voz (${durationMs ~/ 1000}s)]',
+              '🎤 [Audio: $effectiveName]',
               mediaUrl: url,
               mediaType: 'audio',
               extensions: _buildRoleExtensions({
                 'voice': true,
                 'durationMs': durationMs,
                 'audioUrl': url,
+                'fileName': effectiveName,
               }),
             );
         if (ok) {
@@ -964,10 +999,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         }
       }
     } catch (e) {
-      debugPrint('[AUDIO_DEBUG] Error subiendo nota de voz: $e');
+      debugPrint('[AUDIO_DEBUG] Error subiendo audio: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo subir la nota de voz')),
+          const SnackBar(content: Text('Error al enviar el archivo de audio')),
         );
       }
     }

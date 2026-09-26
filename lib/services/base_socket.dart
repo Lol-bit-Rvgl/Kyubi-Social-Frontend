@@ -135,6 +135,40 @@ abstract class BaseSocket<TEvent> {
     }
   }
 
+  /// Espera a que el socket esté conectado (`isConnected == true`).
+  /// Si está desconectado o en error, invoca [connect] y espera el evento
+  /// de conexión con un timeout.
+  Future<bool> ensureConnected({
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (isConnected) return true;
+
+    final connectionFuture = stateChanges
+        .firstWhere((s) => s == SocketState.connected || s == SocketState.error)
+        .timeout(timeout);
+
+    if (!isConnecting) {
+      await connect();
+    }
+
+    if (isConnected) return true;
+
+    try {
+      final target = await connectionFuture;
+      return target == SocketState.connected && isConnected;
+    } catch (_) {
+      return isConnected;
+    }
+  }
+
+  /// Fuerza el cierre de cualquier socket previo y establece una conexión limpia desde cero con token renovado.
+  Future<bool> reconnect({
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    disconnect();
+    return ensureConnected(timeout: timeout);
+  }
+
   /// Conecta al servidor de Socket.IO utilizando el token de sesión vigente.
   Future<void> connect() async {
     if (_socket?.connected == true || _state == SocketState.connecting) return;

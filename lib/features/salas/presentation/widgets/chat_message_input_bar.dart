@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -420,6 +421,140 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
     }
   }
 
+  Future<void> _pickFilesFromSystem() async {
+    if (!widget.enabled) return;
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'mp4',
+          'm4a',
+          'mp3',
+          'aac',
+          'pdf',
+        ],
+        allowMultiple: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      for (final file in result.files) {
+        final path = file.path;
+        if (path == null || path.isEmpty) continue;
+        final ext = (file.extension ?? path.split('.').last).toLowerCase();
+        if (['m4a', 'mp3', 'aac', 'wav', 'ogg'].contains(ext)) {
+          final f = File(path);
+          if (await f.exists()) {
+            final bytes = await f.readAsBytes();
+            widget.onSendAudio(10000, bytes, file.name);
+          }
+        } else {
+          widget.onSendImage(path);
+        }
+      }
+    } catch (e) {
+      debugPrint('[FILE_PICKER_DEBUG] Error seleccionando archivos: $e');
+    }
+  }
+
+  void _showMediaSourceSheet() {
+    if (!widget.enabled) return;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF141220),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(top: BorderSide(color: Color(0xFF2E2746), width: 1)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.photo_library_rounded,
+                  color: AppColors.accentCyan,
+                ),
+                title: const Text(
+                  'Galería rápida / Fotos',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Selector multimedia predeterminado de la app',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage();
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.folder_open_rounded,
+                  color: Color(0xFF4DD0E1),
+                ),
+                title: const Text(
+                  'Explorador de Archivos / Sistema',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Archivos, audios y documentos del almacenamiento nativo',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickFilesFromSystem();
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.camera_alt_rounded,
+                  color: Color(0xFFBA68C8),
+                ),
+                title: const Text(
+                  'Cámara',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picker = ImagePicker();
+                  final image = await picker.pickImage(
+                    source: ImageSource.camera,
+                  );
+                  if (image != null) widget.onSendImage(image.path);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showDiceModal() {
     if (!widget.enabled) return;
     showModalBottomSheet(
@@ -709,7 +844,7 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                             icon: Icons.photo_outlined,
                             color: const Color(0xFF9E9EA8),
                             tooltip: 'Enviar imagen',
-                            onTap: _pickImage,
+                            onTap: _showMediaSourceSheet,
                           ),
 
                         // 3. Selector de emojis y stickers (😊)
@@ -1701,12 +1836,34 @@ class _ChatMessageInputBarState extends State<ChatMessageInputBar>
                   color: AppColors.accentCyan,
                 ),
                 title: const Text(
-                  'Galería de fotos',
+                  'Galería rápida / Fotos',
                   style: TextStyle(color: Colors.white),
+                ),
+                subtitle: const Text(
+                  'Selector de fotos de la app',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickImage();
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.folder_open_rounded,
+                  color: Color(0xFF4DD0E1),
+                ),
+                title: const Text(
+                  'Explorador de Archivos / Sistema',
+                  style: TextStyle(color: Colors.white),
+                ),
+                subtitle: const Text(
+                  'Archivos, audios y documentos del sistema',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickFilesFromSystem();
                 },
               ),
               ListTile(

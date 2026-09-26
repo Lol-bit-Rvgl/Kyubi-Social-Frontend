@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -94,6 +97,128 @@ class _EditPostModalState extends ConsumerState<EditPostModal> {
         );
       }
     }
+  }
+
+  Future<void> _pickFilesFromSystem() async {
+    final remaining = _maxImages - _totalImagesCount;
+    if (remaining <= 0) return;
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'mp4',
+          'm4a',
+          'mp3',
+          'aac',
+          'pdf',
+        ],
+        allowMultiple: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      for (final file in result.files.take(remaining)) {
+        Uint8List? bytes = file.bytes;
+        final path = file.path;
+        if (bytes == null && path != null) {
+          final f = File(path);
+          if (await f.exists()) {
+            bytes = await f.readAsBytes();
+          }
+        }
+        if (bytes != null) {
+          final xFile = path != null
+              ? XFile(path)
+              : XFile.fromData(bytes, name: file.name);
+          _newImages.add(_NewMediaItem(file: xFile, bytes: bytes));
+        }
+      }
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudieron cargar los archivos seleccionados'),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showMediaPickerOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF141220),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(top: BorderSide(color: Color(0xFF2E2746), width: 1)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.photo_library_rounded,
+                  color: AppColors.accentCyan,
+                ),
+                title: const Text(
+                  'Galería rápida / Fotos',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Selector multimedia predeterminado de la app',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImages();
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.folder_open_rounded,
+                  color: Color(0xFF4DD0E1),
+                ),
+                title: const Text(
+                  'Explorador de Archivos / Sistema',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Almacenamiento nativo, carpetas y documentos',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickFilesFromSystem();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _removeExistingImage(int index) {
@@ -602,7 +727,7 @@ class _EditPostModalState extends ConsumerState<EditPostModal> {
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
-          onTap: _saving ? null : _pickImages,
+          onTap: _saving ? null : _showMediaPickerOptions,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [

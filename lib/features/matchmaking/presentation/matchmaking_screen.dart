@@ -167,6 +167,15 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
         HapticFeedback.heavyImpact();
         _matchFoundController.forward(from: 0.0);
       }
+      if ((next.status == MatchStatus.searching ||
+              next.status == MatchStatus.connecting) &&
+          (prev?.status == MatchStatus.error ||
+              prev?.status == MatchStatus.timeout) &&
+          mounted) {
+        setState(() {
+          _secondsElapsed = 0;
+        });
+      }
     });
 
     final match = ref.watch(matchmakingControllerProvider);

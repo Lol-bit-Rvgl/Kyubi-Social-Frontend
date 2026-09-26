@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -167,6 +170,135 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         const SnackBar(content: Text('No se pudieron cargar las imágenes')),
       );
     }
+  }
+
+  /// Abre el explorador de archivos nativo del sistema para adjuntar imágenes y multimedia.
+  Future<void> _pickFilesFromSystem() async {
+    try {
+      final remaining = _maxImages - _selectedImages.length;
+      if (remaining <= 0) return;
+      FocusScope.of(context).unfocus();
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'mp4',
+          'm4a',
+          'mp3',
+          'aac',
+          'pdf',
+        ],
+        allowMultiple: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final loaded = <_PickedImage>[];
+      for (final file in result.files) {
+        Uint8List? bytes = file.bytes;
+        final path = file.path;
+        if (bytes == null && path != null) {
+          final f = File(path);
+          if (await f.exists()) {
+            bytes = await f.readAsBytes();
+          }
+        }
+        if (bytes != null) {
+          final xFile = path != null
+              ? XFile(path)
+              : XFile.fromData(bytes, name: file.name);
+          loaded.add(_PickedImage(xFile, bytes));
+        }
+      }
+      if (!mounted || loaded.isEmpty) return;
+      setState(() {
+        _selectedImages.addAll(loaded.take(remaining));
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudieron cargar los archivos seleccionados'),
+        ),
+      );
+    }
+  }
+
+  /// Muestra el menú de selección de origen multimedia (Galería integrada vs Explorador nativo).
+  void _showMediaPickerOptions() {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF141220),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(top: BorderSide(color: Color(0xFF2E2746), width: 1)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.photo_library_rounded,
+                  color: AppColors.accentCyan,
+                ),
+                title: const Text(
+                  'Galería rápida / Fotos',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Selector multimedia predeterminado de la app',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImages();
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.folder_open_rounded,
+                  color: Color(0xFF4DD0E1),
+                ),
+                title: const Text(
+                  'Explorador de Archivos / Sistema',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Almacenamiento nativo, carpetas y documentos',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickFilesFromSystem();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Descarta una imagen de la previsualización antes de publicar.
@@ -366,7 +498,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   /// Tile para agregar más imágenes desde la galería.
   Widget _buildAddTile() {
     return GestureDetector(
-      onTap: _uploadingMedia ? null : _pickImages,
+      onTap: _uploadingMedia ? null : _showMediaPickerOptions,
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF14141B),
@@ -901,7 +1033,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 IconButton(
                   onPressed: _selectedImages.length >= _maxImages
                       ? null
-                      : _pickImages,
+                      : _showMediaPickerOptions,
                   style: IconButton.styleFrom(
                     foregroundColor: AppColors.accentCyan,
                     disabledForegroundColor: Colors.white24,
