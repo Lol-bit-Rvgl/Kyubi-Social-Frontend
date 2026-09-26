@@ -50,6 +50,7 @@ class DirectChatMessageBubble extends StatelessWidget {
     this.deletedLabel = 'Mensaje eliminado',
     this.isEdited = false,
     this.editedAt,
+    this.isSending = false,
     this.accentColor,
     this.roleLabel,
     this.roleColor,
@@ -78,6 +79,13 @@ class DirectChatMessageBubble extends StatelessWidget {
   final String deletedLabel;
   final bool isEdited;
   final String? editedAt;
+  final bool isSending;
+
+  bool get _effectiveSending =>
+      isSending ||
+      (extensions?['status'] == 'sending') ||
+      (extensions?['tempId'] != null && extensions?['status'] != 'sent');
+
   final Color? accentColor;
   final String? roleLabel;
   final Color? roleColor;
@@ -626,11 +634,18 @@ class DirectChatMessageBubble extends StatelessWidget {
               ],
               if (isMine) ...[
                 const SizedBox(width: 4),
-                const Icon(
-                  Icons.done_all_rounded,
-                  size: 13,
-                  color: Color(0xFF00E5FF),
-                ),
+                if (_effectiveSending)
+                  const Icon(
+                    Icons.access_time_rounded,
+                    size: 11,
+                    color: Color(0xFFD4A0B0),
+                  )
+                else
+                  const Icon(
+                    Icons.done_all_rounded,
+                    size: 13,
+                    color: Color(0xFF00E5FF),
+                  ),
               ],
             ],
           ),

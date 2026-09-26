@@ -210,3 +210,42 @@ class NotificationsCache {
   }
 }
 
+/// Cache local de posts del feed para arranque instantáneo (Cache-First).
+class FeedCache {
+  FeedCache._();
+
+  static String _key([String? category]) =>
+      category != null && category.isNotEmpty
+          ? 'feed_cache_$category'
+          : 'feed_cache_para_ti';
+
+  static Future<void> save(List<dynamic> posts, {String? category}) async {
+    try {
+      final jsonList = posts.map((p) => p.toJson()).toList();
+      await SecureStorage.write(_key(category), jsonEncode(jsonList));
+    } catch (_) {}
+  }
+
+  static Future<List<Map<String, dynamic>>> read({String? category}) async {
+    try {
+      final raw = await SecureStorage.read(_key(category));
+      if (raw == null || raw.isEmpty) return [];
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded.whereType<Map<String, dynamic>>().toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<void> clear({String? category}) async {
+    try {
+      await SecureStorage.delete(_key(category));
+      if (category == null) {
+        await SecureStorage.delete('feed_cache_para_ti');
+      }
+    } catch (_) {}
+  }
+}
+
+

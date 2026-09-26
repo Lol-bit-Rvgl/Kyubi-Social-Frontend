@@ -22,6 +22,7 @@ class ChatMessageBubble extends StatelessWidget {
     this.deletedLabel = 'Mensaje eliminado',
     this.isEdited = false,
     this.editedAt,
+    this.isSending = false,
     this.accentColor,
     this.media,
     this.mediaUrl,
@@ -50,6 +51,7 @@ class ChatMessageBubble extends StatelessWidget {
   final String deletedLabel;
   final bool isEdited;
   final String? editedAt;
+  final bool isSending;
   final Color? accentColor;
   final Media? media;
   final String? mediaUrl;
@@ -83,6 +85,7 @@ class ChatMessageBubble extends StatelessWidget {
       deletedLabel: deletedLabel,
       isEdited: isEdited,
       editedAt: editedAt,
+      isSending: isSending,
       accentColor: accentColor,
       roleLabel: roleLabel,
       roleColor: roleColor,

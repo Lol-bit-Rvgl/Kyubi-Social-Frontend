@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/post_author.dart';
@@ -221,7 +223,7 @@ class SalaChatNotifier
 
   Future<bool> send(String body) async {
     final text = body.trim();
-    if (text.isEmpty || state.sending) return false;
+    if (text.isEmpty) return false;
     final me = ref.read(authControllerProvider).user;
     final myId = me?.id ?? '';
     final room = ref.read(salaDetailControllerProvider(_roomId)).room;
@@ -234,8 +236,10 @@ class SalaChatNotifier
         return false;
       }
     }
+    final tempId = 'temp-${DateTime.now().millisecondsSinceEpoch}';
     final optimistic = RoomChatMessage(
-      id: 'local-${DateTime.now().microsecondsSinceEpoch}',
+      id: tempId,
+      clientTempId: tempId,
       roomId: _roomId,
       senderId: myId,
       sender: me == null
@@ -252,34 +256,72 @@ class SalaChatNotifier
             ),
       body: text,
       createdAt: DateTime.now().toUtc(),
+      metadata: {'status': 'sending', 'clientTempId': tempId},
     );
+
+    // Frame 0: Inserción 100% síncrona en la lista local
     state = state.copyWith(
       messages: [...state.messages, optimistic],
-      sending: true,
+      sending: false,
     );
+
+    // Sincronización asíncrona sin bloquear la UI
+    unawaited(_dispatchAsyncSend(optimistic: optimistic, text: text));
+    return true;
+  }
+
+  Future<void> _dispatchAsyncSend({
+    required RoomChatMessage optimistic,
+    required String text,
+  }) async {
     try {
       final sent = await _repo.sendRoomMessage(_roomId, body: text);
-      state = state.copyWith(
-        messages: [
-          ...state.messages.where(
-            (m) => m.id != optimistic.id && m.id != sent.id,
-          ),
-          sent,
-        ],
-        sending: false,
+      if (_disposed) return;
+      final sentWithStatus = sent.copyWith(
+        metadata: {
+          ...?sent.metadata,
+          'status': 'sent',
+        },
       );
-      return true;
+      final idx = state.messages.indexWhere(
+        (m) =>
+            m.id == optimistic.id ||
+            m.id == sent.id ||
+            (optimistic.clientTempId != null &&
+                m.clientTempId == optimistic.clientTempId),
+      );
+      if (idx >= 0) {
+        final list = List<RoomChatMessage>.from(state.messages);
+        list[idx] = sentWithStatus;
+        state = state.copyWith(messages: list);
+      } else {
+        state = state.copyWith(messages: [...state.messages, sentWithStatus]);
+      }
     } catch (_) {
-      state = state.copyWith(
-        messages: state.messages.where((m) => m.id != optimistic.id).toList(),
-        sending: false,
-      );
-      return false;
+      if (!_disposed) {
+        final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
+        if (idx >= 0) {
+          final list = List<RoomChatMessage>.from(state.messages);
+          list[idx] = optimistic.copyWith(
+            metadata: {
+              ...?optimistic.metadata,
+              'status': 'error',
+            },
+          );
+          state = state.copyWith(messages: list);
+        }
+      }
     }
   }
 
   void _addIncoming(Map<String, dynamic> payload) {
-    final message = RoomChatMessage.fromJson(payload);
+    final rawMessage = RoomChatMessage.fromJson(payload);
+    final message = rawMessage.copyWith(
+      metadata: {
+        ...?rawMessage.metadata,
+        'status': 'sent',
+      },
+    );
     final existing = state.messages.indexWhere((m) => m.id == message.id);
     if (existing >= 0) {
       final updated = [...state.messages];
@@ -314,7 +356,7 @@ class SalaChatNotifier
 
     final localIndex = state.messages.indexWhere(
       (m) {
-        if (!m.id.startsWith('local-')) return false;
+        if (!m.id.startsWith('local-') && !m.id.startsWith('temp-')) return false;
         if (message.clientTempId != null &&
             (m.clientTempId == message.clientTempId ||
                 m.id == message.clientTempId)) {

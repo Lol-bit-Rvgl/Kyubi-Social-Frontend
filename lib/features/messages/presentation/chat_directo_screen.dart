@@ -418,6 +418,7 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
     setState(() {
       _replyingToMessage = null;
     });
+    _scrollToBottom();
     final ok = await ref
         .read(conversationChatProvider(widget.conversationId).notifier)
         .send(
@@ -1407,6 +1408,7 @@ class _ChatDirectoScreenState extends ConsumerState<ChatDirectoScreen> {
             isDeleted: message.isDeleted,
             isEdited: message.isEdited,
             editedAt: message.editedAt,
+            isSending: message.isSending,
             replyToId: message.replyToId,
             replyToName: replySenderName,
             replyToBody: replyBody,

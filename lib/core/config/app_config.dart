@@ -244,8 +244,8 @@ class AppConfig {
   /// `connectTimeout` corto (15 s): un timeout largo solo congelaba la UI
   /// esperando cold-starts de Render free-tier (30–50 s). El reintento con
   /// backoff del [ApiClient] cubre ese caso con feedback al usuario.
-  static const Duration connectTimeout = Duration(seconds: 15);
-  static const Duration receiveTimeout = Duration(seconds: 30);
+  static const Duration connectTimeout = Duration(seconds: 45);
+  static const Duration receiveTimeout = Duration(seconds: 45);
   static const Duration sendTimeout = Duration(seconds: 60);
 
   /// true si la app corre sin `--dart-define=API_BASE_URL` sobre Android

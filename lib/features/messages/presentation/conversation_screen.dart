@@ -456,6 +456,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             isDeleted: message.isDeleted,
             isEdited: message.isEdited,
             editedAt: message.editedAt,
+            isSending: message.isSending,
             replyToId: message.replyToId,
             replyToName: replySenderName,
             replyToBody: replyBody,
@@ -771,6 +772,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     setState(() {
       _replyingToMessage = null;
     });
+    _scrollToBottom();
     final ok = await ref
         .read(conversationChatProvider(widget.conversationId).notifier)
         .send(

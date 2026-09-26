@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../core/config/app_config.dart';
@@ -32,13 +33,57 @@ abstract class BaseSocket<TEvent> {
     this.reconnectionAttempts = 5,
     this.reconnectionDelay = 2000,
     this.reconnectionDelayMax = 10000,
-  });
+  }) {
+    _initLifecycle();
+  }
 
   final String serviceName;
   final List<String> transports;
   final int reconnectionAttempts;
   final int reconnectionDelay;
   final int reconnectionDelayMax;
+
+  Timer? _heartbeatTimer;
+  AppLifecycleListener? _lifecycleListener;
+
+  void _initLifecycle() {
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () {
+        if (_state != SocketState.connected &&
+            _state != SocketState.connecting) {
+          if (kDebugMode) {
+            debugPrint(
+              '[SOCKET][$serviceName] App reanudada en primer plano. Reconectando socket...',
+            );
+          }
+          ensureConnected();
+        }
+      },
+    );
+  }
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_socket != null && _state == SocketState.connected) {
+        if (_socket!.connected != true) {
+          if (kDebugMode) {
+            debugPrint(
+              '[SOCKET][$serviceName] Heartbeat: socket desconectado silenciosamente. Reconectando...',
+            );
+          }
+          ensureConnected();
+        } else {
+          _socket?.emit('ping');
+        }
+      }
+    });
+  }
+
+  void _stopHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+  }
 
   final StreamController<TEvent> _eventController =
       StreamController<TEvent>.broadcast();
@@ -188,18 +233,23 @@ abstract class BaseSocket<TEvent> {
     }
 
     try {
+      final opts = io.OptionBuilder()
+          .setTransports(transports)
+          .disableAutoConnect()
+          .setAuth({'token': token})
+          .setExtraHeaders({'Authorization': 'Bearer $token'})
+          .enableReconnection()
+          .setReconnectionAttempts(reconnectionAttempts)
+          .setReconnectionDelay(reconnectionDelay)
+          .setReconnectionDelayMax(reconnectionDelayMax)
+          .build();
+      opts['pingInterval'] = 10000;
+      opts['pingTimeout'] = 5000;
+      opts['timeout'] = 10000;
+
       _socket = io.io(
         AppConfig.apiBaseUrl,
-        io.OptionBuilder()
-            .setTransports(transports)
-            .disableAutoConnect()
-            .setAuth({'token': token})
-            .setExtraHeaders({'Authorization': 'Bearer $token'})
-            .enableReconnection()
-            .setReconnectionAttempts(reconnectionAttempts)
-            .setReconnectionDelay(reconnectionDelay)
-            .setReconnectionDelayMax(reconnectionDelayMax)
-            .build(),
+        opts,
       );
 
       _setupBaseListeners();
@@ -220,6 +270,7 @@ abstract class BaseSocket<TEvent> {
 
     s.onConnect((_) {
       _updateState(SocketState.connected);
+      _startHeartbeat();
       if (kDebugMode) {
         debugPrint('[SOCKET_STATUS][$serviceName] Conectado: ${s.id}');
       }
@@ -228,6 +279,7 @@ abstract class BaseSocket<TEvent> {
 
     s.onDisconnect((reason) {
       _updateState(SocketState.disconnected);
+      _stopHeartbeat();
       if (kDebugMode) {
         debugPrint('[SOCKET_STATUS][$serviceName] Desconectado: $reason');
       }
@@ -324,6 +376,7 @@ abstract class BaseSocket<TEvent> {
   /// Desconecta el socket y limpia los recursos de red sin cerrar el stream de
   /// eventos (permite reutilizar la instancia tras un nuevo login).
   void disconnect() {
+    _stopHeartbeat();
     final s = _socket;
     if (s != null) {
       s.dispose();
@@ -335,6 +388,9 @@ abstract class BaseSocket<TEvent> {
 
   /// Libera el socket y cierra definitivamente los controladores de streams.
   void dispose() {
+    _stopHeartbeat();
+    _lifecycleListener?.dispose();
+    _lifecycleListener = null;
     disconnect();
     if (!_eventController.isClosed) {
       _eventController.close();

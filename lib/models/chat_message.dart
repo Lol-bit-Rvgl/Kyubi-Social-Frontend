@@ -32,6 +32,10 @@ abstract class Message with _$Message {
 
   bool get isDeleted => deletedAt != null && deletedAt!.isNotEmpty;
   bool get isEdited => editedAt != null;
+  String get status =>
+      (extensions?['status'] as String?) ??
+      (id.startsWith('temp-') || id.startsWith('local-') ? 'sending' : 'sent');
+  bool get isSending => status == 'sending';
 
   factory Message.fromJson(Map<String, dynamic> json) =>
       _$MessageFromJson(<String, dynamic>{

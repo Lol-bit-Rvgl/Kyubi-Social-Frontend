@@ -112,12 +112,19 @@ class ApiClient {
           if (isIdempotent &&
               retryCount < _maxRetries &&
               (isServerStarting ||
-                  error.type == DioExceptionType.connectionTimeout)) {
+                  error.type == DioExceptionType.connectionTimeout ||
+                  error.type == DioExceptionType.receiveTimeout)) {
             final opts = error.requestOptions;
             opts.extra['__kyubi_retry_count'] = retryCount + 1;
             // Backoff exponencial: 1s → 2s.
+            final delaySecs = 1 << retryCount;
+            if (kDebugMode) {
+              debugPrint(
+                '[API] Cold start / timeout (${error.type}) detectado en ${opts.path}. Reintentando ${retryCount + 1}/$_maxRetries en ${delaySecs}s...',
+              );
+            }
             await Future<void>.delayed(
-              Duration(seconds: 1 << retryCount),
+              Duration(seconds: delaySecs),
             );
             try {
               final res = await _retry(opts);

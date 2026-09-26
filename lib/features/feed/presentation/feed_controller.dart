@@ -1,5 +1,8 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/storage/session_store.dart';
 import '../../../models/post.dart';
 import '../../../models/room.dart';
 import '../../../repositories/post_repository.dart';
@@ -18,6 +21,7 @@ class FeedState {
     this.error,
     this.nextCursor,
     this.hasMore = false,
+    this.isServerWakingUp = false,
   });
 
   final List<Post> posts;
@@ -29,6 +33,7 @@ class FeedState {
   final String? error;
   final String? nextCursor;
   final bool hasMore;
+  final bool isServerWakingUp;
 
   FeedState copyWith({
     List<Post>? posts,
@@ -40,6 +45,7 @@ class FeedState {
     String? error,
     String? nextCursor,
     bool? hasMore,
+    bool? isServerWakingUp,
   }) {
     return FeedState(
       posts: posts ?? this.posts,
@@ -51,6 +57,7 @@ class FeedState {
       error: error ?? this.error,
       nextCursor: nextCursor ?? this.nextCursor,
       hasMore: hasMore ?? this.hasMore,
+      isServerWakingUp: isServerWakingUp ?? this.isServerWakingUp,
     );
   }
 }
@@ -64,14 +71,38 @@ class FeedNotifier extends Notifier<FeedState> {
   @override
   FeedState build() {
     ref.onDispose(() => _disposed = true);
-    Future.microtask(_load);
+    Future.microtask(_initCacheAndLoad);
     return const FeedState();
+  }
+
+  Future<void> _initCacheAndLoad() async {
+    if (_disposed) return;
+    // 1. Hidratar caché de inmediato (Cache-First)
+    try {
+      final cachedJson = await FeedCache.read(category: state.category);
+      if (cachedJson.isNotEmpty && !_disposed && state.posts.isEmpty) {
+        final cachedPosts = cachedJson.map(Post.fromJson).toList();
+        state = state.copyWith(
+          posts: cachedPosts,
+          loading: false,
+          refreshing: true,
+        );
+      }
+    } catch (_) {}
+
+    // 2. Sincronizar datos frescos en segundo plano
+    await _load();
   }
 
   Future<void> _load() async {
     if (_disposed) return;
-    if (state.loading || state.refreshing) return;
-    state = state.copyWith(loading: true, error: null);
+    final hasPosts = state.posts.isNotEmpty;
+    state = state.copyWith(
+      loading: !hasPosts,
+      refreshing: hasPosts,
+      error: null,
+      isServerWakingUp: false,
+    );
     try {
       final feedFuture = _repo.getFeed(
         category: state.category,
@@ -92,10 +123,37 @@ class FeedNotifier extends Notifier<FeedState> {
         nextCursor: page.nextCursor,
         hasMore: page.nextCursor != null,
         loading: false,
+        refreshing: false,
+        isServerWakingUp: false,
+        error: null,
       );
+      unawaited(FeedCache.save(page.posts, category: state.category));
     } catch (e) {
       if (_disposed) return;
-      state = state.copyWith(loading: false, error: e.toString());
+      final errStr = e.toString().toLowerCase();
+      final isTimeoutOrColdStart = errStr.contains('timeout') ||
+          errStr.contains('iniciando') ||
+          errStr.contains('reintentando') ||
+          errStr.contains('502') ||
+          errStr.contains('503') ||
+          errStr.contains('504');
+
+      if (state.posts.isNotEmpty) {
+        // Tolerancia a cold start: MANTENER los posts cacheados visibles
+        state = state.copyWith(
+          loading: false,
+          refreshing: false,
+          isServerWakingUp: isTimeoutOrColdStart,
+          error: isTimeoutOrColdStart ? null : e.toString(),
+        );
+      } else {
+        state = state.copyWith(
+          loading: false,
+          refreshing: false,
+          isServerWakingUp: isTimeoutOrColdStart,
+          error: e.toString(),
+        );
+      }
     }
   }
 
@@ -122,10 +180,33 @@ class FeedNotifier extends Notifier<FeedState> {
         nextCursor: page.nextCursor,
         hasMore: page.nextCursor != null,
         refreshing: false,
+        isServerWakingUp: false,
+        error: null,
       );
+      unawaited(FeedCache.save(page.posts, category: state.category));
     } catch (e) {
       if (_disposed) return;
-      state = state.copyWith(refreshing: false, error: e.toString());
+      final errStr = e.toString().toLowerCase();
+      final isTimeoutOrColdStart = errStr.contains('timeout') ||
+          errStr.contains('iniciando') ||
+          errStr.contains('reintentando') ||
+          errStr.contains('502') ||
+          errStr.contains('503') ||
+          errStr.contains('504');
+
+      if (state.posts.isNotEmpty) {
+        state = state.copyWith(
+          refreshing: false,
+          isServerWakingUp: isTimeoutOrColdStart,
+          error: isTimeoutOrColdStart ? null : e.toString(),
+        );
+      } else {
+        state = state.copyWith(
+          refreshing: false,
+          isServerWakingUp: isTimeoutOrColdStart,
+          error: e.toString(),
+        );
+      }
     }
   }
 
@@ -157,7 +238,7 @@ class FeedNotifier extends Notifier<FeedState> {
   Future<void> switchCategory(String category) async {
     if (state.category == category) return;
     state = FeedState(category: category);
-    await _load();
+    await _initCacheAndLoad();
   }
 
   /// Aplica cambios locales a un post tras una reacción.

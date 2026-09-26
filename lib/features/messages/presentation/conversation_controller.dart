@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/chat_conversation.dart';
@@ -231,8 +233,11 @@ class ConversationChatNotifier
     }
     final currentUser = ref.read(authControllerProvider).user;
     final myId = currentUser?.id ?? '';
+    final tempId = 'temp-${DateTime.now().millisecondsSinceEpoch}';
     final combinedExt = <String, dynamic>{
       ...?extensions,
+      'status': 'sending',
+      'tempId': tempId,
       'poll': ?poll,
       'stickerId': ?stickerId,
       'stickerUrl': ?stickerUrl,
@@ -248,7 +253,7 @@ class ConversationChatNotifier
             ? currentUser!.username
             : 'Tú');
     final optimistic = Message(
-      id: 'local-${DateTime.now().microsecondsSinceEpoch}',
+      id: tempId,
       conversationId: _conversationId,
       senderId: myId,
       sender: ChatAuthor(
@@ -261,17 +266,21 @@ class ConversationChatNotifier
       mediaUrl: effectiveMediaUrl,
       mediaType: mediaType ?? (effectiveMediaUrl != null ? 'image' : null),
       replyToId: replyToId,
-      extensions: combinedExt.isNotEmpty ? combinedExt : null,
+      extensions: combinedExt,
       createdAt: DateTime.now().toUtc(),
     );
+
+    // Frame 0: Inserción 100% síncrona en la lista local
     state = state.copyWith(
       messages: [...state.messages, optimistic],
-      sending: true,
+      sending: false,
     );
-    try {
-      final sent = await _repo.sendMessage(
-        _conversationId,
-        body: text,
+
+    // Sincronización asíncrona sin bloquear la UI ni esperar await
+    unawaited(
+      _dispatchAsyncSend(
+        optimistic: optimistic,
+        text: text,
         type: type,
         mediaUrl: mediaUrl,
         mediaType: mediaType ?? (effectiveMediaUrl != null ? 'image' : null),
@@ -279,21 +288,61 @@ class ConversationChatNotifier
         stickerId: stickerId,
         poll: poll,
         replyToId: replyToId,
+        combinedExt: combinedExt,
+      ),
+    );
+
+    return true;
+  }
+
+  Future<void> _dispatchAsyncSend({
+    required Message optimistic,
+    required String text,
+    String? type,
+    String? mediaUrl,
+    String? mediaType,
+    String? stickerUrl,
+    String? stickerId,
+    Map<String, dynamic>? poll,
+    String? replyToId,
+    required Map<String, dynamic> combinedExt,
+  }) async {
+    try {
+      final sent = await _repo.sendMessage(
+        _conversationId,
+        body: text,
+        type: type,
+        mediaUrl: mediaUrl,
+        mediaType: mediaType,
+        stickerUrl: stickerUrl,
+        stickerId: stickerId,
+        poll: poll,
+        replyToId: replyToId,
         extensions: combinedExt.isNotEmpty ? combinedExt : null,
       );
-      if (_disposed) return true;
-      state = state.copyWith(
-        messages: [
-          ...state.messages.where(
-            (m) => m.id != optimistic.id && m.id != sent.id,
-          ),
-          sent,
-        ],
-        sending: false,
+      if (_disposed) return;
+
+      // Reemplazo en el mismo índice del tempId por el mensaje confirmado con status 'sent'
+      final idx = state.messages.indexWhere(
+        (m) => m.id == optimistic.id || m.id == sent.id,
       );
+      final sentWithStatus = sent.copyWith(
+        extensions: {
+          ...?sent.extensions,
+          'status': 'sent',
+        },
+      );
+      if (idx >= 0) {
+        final updated = [...state.messages];
+        updated[idx] = sentWithStatus;
+        state = state.copyWith(messages: updated);
+      } else {
+        state = state.copyWith(messages: [...state.messages, sentWithStatus]);
+      }
+
       if (state.conversation != null) {
         final updatedConv = state.conversation!.copyWith(
-          lastMessage: sent,
+          lastMessage: sentWithStatus,
           updatedAt: sent.createdAt,
         );
         state = state.copyWith(conversation: updatedConv);
@@ -304,24 +353,32 @@ class ConversationChatNotifier
       try {
         await _markRead();
       } catch (_) {}
-      return true;
     } catch (_) {
       if (!_disposed) {
-        state = state.copyWith(
-          messages: state.messages.where((m) => m.id != optimistic.id).toList(),
-          sending: false,
-        );
-      }
-      return false;
-    } finally {
-      if (!_disposed && state.sending) {
-        state = state.copyWith(sending: false);
+        // En caso de error, marcar el mensaje con error para permitir reintento o retirarlo
+        final idx = state.messages.indexWhere((m) => m.id == optimistic.id);
+        if (idx >= 0) {
+          final updated = [...state.messages];
+          updated[idx] = optimistic.copyWith(
+            extensions: {
+              ...?optimistic.extensions,
+              'status': 'error',
+            },
+          );
+          state = state.copyWith(messages: updated);
+        }
       }
     }
   }
 
   void _addIncoming(Map<String, dynamic> payload) {
-    final message = Message.fromJson(payload);
+    final rawMessage = Message.fromJson(payload);
+    final message = rawMessage.copyWith(
+      extensions: {
+        ...?rawMessage.extensions,
+        'status': 'sent',
+      },
+    );
     final existing = state.messages.indexWhere((m) => m.id == message.id);
     if (existing >= 0) {
       final updated = [...state.messages];
@@ -334,9 +391,10 @@ class ConversationChatNotifier
     }
     final localIndex = state.messages.indexWhere(
       (m) =>
-          m.id.startsWith('local-') &&
+          (m.id.startsWith('temp-') || m.id.startsWith('local-')) &&
           m.senderId == message.senderId &&
-          m.body == message.body,
+          (m.body.trim() == message.body.trim() ||
+              (message.mediaUrl != null && m.mediaUrl == message.mediaUrl)),
     );
     if (localIndex >= 0) {
       final updated = [...state.messages];

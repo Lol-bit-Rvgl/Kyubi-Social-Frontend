@@ -43,7 +43,12 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       return ColoredBox(
         color: Colors.transparent,
         child: SafeArea(
-          child: ErrorView(message: feed.error!, onRetry: notifier.refresh),
+          child: ErrorView(
+            message: feed.isServerWakingUp
+                ? 'El servidor está iniciando en Render, reintentando automáticamente...'
+                : feed.error!,
+            onRetry: notifier.refresh,
+          ),
         ),
       );
     }
@@ -67,6 +72,10 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 slivers: [
                   // 1. Cabecera superior (Avatar + Notificaciones)
                   const HeaderProfile(),
+
+                  // Banner discreto cuando el servidor en Render está iniciando
+                  if (feed.isServerWakingUp)
+                    _buildColdStartBanner(context, notifier.refresh),
 
                   // 2. Buscador horizontal
                   _buildSearchBar(context),
@@ -138,7 +147,86 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     );
   }
 
-  // ── 4. Tarjetas Duales de Acción Rápida ──────────────────────────────────
+  Widget _buildColdStartBanner(BuildContext context, VoidCallback onRetry) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(AppDimens.md, 0, AppDimens.md, 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1724).withValues(alpha: 0.95),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFFFFA726).withValues(alpha: 0.45),
+              width: 0.9,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFFA726).withValues(alpha: 0.12),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFFFFA726),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Despertando servidor en Render... Mostrando publicaciones locales.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFFFCC80),
+                    height: 1.3,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onRetry,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFA726).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.refresh_rounded,
+                        size: 14,
+                        color: Color(0xFFFFA726),
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Reintentar',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFFFA726),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   // ── 2. Barra de búsqueda horizontal ──────────────────────────────────────
 
